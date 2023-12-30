@@ -1,6 +1,7 @@
 module TokenType : sig
   type t =
     | Eof
+    | Identifier
     | LParen
     | RParen
     | StringLiteral

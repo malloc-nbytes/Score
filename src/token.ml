@@ -1,6 +1,7 @@
 module TokenType = struct
   type t =
     | Eof
+    | Identifier
     | LParen
     | RParen
     | StringLiteral
@@ -26,6 +27,7 @@ module TokenType = struct
 
   let to_string = function
     | Eof -> "Eof"
+    | Identifier -> "Identifier"
     | LParen -> "LParen"
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"

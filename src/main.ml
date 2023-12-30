@@ -10,6 +10,7 @@ let populate_symbols () =
   let _ = Hashtbl.add symbols "+" TokenType.Plus in
   let _ = Hashtbl.add symbols ";" TokenType.Semicolon in
   let _ = Hashtbl.add symbols "::" TokenType.DoubleColon in
+  let _ = Hashtbl.add symbols ":" TokenType.Colon in
   let _ = Hashtbl.add symbols "->" TokenType.RightArrow in
   ()
 ;;
@@ -21,20 +22,24 @@ let populate_keywords () =
   let _ = Hashtbl.add keywords "i32" TokenType.I32 in
   let _ = Hashtbl.add keywords "void" TokenType.Void in
   ()
+;;
 
 let err msg =
   let _ = Printf.printf "[Lexer ERR]: %s\n" msg in
   exit 1
+;;
 
 let is_symbol c =
   match Hashtbl.find_opt symbols c with
   | Some t -> Some t
   | None -> None
+;;
 
 let is_keyword s =
   match Hashtbl.find_opt keywords s with
   | Some t -> Some t
   | None -> None
+;;
 
 let isalpha c =
   let c = int_of_char c in
@@ -61,6 +66,12 @@ let consume_while lst predicate =
   aux lst ""
 ;;
 
+let eat lst =
+  match lst with
+  | [] -> None, []
+  | hd :: tl -> Some hd, tl
+;;
+
 let peek lst ahead =
   let rec peek' lst i =
     match lst with
@@ -68,7 +79,7 @@ let peek lst ahead =
     | hd :: _ when i = ahead -> Some hd
     | _ :: tl -> peek' tl (i+1)
   in
-  peek' lst 0
+  peek' lst 1
 ;;
 
 let lex_file src =
@@ -77,8 +88,20 @@ let lex_file src =
     | [] -> [Token.{value = "Eof"; ttype = Eof}]
     | hd :: tl when hd = '\n' -> lex_file' (r+1) 1 tl
     | hd :: tl when isignorable hd -> lex_file' r (c+1) tl
-    | hd :: tl -> failwith "todo"
-    | _ -> err @@ Printf.sprintf "Unexpected character at line: %d char: %d" r c
+    | hd :: tl when hd = ':' ->
+      (match peek tl 1 with
+       | Some ':' ->
+          let _, tl' = eat tl in
+          Token.{value = "::"; ttype = TokenType.DoubleColon} :: lex_file' r (c+2) tl'
+       | _ -> Token.{value = ":"; ttype = TokenType.Colon} :: lex_file' r (c+1) tl)
+    | hd :: tl when hd = '"' ->
+      let (s, tl') = consume_while tl (fun c -> c <> '"') in
+      Token.{value = s; ttype = TokenType.StringLiteral} :: lex_file' r (c+1) (List.tl tl')
+    | hd :: tl when isnum hd ->
+      let (s, tl') = consume_while tl isnum in
+      let s = String.make 1 hd ^ s in
+      Token.{value = s; ttype = TokenType.IntegerLiteral} :: lex_file' r (c+1) tl'
+    | hd :: tl -> failwith "unimplemented"
   in
   lex_file' 1 1 (src |> String.to_seq |> List.of_seq)
 ;;
@@ -96,9 +119,12 @@ let rec print_tokens tokens =
   | hd :: tl ->
     print_endline (Token.to_string hd);
     print_tokens tl
+;;
 
 let filepath = "./input.txt"
 let () =
+  let _ = populate_symbols () in
+  let _ = populate_keywords () in
   let data = file_to_str filepath in
   let tokens = lex_file data in
   print_tokens tokens
