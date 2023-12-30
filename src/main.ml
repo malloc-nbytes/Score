@@ -1,7 +1,40 @@
 open Token
 
-let symbols : (char, TokenType.t) Hashtbl.t = Hashtbl.create 15
+let symbols : (string, TokenType.t) Hashtbl.t = Hashtbl.create 15
 let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 20
+
+let populate_symbols () =
+  let _ = Hashtbl.add symbols "{" TokenType.LBrace in
+  let _ = Hashtbl.add symbols "}" TokenType.RBrace in
+  let _ = Hashtbl.add symbols "=" TokenType.Equals in
+  let _ = Hashtbl.add symbols "+" TokenType.Plus in
+  let _ = Hashtbl.add symbols ";" TokenType.Semicolon in
+  let _ = Hashtbl.add symbols "::" TokenType.DoubleColon in
+  let _ = Hashtbl.add symbols "->" TokenType.RightArrow in
+  ()
+;;
+
+let populate_keywords () =
+  let _ = Hashtbl.add keywords "def" TokenType.Def in
+  let _ = Hashtbl.add keywords "ret" TokenType.Ret in
+  let _ = Hashtbl.add keywords "let" TokenType.Let in
+  let _ = Hashtbl.add keywords "i32" TokenType.I32 in
+  let _ = Hashtbl.add keywords "void" TokenType.Void in
+  ()
+
+let err msg =
+  let _ = Printf.printf "[Lexer ERR]: %s\n" msg in
+  exit 1
+
+let is_symbol c =
+  match Hashtbl.find_opt symbols c with
+  | Some t -> Some t
+  | None -> None
+
+let is_keyword s =
+  match Hashtbl.find_opt keywords s with
+  | Some t -> Some t
+  | None -> None
 
 let isalpha c =
   let c = int_of_char c in
@@ -39,14 +72,15 @@ let peek lst ahead =
 ;;
 
 let lex_file src =
-  let rec lex_file' r c t lst =
+  let rec lex_file' r c lst =
     match lst with
-    | [] -> t @ [Token.{value = "EOF"; ttype = Eof}]
-    | hd :: tl when hd = '\n' -> lex_file' (r+1) 0 t tl
-    | hd :: tl when isignorable hd -> lex_file' r (c+1) t tl
-    | _ -> failwith "unimplemented"
+    | [] -> [Token.{value = "Eof"; ttype = Eof}]
+    | hd :: tl when hd = '\n' -> lex_file' (r+1) 1 tl
+    | hd :: tl when isignorable hd -> lex_file' r (c+1) tl
+    | hd :: tl -> failwith "todo"
+    | _ -> err @@ Printf.sprintf "Unexpected character at line: %d char: %d" r c
   in
-  lex_file' 0 0 [] (src |> String.to_seq |> List.of_seq)
+  lex_file' 1 1 (src |> String.to_seq |> List.of_seq)
 ;;
 
 let file_to_str filename =

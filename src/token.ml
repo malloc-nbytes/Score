@@ -5,8 +5,24 @@ module TokenType = struct
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Keyword
     | Binop
+    | LBrace
+    | RBrace
+    | Equals
+    | Semicolon
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+    | DoubleColon
+    | Colon
+    | RightArrow
+    (* Keywords *)
+    | Def
+    | Let
+    | Ret
+    | Void
+    | I32
 
   let to_string = function
     | Eof -> "Eof"
@@ -14,8 +30,23 @@ module TokenType = struct
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
     | IntegerLiteral -> "IntegerLiteral"
-    | Keyword -> "Keyword"
     | Binop -> "Binop"
+    | LBrace -> "LBrace"
+    | RBrace -> "RBrace"
+    | Equals -> "Equals"
+    | Semicolon -> "Semicolon"
+    | Plus -> "Plus"
+    | Minus -> "Minus"
+    | Asterisk -> "Asterisk"
+    | ForwardSlash -> "ForwardSlash"
+    | DoubleColon -> "DoubleColon"
+    | Colon -> "Colon"
+    | RightArrow -> "RightArrow"
+    | Def -> "Def"
+    | Let -> "Let"
+    | Ret -> "Ret"
+    | Void -> "Void"
+    | I32 -> "I32"
 end
 
 module Token = struct

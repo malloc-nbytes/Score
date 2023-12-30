@@ -5,8 +5,24 @@ module TokenType : sig
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Keyword
     | Binop
+    | LBrace
+    | RBrace
+    | Equals
+    | Semicolon
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+    | DoubleColon
+    | Colon
+    | RightArrow
+    (* Keywords *)
+    | Def
+    | Let
+    | Ret
+    | Void
+    | I32
 
   val to_string : t -> string
 end
