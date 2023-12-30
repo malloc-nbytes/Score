@@ -10,6 +10,7 @@
 
 main
 input.txt
+input.bak
 
 # ocamlbuild working directory
 _build/
