@@ -18,6 +18,7 @@ module TokenType : sig
     | DoubleColon
     | Colon
     | RightArrow
+    | Comment
     (* Keywords *)
     | Def
     | Let

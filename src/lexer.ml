@@ -102,7 +102,28 @@ module Lexer = struct
         let (s, tl') = consume_while tl isnum in
         let s = String.make 1 hd ^ s in
         Token.{value = s; ttype = TokenType.IntegerLiteral} :: lex_file' r (c+1) tl'
-      | hd :: tl -> failwith "unimplemented"
+      | hd :: tl when hd = '+' -> Token.{value = "+"; ttype = TokenType.Plus} :: lex_file' r (c+1) tl
+      | hd :: tl when hd = '*' -> Token.{value = "*"; ttype = TokenType.Asterisk} :: lex_file' r (c+1) tl
+      | hd :: tl when hd = '-' ->
+        (match peek tl 1 with
+        | Some '>' ->
+            let _, tl' = eat tl in
+            Token.{value = "->"; ttype = TokenType.RightArrow} :: lex_file' r (c+2) tl'
+        | _ -> Token.{value = "-"; ttype = TokenType.Minus} :: lex_file' r (c+1) tl)
+      | hd :: tl when hd = '/' ->
+        (match peek tl 1 with
+        | Some '/' ->
+            let _, tl' = eat tl in
+            let (s, tl'') = consume_while tl' (fun c -> c <> '\n') in
+            Token.{value = s; ttype = TokenType.Comment} :: lex_file' r (c+1) tl''
+        | _ -> Token.{value = "/"; ttype = TokenType.ForwardSlash} :: lex_file' r (c+1) tl)
+      | hd :: tl when hd = ';' -> Token.{value = ";"; ttype = TokenType.Semicolon} :: lex_file' r (c+1) tl
+      | hd :: tl ->
+        let (s, tl') = consume_while tl (fun c -> isalnum c || c = '_') in
+        let s = String.make 1 hd ^ s in
+        (match is_keyword s with
+        | Some t -> Token.{value = s; ttype = t} :: lex_file' r (c + String.length s) tl'
+        | None -> Token.{value = s; ttype = TokenType.Identifier} :: lex_file' r (c + String.length s) tl')
     in
     let _ = populate_symbols () in
     let _ = populate_keywords () in

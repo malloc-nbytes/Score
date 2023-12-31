@@ -18,6 +18,7 @@ module TokenType = struct
     | DoubleColon
     | Colon
     | RightArrow
+    | Comment
     (* Keywords *)
     | Def
     | Let
@@ -44,6 +45,7 @@ module TokenType = struct
     | DoubleColon -> "DoubleColon"
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
+    | Comment -> "Comment"
     | Def -> "Def"
     | Let -> "Let"
     | Ret -> "Ret"
