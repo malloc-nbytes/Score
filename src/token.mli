@@ -15,6 +15,7 @@ module TokenType : sig
     | Minus
     | Asterisk
     | ForwardSlash
+    | DoubleEquals
     | DoubleColon
     | Colon
     | RightArrow

@@ -15,6 +15,7 @@ module TokenType = struct
     | Minus
     | Asterisk
     | ForwardSlash
+    | DoubleEquals
     | DoubleColon
     | Colon
     | RightArrow
@@ -42,6 +43,7 @@ module TokenType = struct
     | Minus -> "Minus"
     | Asterisk -> "Asterisk"
     | ForwardSlash -> "ForwardSlash"
+    | DoubleEquals -> "DoubleEquals"
     | DoubleColon -> "DoubleColon"
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
