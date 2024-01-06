@@ -1,5 +1,6 @@
 open Token
 open Lexer
+open Parser
 
 let file_to_str filename =
   let ch = open_in_bin filename in
@@ -12,5 +13,6 @@ let filepath = "./input.txt"
 let () =
   let data = file_to_str filepath in
   let tokens = Lexer.lex_file data in
+  let ast = Parser.parse_program tokens in
   Lexer.print_tokens tokens
 ;;
