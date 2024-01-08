@@ -2,7 +2,11 @@
 
 set -xe
 
-if [ "$1" == "clean" ];
+if [ "$1" == "switch" ]
+then
+    opam switch 5.0.0
+    eval $(opam env)
+elif [ "$1" == "clean" ]
 then
     rm *.cmo *.cmi main
 else
