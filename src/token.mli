@@ -26,6 +26,8 @@ module TokenType : sig
     | Ret
     | Void
     | I32
+    (* Other *)
+    | Type
 
   val to_string : t -> string
 end

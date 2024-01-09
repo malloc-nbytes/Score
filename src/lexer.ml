@@ -7,7 +7,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "def" TokenType.Def in
     let _ = Hashtbl.add keywords "ret" TokenType.Ret in
     let _ = Hashtbl.add keywords "let" TokenType.Let in
-    let _ = Hashtbl.add keywords "i32" TokenType.I32 in
+    let _ = Hashtbl.add keywords "i32" TokenType.Type in
     let _ = Hashtbl.add keywords "void" TokenType.Void in
     ()
   ;;
@@ -76,27 +76,21 @@ module Lexer = struct
              let _, tl' = eat tl in
              Token.{value = "::"; ttype = TokenType.DoubleColon} :: lex_file' r (c+2) tl'
           | _ -> Token.{value = ":"; ttype = TokenType.Colon} :: lex_file' r (c+1) tl)
-
       | hd :: tl when hd = '"' ->
          let (s, tl') = consume_while tl (fun c -> c <> '"') in
          Token.{value = s; ttype = TokenType.StringLiteral} :: lex_file' r (c+1) (List.tl tl')
-
       | hd :: tl when isnum hd ->
          let (s, tl') = consume_while tl isnum in
          let s = String.make 1 hd ^ s in
          Token.{value = s; ttype = TokenType.IntegerLiteral} :: lex_file' r (c+1) tl'
-
       | hd :: tl when hd = '+' -> Token.{value = "+"; ttype = TokenType.Plus} :: lex_file' r (c+1) tl
-
       | hd :: tl when hd = '*' -> Token.{value = "*"; ttype = TokenType.Asterisk} :: lex_file' r (c+1) tl
-
       | hd :: tl when hd = '-' ->
          (match peek tl 1 with
           | Some '>' ->
              let _, tl' = eat tl in
              Token.{value = "->"; ttype = TokenType.RightArrow} :: lex_file' r (c+2) tl'
           | _ -> Token.{value = "-"; ttype = TokenType.Minus} :: lex_file' r (c+1) tl)
-
       | hd :: tl when hd = '/' ->
          (match peek tl 1 with
           | Some '/' ->
@@ -104,7 +98,6 @@ module Lexer = struct
              let (s, tl'') = consume_while tl' (fun c -> c <> '\n') in
              Token.{value = s; ttype = TokenType.Comment} :: lex_file' r (c+1) tl''
           | _ -> Token.{value = "/"; ttype = TokenType.ForwardSlash} :: lex_file' r (c+1) tl)
-
       | hd :: tl when hd = '=' ->
          (match peek tl 1 with
           | Some '=' ->
@@ -112,11 +105,8 @@ module Lexer = struct
              Token.{value = "=="; ttype = TokenType.DoubleEquals} :: lex_file' r (c+2) tl'
           | _ -> Token.{value = "="; ttype = TokenType.Equals} :: lex_file' r (c+1) tl)
       | hd :: tl when hd = ';' -> Token.{value = ";"; ttype = TokenType.Semicolon} :: lex_file' r (c+1) tl
-
       | hd :: tl when hd = '{' -> Token.{value = "{"; ttype = TokenType.LBrace} :: lex_file' r (c+1) tl
-
       | hd :: tl when hd = '}' -> Token.{value = "}"; ttype = TokenType.RBrace} :: lex_file' r (c+1) tl
-
       | hd :: tl ->
          let (s, tl') = consume_while tl (fun c -> isalnum c || c = '_') in
          let s = String.make 1 hd ^ s in

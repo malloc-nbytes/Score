@@ -26,6 +26,8 @@ module TokenType = struct
     | Ret
     | Void
     | I32
+    (* Other *)
+    | Type
 
   let to_string = function
     | Eof -> "Eof"
@@ -53,6 +55,7 @@ module TokenType = struct
     | Ret -> "Ret"
     | Void -> "Void"
     | I32 -> "I32"
+    | Type -> "Type"
 end
 
 module Token = struct
