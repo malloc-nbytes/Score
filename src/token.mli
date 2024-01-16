@@ -5,6 +5,16 @@ module TokenType : sig
     | Asterisk
     | ForwardSlash
 
+  type vartype =
+    | I32
+    | Str
+    | Void
+
+  type keyword =
+    | Def
+    | Let
+    | Ret
+
   type t =
     | Eof
     | Identifier
@@ -22,14 +32,8 @@ module TokenType : sig
     | Colon
     | RightArrow
     | Comment
-    (* Keywords *)
-    | Def
-    | Let
-    | Ret
-    | Void
-    | I32
-    (* Other *)
-    | Type
+    | Keyword of keyword
+    | Type of vartype
 
   val to_string : t -> string
 end

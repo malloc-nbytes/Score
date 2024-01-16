@@ -5,6 +5,16 @@ module TokenType = struct
     | Asterisk
     | ForwardSlash
 
+  type vartype =
+    | I32
+    | Str
+    | Void
+
+  type keyword =
+    | Def
+    | Let
+    | Ret
+
   type t =
     | Eof
     | Identifier
@@ -22,14 +32,8 @@ module TokenType = struct
     | Colon
     | RightArrow
     | Comment
-    (* Keywords *)
-    | Def
-    | Let
-    | Ret
-    | Void
-    | I32
-    (* Other *)
-    | Type
+    | Keyword of keyword
+    | Type of vartype
 
   let to_string = function
     | Eof -> "Eof"
@@ -38,7 +42,7 @@ module TokenType = struct
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
     | IntegerLiteral -> "IntegerLiteral"
-    | Binop binop -> "Binop"
+    | Binop _ -> "Binop"
     | LBrace -> "LBrace"
     | RBrace -> "RBrace"
     | Equals -> "Equals"
@@ -48,12 +52,8 @@ module TokenType = struct
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
-    | Def -> "Def"
-    | Let -> "Let"
-    | Ret -> "Ret"
-    | Void -> "Void"
-    | I32 -> "I32"
-    | Type -> "Type"
+    | Type _ -> "type"
+    | Keyword _ -> "keyword"
 
 end
 
@@ -66,5 +66,5 @@ module Token = struct
     }
 
   let to_string token =
-    Printf.sprintf "%s: %s" (TokenType.to_string token.ttype) token.value
+    Printf.sprintf "%s: %s (r: %d, c: %d)" (TokenType.to_string token.ttype) token.value token.r token.c
 end

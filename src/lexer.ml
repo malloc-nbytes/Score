@@ -4,11 +4,11 @@ module Lexer = struct
   let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 20
 
   let populate_keywords () =
-    let _ = Hashtbl.add keywords "def" TokenType.Def in
-    let _ = Hashtbl.add keywords "ret" TokenType.Ret in
-    let _ = Hashtbl.add keywords "let" TokenType.Let in
-    let _ = Hashtbl.add keywords "i32" TokenType.Type in
-    let _ = Hashtbl.add keywords "void" TokenType.Void in
+    let _ = Hashtbl.add keywords "def" (Keyword TokenType.Def) in
+    let _ = Hashtbl.add keywords "ret" (Keyword TokenType.Ret) in
+    let _ = Hashtbl.add keywords "let" (Keyword TokenType.Let) in
+    let _ = Hashtbl.add keywords "i32" (Type TokenType.I32) in
+    let _ = Hashtbl.add keywords "void" (Type TokenType.Void) in
     ()
   ;;
 
@@ -62,11 +62,19 @@ module Lexer = struct
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '(' :: tl        -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
     | ')' :: tl        -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
+    | '{' :: tl        -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
+    | '}' :: tl        -> [Token.{value = "}"; ttype = RBrace; r; c}] @ lex_file tl r (c+1)
     | ';' :: tl        -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
     | '+' :: tl        -> [Token.{value = "+"; ttype = Binop TokenType.Plus; r; c}] @ lex_file tl r (c+1)
     | '-' :: tl        -> [Token.{value = "-"; ttype = Binop TokenType.Minus; r; c}] @ lex_file tl r (c+1)
     | '*' :: tl        -> [Token.{value = "*"; ttype = Binop TokenType.Asterisk; r; c}] @ lex_file tl r (c+1)
     | '/' :: tl        -> [Token.{value = "/"; ttype = Binop TokenType.ForwardSlash; r; c}] @ lex_file tl r (c+1)
+    | '0'..'9' :: tl   -> let intlit, rest = consume_while tl (fun c -> isnum c) in
+                          [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
+                          @ lex_file rest r (c+String.length intlit)
+    | hd :: tl         -> let identifier, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+                          [Token.{value = identifier; ttype = Identifier; r; c = c+(String.length identifier)}]
+                          @ lex_file rest r (c+String.length identifier)
     | hd :: _          -> failwith @@ Printf.sprintf "unsupported token: %c" hd
 
   let rec print_tokens tokens =
