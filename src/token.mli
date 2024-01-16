@@ -1,4 +1,10 @@
 module TokenType : sig
+  type binop =
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+
   type t =
     | Eof
     | Identifier
@@ -6,15 +12,11 @@ module TokenType : sig
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop
+    | Binop of binop
     | LBrace
     | RBrace
     | Equals
     | Semicolon
-    | Plus
-    | Minus
-    | Asterisk
-    | ForwardSlash
     | DoubleEquals
     | DoubleColon
     | Colon
@@ -36,6 +38,8 @@ module Token : sig
   type t =
     { value : string
     ; ttype : TokenType.t
+    ; r : int
+    ; c : int
     }
 
   val to_string : t -> string

@@ -36,9 +36,7 @@ module Lexer = struct
 
   let isalnum c = isalpha c || isnum c ;;
 
-  let isignorable c = c = ' ' || c = '\t' ;;
-
-  let consume_while lst predicate =
+  let consume_while (lst : char list) (predicate : char -> bool) : string * char list =
     let rec aux lst acc =
       match lst with
       | [] -> acc, []
@@ -48,75 +46,28 @@ module Lexer = struct
     aux lst ""
   ;;
 
-  let eat lst =
-    match lst with
-    | [] -> None, []
-    | hd :: tl -> Some hd, tl
-  ;;
-
-  let peek lst ahead =
-    let rec peek' lst i =
-      match lst with
-      | [] -> None
-      | hd :: _ when i = ahead -> Some hd
-      | _ :: tl -> peek' tl (i+1)
-    in
-    peek' lst 1
-  ;;
-
-  let lex_file src =
-    let rec lex_file' r c lst =
-      match lst with
-      | [] -> [Token.{value = "Eof"; ttype = Eof}]
-      | hd :: tl when hd = '\n' -> lex_file' (r+1) 1 tl
-      | hd :: tl when isignorable hd -> lex_file' r (c+1) tl
-      | hd :: tl when hd = ':' ->
-         (match peek tl 1 with
-          | Some ':' ->
-             let _, tl' = eat tl in
-             Token.{value = "::"; ttype = TokenType.DoubleColon} :: lex_file' r (c+2) tl'
-          | _ -> Token.{value = ":"; ttype = TokenType.Colon} :: lex_file' r (c+1) tl)
-      | hd :: tl when hd = '"' ->
-         let (s, tl') = consume_while tl (fun c -> c <> '"') in
-         Token.{value = s; ttype = TokenType.StringLiteral} :: lex_file' r (c+1) (List.tl tl')
-      | hd :: tl when isnum hd ->
-         let (s, tl') = consume_while tl isnum in
-         let s = String.make 1 hd ^ s in
-         Token.{value = s; ttype = TokenType.IntegerLiteral} :: lex_file' r (c+1) tl'
-      | hd :: tl when hd = '+' -> Token.{value = "+"; ttype = TokenType.Plus} :: lex_file' r (c+1) tl
-      | hd :: tl when hd = '*' -> Token.{value = "*"; ttype = TokenType.Asterisk} :: lex_file' r (c+1) tl
-      | hd :: tl when hd = '-' ->
-         (match peek tl 1 with
-          | Some '>' ->
-             let _, tl' = eat tl in
-             Token.{value = "->"; ttype = TokenType.RightArrow} :: lex_file' r (c+2) tl'
-          | _ -> Token.{value = "-"; ttype = TokenType.Minus} :: lex_file' r (c+1) tl)
-      | hd :: tl when hd = '/' ->
-         (match peek tl 1 with
-          | Some '/' ->
-             let _, tl' = eat tl in
-             let (s, tl'') = consume_while tl' (fun c -> c <> '\n') in
-             Token.{value = s; ttype = TokenType.Comment} :: lex_file' r (c+1) tl''
-          | _ -> Token.{value = "/"; ttype = TokenType.ForwardSlash} :: lex_file' r (c+1) tl)
-      | hd :: tl when hd = '=' ->
-         (match peek tl 1 with
-          | Some '=' ->
-             let _, tl' = eat tl in
-             Token.{value = "=="; ttype = TokenType.DoubleEquals} :: lex_file' r (c+2) tl'
-          | _ -> Token.{value = "="; ttype = TokenType.Equals} :: lex_file' r (c+1) tl)
-      | hd :: tl when hd = ';' -> Token.{value = ";"; ttype = TokenType.Semicolon} :: lex_file' r (c+1) tl
-      | hd :: tl when hd = '{' -> Token.{value = "{"; ttype = TokenType.LBrace} :: lex_file' r (c+1) tl
-      | hd :: tl when hd = '}' -> Token.{value = "}"; ttype = TokenType.RBrace} :: lex_file' r (c+1) tl
-      | hd :: tl ->
-         let (s, tl') = consume_while tl (fun c -> isalnum c || c = '_') in
-         let s = String.make 1 hd ^ s in
-         (match is_keyword s with
-          | Some t -> Token.{value = s; ttype = t} :: lex_file' r (c + String.length s) tl'
-          | None -> Token.{value = s; ttype = TokenType.Identifier} :: lex_file' r (c + String.length s) tl')
-    in
-    let _ = populate_keywords () in
-    lex_file' 1 1 (src |> String.to_seq |> List.of_seq)
-  ;;
+  let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
+    match src with
+    | []               -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
+    | '\n' :: tl       -> lex_file tl r (c+1)
+    | '\t' :: tl       -> lex_file tl r (c+1)
+    | ' ' :: tl        -> lex_file tl r (c+1)
+    | '/' :: '/' :: tl -> let comment, rest = consume_while tl (fun c -> c = '\n') in
+                          [Token.{value = comment; ttype = Comment; r; c = c+2+(String.length comment)}]
+                          @ lex_file tl r (c+2+String.length comment)
+    | '"' :: tl        -> let strlit, rest = consume_while tl (fun c -> c = '"') in
+                          [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
+                          @ lex_file (List.tl tl) r (c+2+String.length strlit)
+    | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
+    | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
+    | '(' :: tl        -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
+    | ')' :: tl        -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
+    | ';' :: tl        -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
+    | '+' :: tl        -> [Token.{value = "+"; ttype = Binop TokenType.Plus; r; c}] @ lex_file tl r (c+1)
+    | '-' :: tl        -> [Token.{value = "-"; ttype = Binop TokenType.Minus; r; c}] @ lex_file tl r (c+1)
+    | '*' :: tl        -> [Token.{value = "*"; ttype = Binop TokenType.Asterisk; r; c}] @ lex_file tl r (c+1)
+    | '/' :: tl        -> [Token.{value = "/"; ttype = Binop TokenType.ForwardSlash; r; c}] @ lex_file tl r (c+1)
+    | hd :: _          -> failwith @@ Printf.sprintf "unsupported token: %c" hd
 
   let rec print_tokens tokens =
     match tokens with

@@ -1,4 +1,10 @@
 module TokenType = struct
+  type binop =
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+
   type t =
     | Eof
     | Identifier
@@ -6,15 +12,11 @@ module TokenType = struct
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop
+    | Binop of binop
     | LBrace
     | RBrace
     | Equals
     | Semicolon
-    | Plus
-    | Minus
-    | Asterisk
-    | ForwardSlash
     | DoubleEquals
     | DoubleColon
     | Colon
@@ -36,15 +38,11 @@ module TokenType = struct
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
     | IntegerLiteral -> "IntegerLiteral"
-    | Binop -> "Binop"
+    | Binop binop -> "Binop"
     | LBrace -> "LBrace"
     | RBrace -> "RBrace"
     | Equals -> "Equals"
     | Semicolon -> "Semicolon"
-    | Plus -> "Plus"
-    | Minus -> "Minus"
-    | Asterisk -> "Asterisk"
-    | ForwardSlash -> "ForwardSlash"
     | DoubleEquals -> "DoubleEquals"
     | DoubleColon -> "DoubleColon"
     | Colon -> "Colon"
@@ -56,12 +54,15 @@ module TokenType = struct
     | Void -> "Void"
     | I32 -> "I32"
     | Type -> "Type"
+
 end
 
 module Token = struct
   type t =
     { value : string
     ; ttype : TokenType.t
+    ; r : int
+    ; c : int
     }
 
   let to_string token =
