@@ -73,6 +73,7 @@ module Lexer = struct
                           [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
                           @ lex_file rest r (c+String.length intlit)
     | hd :: tl         -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+                          let word = String.make 1 hd ^ word in
                           (match is_keyword word with
                            | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
                            | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))

@@ -11,6 +11,7 @@ let file_to_str filename =
 let filepath = "./input.txt"
 let () =
   let data = file_to_str filepath in
+  let _ = Lexer.populate_keywords () in
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
   Lexer.print_tokens tokens
 ;;
