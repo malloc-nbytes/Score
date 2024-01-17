@@ -34,7 +34,7 @@ module Lexer = struct
     (c >= 0) && (c <= 9)
   ;;
 
-  let isalnum c = isalpha c || isnum c ;;
+  let isalnum c = isalpha c || isnum c;;
 
   let consume_while (lst : char list) (predicate : char -> bool) : string * char list =
     let rec aux lst acc =
@@ -72,10 +72,11 @@ module Lexer = struct
     | '0'..'9' :: tl   -> let intlit, rest = consume_while tl (fun c -> isnum c) in
                           [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
                           @ lex_file rest r (c+String.length intlit)
-    | hd :: tl         -> let identifier, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
-                          [Token.{value = identifier; ttype = Identifier; r; c = c+(String.length identifier)}]
-                          @ lex_file rest r (c+String.length identifier)
-    | hd :: _          -> failwith @@ Printf.sprintf "unsupported token: %c" hd
+    | hd :: tl         -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+                          (match is_keyword word with
+                           | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
+                           | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
+;;
 
   let rec print_tokens tokens =
     match tokens with
