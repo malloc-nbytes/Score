@@ -49,7 +49,7 @@ module Lexer = struct
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with
     | []               -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
-    | '\n' :: tl       -> lex_file tl r (c+1)
+    | '\n' :: tl       -> lex_file tl (r+1) 1
     | '\t' :: tl       -> lex_file tl r (c+1)
     | ' ' :: tl        -> lex_file tl r (c+1)
     | '/' :: '/' :: tl -> let comment, rest = consume_while tl (fun c -> c = '\n') in
@@ -64,11 +64,15 @@ module Lexer = struct
     | ')' :: tl        -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
     | '{' :: tl        -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
     | '}' :: tl        -> [Token.{value = "}"; ttype = RBrace; r; c}] @ lex_file tl r (c+1)
+    | '[' :: tl        -> [Token.{value = "["; ttype = LBracket; r; c}] @ lex_file tl r (c+1)
+    | ']' :: tl        -> [Token.{value = "]"; ttype = RBracket; r; c}] @ lex_file tl r (c+1)
     | ';' :: tl        -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
     | '+' :: tl        -> [Token.{value = "+"; ttype = Binop TokenType.Plus; r; c}] @ lex_file tl r (c+1)
     | '-' :: tl        -> [Token.{value = "-"; ttype = Binop TokenType.Minus; r; c}] @ lex_file tl r (c+1)
     | '*' :: tl        -> [Token.{value = "*"; ttype = Binop TokenType.Asterisk; r; c}] @ lex_file tl r (c+1)
     | '/' :: tl        -> [Token.{value = "/"; ttype = Binop TokenType.ForwardSlash; r; c}] @ lex_file tl r (c+1)
+    | '%' :: tl        -> [Token.{value = "%"; ttype = Binop TokenType.Percent; r; c}] @ lex_file tl r (c+1)
+    | '=' :: tl        -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
     | '0'..'9' :: tl   -> let intlit, rest = consume_while tl (fun c -> isnum c) in
                           [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
                           @ lex_file rest r (c+String.length intlit)

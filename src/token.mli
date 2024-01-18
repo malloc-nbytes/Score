@@ -4,6 +4,7 @@ module TokenType : sig
     | Minus
     | Asterisk
     | ForwardSlash
+    | Percent
 
   type vartype =
     | I32
@@ -34,6 +35,10 @@ module TokenType : sig
     | Comment
     | Keyword of keyword
     | Type of vartype
+    | GreaterThan
+    | LessThan
+    | LBracket
+    | RBracket
 
   val to_string : t -> string
 end

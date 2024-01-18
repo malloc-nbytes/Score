@@ -4,6 +4,7 @@ module TokenType = struct
     | Minus
     | Asterisk
     | ForwardSlash
+    | Percent
 
   type vartype =
     | I32
@@ -34,6 +35,10 @@ module TokenType = struct
     | Comment
     | Keyword of keyword
     | Type of vartype
+    | GreaterThan
+    | LessThan
+    | LBracket
+    | RBracket
 
   let to_string = function
     | Eof -> "Eof"
@@ -54,7 +59,10 @@ module TokenType = struct
     | Comment -> "Comment"
     | Type _ -> "type"
     | Keyword _ -> "keyword"
-
+    | GreaterThan -> "GreaterThan"
+    | LessThan -> "LessThan"
+    | LBracket -> "LBracket"
+    | RBracket -> "RBracket"
 end
 
 module Token = struct
