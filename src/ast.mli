@@ -12,6 +12,17 @@ module Ast : sig
     | NodeStmtLet      of node_stmt_let
     | NodeStmtMut      of node_stmt_mut
 
+  and node_stmt_func_def =
+    { id : string
+    ; params : (TokenType.vartype * string) list
+    ; rettype : TokenType.vartype
+    }
+
+  and node_stmt_func_call =
+    { id : string
+    ; args : node_expr list
+    }
+
   and node_stmt_compound =
     { stmts : node_stmt list
     }
@@ -28,10 +39,25 @@ module Ast : sig
     }
 
   and node_expr =
-    | NodeExprIntLit    of node_expr_int_lit
-    | NodeExprStringLit of node_expr_string_lit
-    | NodeExprBinop     of node_expr_binop
+    | NodeBinExpr of node_bin_expr
+    | NodeTerm    of node_term
 
+  and node_term =
+    | NodeTermID     of node_term_id
+    | NodeTermIntLit of node_term_intlit
 
+  and node_bin_expr =
+    { lhs : node_expr
+    ; rhs : node_expr
+    ; op : string
+    }
+
+  and node_term_id =
+    { id : Token.t
+    }
+
+  and node_term_intlit =
+    { intlit : Token.t
+    }
 
 end
