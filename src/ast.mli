@@ -15,7 +15,7 @@ module Ast : sig
   and node_stmt_func_def =
     { id : string
     ; params : (TokenType.vartype * string) list
-    ; rettype : TokenType.vartype
+    ; rtype : TokenType.vartype
     }
 
   and node_stmt_func_call =

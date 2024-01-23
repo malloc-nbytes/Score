@@ -42,8 +42,40 @@ module Parser = struct
     | hd :: tl -> hd, tl
   ;;
 
-  let rec produce_program (tokens : Token.t list) : Ast.node_prog =
+  (* (a: i32, b: i32) *)
+  let parse_func_def (tokens : Token.t list) : Ast.node_stmt * Token.t list =
+    let rec gather_params (tokens : Token.t list)
+            : ((string * TokenType.vartype) list) * Token.t list =
+      match tokens with
+      | hd :: tl when hd.ttype = TokenType.RParen -> [], tl
+      | id :: tl when id.ttype = TokenType.Identifier ->
+         let _, tokens = expect tl TokenType.Colon in
+         failwith "todo"
+         | _ -> failwith "invalid param type"
+      | _ -> failwith "invalid func params"
+    in
+
+    let func_name, tokens = expect tokens TokenType.Identifier in
+    let _, tokens = expect tokens TokenType.LParen in
+    let (params : (string * TokenType.vartype) list), tokens = gather_params tokens in
     failwith "todo"
+  ;;
+
+  let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
+    match tokens with
+    | hd :: tl when hd.ttype = TokenType.Keyword Proc -> parse_func_def tl
+    | _ -> failwith "parse_primary_stmt () unsupported token"
+
+  (* Entrypoint of the parser. Takes a list of tokens and produces
+   * a node_prog. *)
+  let produce_ast (tokens : Token.t list) : Ast.node_prog =
+    let rec f = function
+      | [] -> []
+      | hd :: _ when hd.Token.ttype = TokenType.Eof -> []
+      | tokens' ->
+         let stmt, rest = parse_primary_stmt tokens' in
+         [stmt] @ f rest in
+    Ast.{stmts = f tokens}
   ;;
 
 end

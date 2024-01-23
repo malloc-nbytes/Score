@@ -12,7 +12,7 @@ module TokenType = struct
     | Void
 
   type keyword =
-    | Def
+    | Proc
     | Let
     | Ret
 
@@ -40,6 +40,7 @@ module TokenType = struct
     | LBracket
     | RBracket
 
+  (* Convert a Token to a string *)
   let to_string = function
     | Eof -> "Eof"
     | Identifier -> "Identifier"
@@ -73,6 +74,7 @@ module Token = struct
     ; c : int
     }
 
+  (* Convert a Token to a string *)
   let to_string token =
     Printf.sprintf "%s: %s (r: %d, c: %d)" (TokenType.to_string token.ttype) token.value token.r token.c
 end

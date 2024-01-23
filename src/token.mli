@@ -12,7 +12,7 @@ module TokenType : sig
     | Void
 
   type keyword =
-    | Def
+    | Proc
     | Let
     | Ret
 

@@ -3,8 +3,10 @@ module Lexer = struct
 
   let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 20
 
-  let populate_keywords () =
-    let _ = Hashtbl.add keywords "def" (Keyword TokenType.Def) in
+  (* Fill the keywords hashtable with the correct words
+   * and token type. Should be called before `lex_file ()` is called. *)
+  let populate_keywords () : unit =
+    let _ = Hashtbl.add keywords "proc" (Keyword TokenType.Proc) in
     let _ = Hashtbl.add keywords "ret" (Keyword TokenType.Ret) in
     let _ = Hashtbl.add keywords "let" (Keyword TokenType.Let) in
     let _ = Hashtbl.add keywords "i32" (Type TokenType.I32) in
@@ -12,30 +14,44 @@ module Lexer = struct
     ()
   ;;
 
-  let err msg =
+  (* Takes a message and prints it for error logging.
+   * Exits the program. *)
+  let err (msg : string) : unit =
     let _ = Printf.printf "[Lexer ERR]: %s\n" msg in
     exit 1
   ;;
 
-  let is_keyword s =
+  (* Determines if the given string `s` is a
+   * keyword or not. If it is, it returns the
+   * appropriate token type. *)
+  let is_keyword (s : string) : TokenType.t option =
     match Hashtbl.find_opt keywords s with
     | Some t -> Some t
     | None -> None
   ;;
 
-  let isalpha c =
+  (* Takes a character and determines if
+   * it is an alpha character. *)
+  let isalpha (c : char) : bool =
     let c = int_of_char c in
     (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
   ;;
 
-  let isnum c =
+  (* Takes a character and determines if
+   * it is a number character. *)
+  let isnum (c : char) : bool =
     let c = int_of_char c in
     let c = c - int_of_char '0' in
     (c >= 0) && (c <= 9)
   ;;
 
-  let isalnum c = isalpha c || isnum c;;
+  (* Takes a character and determines if
+   * it is alphanumeric. *)
+  let isalnum (c : char) : bool = isalpha c || isnum c;;
 
+  (* Takes a list of characters and a predicate. It will accumulate
+   * chars until a char satisfies `predicate`. It will then return
+   * the accumulated chars as a string, as well as the rest *)
   let consume_while (lst : char list) (predicate : char -> bool) : string * char list =
     let rec aux lst acc =
       match lst with
@@ -46,6 +62,9 @@ module Lexer = struct
     aux lst ""
   ;;
 
+  (* Given `src` (source code converted to a char list), will lex
+   * all chars into tokensl `r` and `c` are the rows and columns that
+   * will be added to a created token. *)
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with
     | []               -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
@@ -81,13 +100,15 @@ module Lexer = struct
                           (match is_keyword word with
                            | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
                            | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
-;;
+  ;;
 
-  let rec print_tokens tokens =
+  (* Debug function to print a list of tokens. *)
+  let rec print_tokens (tokens : Token.t list) : unit =
     match tokens with
     | [] -> ()
     | hd :: tl ->
        print_endline (Token.to_string hd);
        print_tokens tl
   ;;
+
 end
