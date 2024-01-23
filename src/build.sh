@@ -14,5 +14,9 @@ else
     ocamlc -c token.ml
     ocamlc -c lexer.mli
     ocamlc -c lexer.ml
-    ocamlc -o main token.cmo lexer.cmo main.ml
+    ocamlc -c ast.mli
+    ocamlc -c ast.ml
+    ocamlc -c parser.mli
+    ocamlc -c parser.ml
+    ocamlc -o main token.cmo lexer.cmo ast.cmo parser.cmo main.ml
 fi
