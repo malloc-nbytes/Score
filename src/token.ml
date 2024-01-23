@@ -1,20 +1,8 @@
 module TokenType = struct
-  type binop =
-    | Plus
-    | Minus
-    | Asterisk
-    | ForwardSlash
-    | Percent
-
-  type vartype =
-    | I32
-    | Str
-    | Void
-
   type keyword =
     | Proc
-    | Let
     | Ret
+    | Let
 
   type t =
     | Eof
@@ -23,7 +11,7 @@ module TokenType = struct
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop of binop
+    | Binop
     | LBrace
     | RBrace
     | Equals
@@ -34,11 +22,12 @@ module TokenType = struct
     | RightArrow
     | Comment
     | Keyword of keyword
-    | Type of vartype
+    | Type
     | GreaterThan
     | LessThan
     | LBracket
     | RBracket
+    | Comma
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -48,7 +37,7 @@ module TokenType = struct
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
     | IntegerLiteral -> "IntegerLiteral"
-    | Binop _ -> "Binop"
+    | Binop -> "Binop"
     | LBrace -> "LBrace"
     | RBrace -> "RBrace"
     | Equals -> "Equals"
@@ -58,12 +47,13 @@ module TokenType = struct
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
-    | Type _ -> "type"
-    | Keyword _ -> "keyword"
+    | Type -> "Type"
+    | Keyword _ -> "Keyword"
     | GreaterThan -> "GreaterThan"
     | LessThan -> "LessThan"
     | LBracket -> "LBracket"
     | RBracket -> "RBracket"
+    | Comma -> "Comma"
 end
 
 module Token = struct

@@ -11,6 +11,11 @@ module Parser = struct
     | None -> failwith "unwrapped None value"
   ;;
 
+  (* Takes a token and returns a string in a syntax error-like message. *)
+  let syntax_error (token : Token.t) : string =
+    let value, ttype, line, ch = token.Token.value, TokenType.to_string token.ttype, token.r, token.c in
+    Printf.sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")" line ch ttype value
+
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
    * it will fail. It will also fail if `lst` is empty. Will
@@ -20,7 +25,12 @@ module Parser = struct
   let expect (lst : Token.t list) (exp : TokenType.t) : Token.t * Token.t list =
     match lst with
     | [] -> failwith "call to expect () with an empty list"
-    | hd :: _ when hd.ttype <> exp -> failwith "call to expect () failed with differing types"
+    | hd :: _ when hd.ttype <> exp ->
+       let actual = TokenType.to_string hd.ttype
+       and expected = TokenType.to_string exp
+       and se = syntax_error hd in
+       let _ = Printf.printf "%s\nexpected %s but got %s" se expected actual in
+       exit 1
     | hd :: tl -> hd, tl
   ;;
 
@@ -42,28 +52,43 @@ module Parser = struct
     | hd :: tl -> hd, tl
   ;;
 
-  (* (a: i32, b: i32) *)
+  (* Takes a token list and will peek the top
+   * token. If something exists, return Some (`hd`).
+   * Otherwise, return None. *)
+  let peek (lst : Token.t list) : Token.t option =
+    match lst with
+    | [] -> None
+    | hd :: _ -> Some hd
+  ;;
+
   let parse_func_def (tokens : Token.t list) : Ast.node_stmt * Token.t list =
-    let rec gather_params (tokens : Token.t list)
-            : ((string * TokenType.vartype) list) * Token.t list =
+    let rec gather_params (tokens : Token.t list) (acc : (string * TokenType.t) list)
+            : ((string * TokenType.t) list) * Token.t list =
       match tokens with
-      | hd :: tl when hd.ttype = TokenType.RParen -> [], tl
-      | id :: tl when id.ttype = TokenType.Identifier ->
+      | {ttype = TokenType.RParen; _} :: tl -> acc, tl
+      | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
-         failwith "todo"
-         | _ -> failwith "invalid param type"
+         let ptype, tokens = expect tokens TokenType.Type in
+         let next, tokens = pop tokens in
+         (match next with
+          | {ttype = TokenType.RParen; _} -> acc, tokens
+          | {ttype = TokenType.Comma; _} -> gather_params tokens @@ acc @ [id.value, ptype.ttype]
+          | _ -> failwith "malformed function params")
       | _ -> failwith "invalid func params"
     in
 
     let func_name, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.LParen in
-    let (params : (string * TokenType.vartype) list), tokens = gather_params tokens in
+    let (params : (string * TokenType.t) list), tokens = gather_params tokens [] in
+    let _, tokens = expect tokens TokenType.Colon in
+    let func_rtype, tokens = expect tokens TokenType.Type in
+    let _, tokens = expect tokens TokenType.LBrace in
     failwith "todo"
   ;;
 
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     match tokens with
-    | hd :: tl when hd.ttype = TokenType.Keyword Proc -> parse_func_def tl
+    | {ttype = TokenType.Keyword TokenType.Proc; _} :: tl -> parse_func_def tl
     | _ -> failwith "parse_primary_stmt () unsupported token"
 
   (* Entrypoint of the parser. Takes a list of tokens and produces

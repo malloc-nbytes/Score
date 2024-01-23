@@ -6,11 +6,11 @@ module Lexer = struct
   (* Fill the keywords hashtable with the correct words
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
-    let _ = Hashtbl.add keywords "proc" (Keyword TokenType.Proc) in
-    let _ = Hashtbl.add keywords "ret" (Keyword TokenType.Ret) in
-    let _ = Hashtbl.add keywords "let" (Keyword TokenType.Let) in
-    let _ = Hashtbl.add keywords "i32" (Type TokenType.I32) in
-    let _ = Hashtbl.add keywords "void" (Type TokenType.Void) in
+    let _ = Hashtbl.add keywords "proc" @@ Keyword Proc in
+    let _ = Hashtbl.add keywords "ret" @@ Keyword Ret in
+    let _ = Hashtbl.add keywords "let" @@ Keyword Let in
+    let _ = Hashtbl.add keywords "i32" Type in
+    let _ = Hashtbl.add keywords "void" Type in
     ()
   ;;
 
@@ -79,6 +79,8 @@ module Lexer = struct
                           @ lex_file (List.tl tl) r (c+2+String.length strlit)
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
+    | ':' :: tl        -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
+    | ',' :: tl        -> [Token.{value = ","; ttype = Comma; r; c}] @ lex_file tl r (c+1)
     | '(' :: tl        -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
     | ')' :: tl        -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
     | '{' :: tl        -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
@@ -86,11 +88,11 @@ module Lexer = struct
     | '[' :: tl        -> [Token.{value = "["; ttype = LBracket; r; c}] @ lex_file tl r (c+1)
     | ']' :: tl        -> [Token.{value = "]"; ttype = RBracket; r; c}] @ lex_file tl r (c+1)
     | ';' :: tl        -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
-    | '+' :: tl        -> [Token.{value = "+"; ttype = Binop TokenType.Plus; r; c}] @ lex_file tl r (c+1)
-    | '-' :: tl        -> [Token.{value = "-"; ttype = Binop TokenType.Minus; r; c}] @ lex_file tl r (c+1)
-    | '*' :: tl        -> [Token.{value = "*"; ttype = Binop TokenType.Asterisk; r; c}] @ lex_file tl r (c+1)
-    | '/' :: tl        -> [Token.{value = "/"; ttype = Binop TokenType.ForwardSlash; r; c}] @ lex_file tl r (c+1)
-    | '%' :: tl        -> [Token.{value = "%"; ttype = Binop TokenType.Percent; r; c}] @ lex_file tl r (c+1)
+    | '+' :: tl        -> [Token.{value = "+"; ttype = Binop; r; c}] @ lex_file tl r (c+1)
+    | '-' :: tl        -> [Token.{value = "-"; ttype = Binop; r; c}] @ lex_file tl r (c+1)
+    | '*' :: tl        -> [Token.{value = "*"; ttype = Binop; r; c}] @ lex_file tl r (c+1)
+    | '/' :: tl        -> [Token.{value = "/"; ttype = Binop; r; c}] @ lex_file tl r (c+1)
+    | '%' :: tl        -> [Token.{value = "%"; ttype = Binop; r; c}] @ lex_file tl r (c+1)
     | '=' :: tl        -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
     | '0'..'9' :: tl   -> let intlit, rest = consume_while tl (fun c -> isnum c) in
                           [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]

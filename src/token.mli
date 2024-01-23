@@ -1,20 +1,8 @@
 module TokenType : sig
-  type binop =
-    | Plus
-    | Minus
-    | Asterisk
-    | ForwardSlash
-    | Percent
-
-  type vartype =
-    | I32
-    | Str
-    | Void
-
   type keyword =
     | Proc
-    | Let
     | Ret
+    | Let
 
   type t =
     | Eof
@@ -23,7 +11,7 @@ module TokenType : sig
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop of binop
+    | Binop
     | LBrace
     | RBrace
     | Equals
@@ -34,11 +22,12 @@ module TokenType : sig
     | RightArrow
     | Comment
     | Keyword of keyword
-    | Type of vartype
+    | Type
     | GreaterThan
     | LessThan
     | LBracket
     | RBracket
+    | Comma
 
   val to_string : t -> string
 end
