@@ -1,9 +1,4 @@
 module TokenType = struct
-  type keyword =
-    | Proc
-    | Ret
-    | Let
-
   type t =
     | Eof
     | Identifier
@@ -20,7 +15,6 @@ module TokenType = struct
     | Colon
     | RightArrow
     | Comment
-    | Keyword of keyword
     | Type
     | GreaterThan
     | LessThan
@@ -33,6 +27,9 @@ module TokenType = struct
     | Asterisk
     | ForwardSlash
     | Percent
+    | Proc
+    | Ret
+    | Let
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -52,7 +49,6 @@ module TokenType = struct
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
     | Type -> "Type"
-    | Keyword _ -> "Keyword"
     | GreaterThan -> "GreaterThan"
     | LessThan -> "LessThan"
     | LBracket -> "LBracket"
@@ -64,6 +60,10 @@ module TokenType = struct
     | Asterisk -> "Asterisk"
     | ForwardSlash -> "ForwardSlash"
     | Percent -> "Percent"
+    | Proc -> "Proc"
+    | Ret -> "Ret"
+    | Let -> "Let"
+
 end
 
 module Token = struct

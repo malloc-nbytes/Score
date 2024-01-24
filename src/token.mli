@@ -1,9 +1,4 @@
 module TokenType : sig
-  type keyword =
-    | Proc
-    | Ret
-    | Let
-
   type t =
     | Eof
     | Identifier
@@ -20,7 +15,6 @@ module TokenType : sig
     | Colon
     | RightArrow
     | Comment
-    | Keyword of keyword
     | Type
     | GreaterThan
     | LessThan
@@ -33,6 +27,9 @@ module TokenType : sig
     | Asterisk
     | ForwardSlash
     | Percent
+    | Proc
+    | Ret
+    | Let
 
   val to_string : t -> string
 end

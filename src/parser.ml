@@ -1,3 +1,8 @@
+(* TODO:
+ *   Factor out the repeating code
+ *   of the `aux` inner functions inside
+ *   of all the expression parsing functions. *)
+
 module Parser = struct
   open Token
   open Ast
@@ -131,7 +136,7 @@ module Parser = struct
     match tokens with
     | [] -> failwith "parse_compound_stmt () failed with no tokens"
     | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
-    | {ttype = TokenType.Keyword TokenType.Let; _} :: tl ->
+    | {ttype = TokenType.Let; _} :: tl ->
        let id, tokens = expect tl TokenType.Identifier in
        let _, tokens = expect tokens TokenType.Colon in
        let vtype, tokens = expect tokens TokenType.Type in
@@ -143,7 +148,7 @@ module Parser = struct
        let id, tokens = pop tokens in
        let _, tokens = expect tokens TokenType.Equals in
        let expr, tokens = parse_expr tokens in
-       let _, tokens = expect tokens TokenType.Colon in
+       let _, tokens = expect tokens TokenType.Semicolon in
        parse_compound_stmt tokens (acc @ [Ast.NodeStmtMut {id = id.value; expr}])
     | _ -> failwith "parse_compound_stmt () failed with unsupported token"
   ;;
@@ -159,9 +164,10 @@ module Parser = struct
          let _, tokens = expect tl TokenType.Colon in
          let ptype, tokens = expect tokens TokenType.Type in
          let next, tokens = pop tokens in
+         let acc = acc @ [id.value, ptype.ttype] in
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
-          | {ttype = TokenType.Comma; _}  -> gather_params tokens @@ acc @ [id.value, ptype.ttype]
+          | {ttype = TokenType.Comma; _}  -> gather_params tokens @@ acc
           | _                             -> failwith "malformed function params")
       | _ -> failwith "invalid func params"
     in
@@ -181,7 +187,7 @@ module Parser = struct
    * aka function defs, structs etc. *)
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     match tokens with
-    | {ttype = TokenType.Keyword TokenType.Proc; _} :: tl -> parse_func_def tl
+    | {ttype = TokenType.Proc; _} :: tl -> parse_func_def tl
     | _ -> failwith "parse_primary_stmt () unsupported token"
   ;;
 
@@ -196,5 +202,52 @@ module Parser = struct
          [stmt] @ f rest in
     Ast.{stmts = f tokens}
   ;;
+
+  (* Takes a node_prog and prints out the AST created. *)
+  let print_ast (prog : Ast.node_prog) : unit =
+    let rec print_stmt (stmt : Ast.node_stmt) : unit =
+      match stmt with
+      | Ast.NodeStmtFuncDef {id; params; rtype; compound_stmt} ->
+         let _ = Printf.printf "func %s (" id in
+         let _ = List.iter (fun (id, ttype) -> Printf.printf "%s: %s, " id (TokenType.to_string ttype)) params in
+         let _ = Printf.printf "): %s {\n" (TokenType.to_string rtype.ttype) in
+         let _ = List.iter print_stmt compound_stmt.stmts in
+         Printf.printf "}\n"
+      | Ast.NodeStmtFuncCall {id; args} ->
+         let _ = Printf.printf "%s(" id in
+         let _ = List.iter (fun arg -> print_expr arg) args in
+         Printf.printf ");\n"
+      | Ast.NodeStmtCompound {stmts} ->
+         let _ = List.iter print_stmt stmts in
+         ()
+      | Ast.NodeStmtLet {id; expr; mut} ->
+         let _ = Printf.printf "let %s = " id in
+         let _ = print_expr expr in
+         let _ = Printf.printf ";\n" in
+         ()
+      | Ast.NodeStmtMut {id; expr} ->
+         let _ = Printf.printf "%s = " id in
+         let _ = print_expr expr in
+         let _ = Printf.printf ";\n" in
+         ()
+
+    and print_expr (expr : Ast.node_expr) : unit =
+      match expr with
+      | Ast.NodeBinExpr {lhs; rhs; op} ->
+          let _ = print_expr lhs in
+          let _ = Printf.printf " %s " op in
+          print_expr rhs
+      | Ast.NodeTerm t ->
+          print_term t
+  
+    and print_term (term : Ast.node_term) : unit =
+      match term with
+      | Ast.NodeTermID {id} ->
+          Printf.printf "%s" id.value
+      | Ast.NodeTermIntLit {intlit} ->
+          Printf.printf "%s" intlit.value
+  
+    in
+    List.iter print_stmt prog.stmts
 
 end
