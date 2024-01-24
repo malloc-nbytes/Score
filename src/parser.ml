@@ -73,24 +73,37 @@ module Parser = struct
                          (unwrap (peek tokens)).Token.value
 
   and parse_eq_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
+      match tokens with
+      | {ttype = TokenType.DoubleEquals; _} as op :: tl ->
+         let (rhs : Ast.node_expr), tokens = parse_primary_expr tokens in
+         aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
+      | _ -> lhs, tokens
+    in
     let (lhs : Ast.node_expr), tokens = parse_primary_expr tokens in
-    failwith "parse_eq_expr unimplemented"
+    aux tokens lhs
 
   and parse_mult_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
+      match tokens with
+      | {ttype = TokenType.Asterisk; _} | {ttype = TokenType.ForwardSlash; _} as op :: tl ->
+         let (rhs : Ast.node_expr), tokens = parse_eq_expr tokens in
+         aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
+      | _ -> lhs, tokens
+    in
     let (lhs : Ast.node_expr), tokens = parse_eq_expr tokens in
-    failwith "parse_mult_expr unimplemented"
+    aux tokens lhs
 
   and parse_add_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
-    let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Token.t list * Ast.node_expr =
+    let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
       | {ttype = TokenType.Plus; _} | {ttype = TokenType.Minus; _} as op :: tl ->
          let (rhs : Ast.node_expr), tokens = parse_mult_expr tokens in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
-      | _ -> tokens, lhs
+      | _ -> lhs, tokens
     in
-
     let (lhs : Ast.node_expr), tokens = parse_mult_expr tokens in
-    failwith "parse_add_expr unimplemented"
+    aux tokens lhs
 
   and parse_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let (expr : Ast.node_expr), tokens = parse_add_expr tokens in
@@ -139,11 +152,11 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LParen in
     let (params : (string * TokenType.t) list), tokens = gather_params tokens [] in
     let _, tokens = expect tokens TokenType.Colon in
-    let func_rtype, tokens = expect tokens TokenType.Type in
+    let rtype, tokens = expect tokens TokenType.Type in
     let _, tokens = expect tokens TokenType.LBrace in
 
     let compound_stmt, tokens = parse_compound_stmt tokens [] in
-    failwith "todo"
+    NodeStmtFuncDef {id = func_name.value; params; rtype; stmts = compound_stmt.stmts}, tokens
   ;;
 
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
