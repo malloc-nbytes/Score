@@ -28,6 +28,7 @@ module TokenType = struct
     | LBracket
     | RBracket
     | Comma
+    | Period
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -54,6 +55,7 @@ module TokenType = struct
     | LBracket -> "LBracket"
     | RBracket -> "RBracket"
     | Comma -> "Comma"
+    | Period -> "Period"
 end
 
 module Token = struct

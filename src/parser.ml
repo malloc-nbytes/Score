@@ -24,7 +24,7 @@ module Parser = struct
    * specific type *)
   let expect (lst : Token.t list) (exp : TokenType.t) : Token.t * Token.t list =
     match lst with
-    | [] -> failwith "call to expect () with an empty list"
+    | []                           -> failwith "call to expect () with an empty list"
     | hd :: _ when hd.ttype <> exp ->
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp
@@ -39,7 +39,7 @@ module Parser = struct
    * when wanting to discard the head. *)
   let rem (lst : Token.t list) : Token.t list =
     match lst with
-    | [] -> failwith "called rem () with no tokens"
+    | []      -> failwith "called rem () with no tokens"
     | _ :: tl -> tl
   ;;
 
@@ -48,7 +48,7 @@ module Parser = struct
    * consume the head, but still use it. *)
   let pop (lst : Token.t list) : Token.t * Token.t list =
     match lst with
-    | [] -> failwith "called pop () with no tokens"
+    | []       -> failwith "called pop () with no tokens"
     | hd :: tl -> hd, tl
   ;;
 
@@ -57,22 +57,43 @@ module Parser = struct
    * Otherwise, return None. *)
   let peek (lst : Token.t list) : Token.t option =
     match lst with
-    | [] -> None
+    | []      -> None
     | hd :: _ -> Some hd
   ;;
 
+  let rec parse_primary_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    failwith "parse_primary_expr () todo"
+
+  let rec parse_compound_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
+      : Ast.node_stmt_compound * Token.t list =
+    match tokens with
+    | [] -> failwith "parse_compound_stmt () failed with no tokens"
+    | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
+    | {ttype = TokenType.Keyword TokenType.Let; _} :: tl ->
+       let id, tokens = expect tl TokenType.Identifier in
+       let _, tokens = expect tl TokenType.Colon in
+       let vtype, tokens = expect tl TokenType.Type in
+       let _, tokens = expect tl TokenType.Equals in
+       let expr, tokens = parse_primary_expr tokens in
+       let _, tokens = expect tl TokenType.Semicolon in
+       parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = false}])
+    | {ttype = TokenType.Identifier; value = id} as hd :: tl -> failwith "mutability unimplemented"
+    | _ -> failwith "parse_compound_stmt () failed with unsupported token"
+
+  (* Given a list of tokens, will parse a function definition
+   * returning a Ast.node_stmt w/ constr. Ast.node_stmt_compound. *)
   let parse_func_def (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     let rec gather_params (tokens : Token.t list) (acc : (string * TokenType.t) list)
             : ((string * TokenType.t) list) * Token.t list =
       match tokens with
-      | {ttype = TokenType.RParen; _} :: tl -> acc, tl
+      | {ttype = TokenType.RParen; _} :: tl           -> acc, tl
       | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
          let ptype, tokens = expect tokens TokenType.Type in
          let next, tokens = pop tokens in
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
-          | {ttype = TokenType.Comma; _} -> gather_params tokens @@ acc @ [id.value, ptype.ttype]
+          | {ttype = TokenType.Comma; _}  -> gather_params tokens @@ acc @ [id.value, ptype.ttype]
           | _ -> failwith "malformed function params")
       | _ -> failwith "invalid func params"
     in
@@ -83,6 +104,8 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Colon in
     let func_rtype, tokens = expect tokens TokenType.Type in
     let _, tokens = expect tokens TokenType.LBrace in
+
+    let compound_stmt, tokens = parse_compound_stmt tokens [] in
     failwith "todo"
   ;;
 
@@ -95,9 +118,9 @@ module Parser = struct
    * a node_prog. *)
   let produce_ast (tokens : Token.t list) : Ast.node_prog =
     let rec f = function
-      | [] -> []
+      | []                                          -> []
       | hd :: _ when hd.Token.ttype = TokenType.Eof -> []
-      | tokens' ->
+      | tokens'                                     ->
          let stmt, rest = parse_primary_stmt tokens' in
          [stmt] @ f rest in
     Ast.{stmts = f tokens}

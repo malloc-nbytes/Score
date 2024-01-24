@@ -28,6 +28,7 @@ module TokenType : sig
     | LBracket
     | RBracket
     | Comma
+    | Period
 
   val to_string : t -> string
 end
