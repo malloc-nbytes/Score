@@ -63,6 +63,7 @@ module Parser = struct
 
   let rec parse_primary_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     failwith "parse_primary_expr () todo"
+  ;;
 
   let rec parse_compound_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
       : Ast.node_stmt_compound * Token.t list =
@@ -76,9 +77,10 @@ module Parser = struct
        let _, tokens = expect tl TokenType.Equals in
        let expr, tokens = parse_primary_expr tokens in
        let _, tokens = expect tl TokenType.Semicolon in
-       parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = false}])
+       parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
     | {ttype = TokenType.Identifier; value = id} as hd :: tl -> failwith "mutability unimplemented"
     | _ -> failwith "parse_compound_stmt () failed with unsupported token"
+  ;;
 
   (* Given a list of tokens, will parse a function definition
    * returning a Ast.node_stmt w/ constr. Ast.node_stmt_compound. *)
@@ -113,6 +115,7 @@ module Parser = struct
     match tokens with
     | {ttype = TokenType.Keyword TokenType.Proc; _} :: tl -> parse_func_def tl
     | _ -> failwith "parse_primary_stmt () unsupported token"
+  ;;
 
   (* Entrypoint of the parser. Takes a list of tokens and produces
    * a node_prog. *)
