@@ -9,13 +9,12 @@ let file_to_str filename =
   s
 ;;
 
-let filepath = "./input.txt"
-let () =
+let make_prog () =
+  let filepath = "./input.txt" in
   let data = file_to_str filepath in
   let _ = Lexer.populate_keywords () in
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
   (* let _ = Lexer.print_tokens tokens in *)
   let ast = Parser.produce_ast tokens in
-  let _ = Parser.print_ast ast in
-  ()
+  ast
 ;;

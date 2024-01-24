@@ -132,7 +132,7 @@ module Parser = struct
    * aka { ... }. This function is used when parsing statements
    * inside of a function (let, if, while etc). *)
   let rec parse_compound_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
-      : Ast.node_stmt_compound * Token.t list =
+          : Ast.node_stmt_compound * Token.t list =
     match tokens with
     | [] -> failwith "parse_compound_stmt () failed with no tokens"
     | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
@@ -202,52 +202,5 @@ module Parser = struct
          [stmt] @ f rest in
     Ast.{stmts = f tokens}
   ;;
-
-  (* Takes a node_prog and prints out the AST created. *)
-  let print_ast (prog : Ast.node_prog) : unit =
-    let rec print_stmt (stmt : Ast.node_stmt) : unit =
-      match stmt with
-      | Ast.NodeStmtFuncDef {id; params; rtype; compound_stmt} ->
-         let _ = Printf.printf "func %s (" id in
-         let _ = List.iter (fun (id, ttype) -> Printf.printf "%s: %s, " id (TokenType.to_string ttype)) params in
-         let _ = Printf.printf "): %s {\n" (TokenType.to_string rtype.ttype) in
-         let _ = List.iter print_stmt compound_stmt.stmts in
-         Printf.printf "}\n"
-      | Ast.NodeStmtFuncCall {id; args} ->
-         let _ = Printf.printf "%s(" id in
-         let _ = List.iter (fun arg -> print_expr arg) args in
-         Printf.printf ");\n"
-      | Ast.NodeStmtCompound {stmts} ->
-         let _ = List.iter print_stmt stmts in
-         ()
-      | Ast.NodeStmtLet {id; expr; mut} ->
-         let _ = Printf.printf "let %s = " id in
-         let _ = print_expr expr in
-         let _ = Printf.printf ";\n" in
-         ()
-      | Ast.NodeStmtMut {id; expr} ->
-         let _ = Printf.printf "%s = " id in
-         let _ = print_expr expr in
-         let _ = Printf.printf ";\n" in
-         ()
-
-    and print_expr (expr : Ast.node_expr) : unit =
-      match expr with
-      | Ast.NodeBinExpr {lhs; rhs; op} ->
-          let _ = print_expr lhs in
-          let _ = Printf.printf " %s " op in
-          print_expr rhs
-      | Ast.NodeTerm t ->
-          print_term t
-  
-    and print_term (term : Ast.node_term) : unit =
-      match term with
-      | Ast.NodeTermID {id} ->
-          Printf.printf "%s" id.value
-      | Ast.NodeTermIntLit {intlit} ->
-          Printf.printf "%s" intlit.value
-  
-    in
-    List.iter print_stmt prog.stmts
 
 end
