@@ -11,7 +11,6 @@ module TokenType : sig
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop
     | LBrace
     | RBrace
     | Equals
@@ -29,6 +28,11 @@ module TokenType : sig
     | RBracket
     | Comma
     | Period
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+    | Percent
 
   val to_string : t -> string
 end

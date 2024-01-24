@@ -81,6 +81,14 @@ module Parser = struct
     failwith "parse_mult_expr unimplemented"
 
   and parse_add_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Token.t list * Ast.node_expr =
+      match tokens with
+      | {ttype = TokenType.Plus; _} | {ttype = TokenType.Minus; _} as op :: tl ->
+         let (rhs : Ast.node_expr), tokens = parse_mult_expr tokens in
+         aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
+      | _ -> tokens, lhs
+    in
+
     let (lhs : Ast.node_expr), tokens = parse_mult_expr tokens in
     failwith "parse_add_expr unimplemented"
 

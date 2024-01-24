@@ -11,7 +11,6 @@ module TokenType = struct
     | RParen
     | StringLiteral
     | IntegerLiteral
-    | Binop
     | LBrace
     | RBrace
     | Equals
@@ -29,6 +28,11 @@ module TokenType = struct
     | RBracket
     | Comma
     | Period
+    | Plus
+    | Minus
+    | Asterisk
+    | ForwardSlash
+    | Percent
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -38,7 +42,6 @@ module TokenType = struct
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
     | IntegerLiteral -> "IntegerLiteral"
-    | Binop -> "Binop"
     | LBrace -> "LBrace"
     | RBrace -> "RBrace"
     | Equals -> "Equals"
@@ -56,6 +59,11 @@ module TokenType = struct
     | RBracket -> "RBracket"
     | Comma -> "Comma"
     | Period -> "Period"
+    | Plus -> "Plus"
+    | Minus -> "Minus"
+    | Asterisk -> "Asterisk"
+    | ForwardSlash -> "ForwardSlash"
+    | Percent -> "Percent"
 end
 
 module Token = struct
