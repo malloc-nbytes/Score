@@ -60,6 +60,11 @@ module Parser = struct
     | []      -> None
     | hd :: _ -> Some hd
 
+  (* The last level of expression parsing. Checks for an
+   * identifier, integer literal etc. If a left paren `(` is
+   * encountered, it will recurse back to the first level of
+   * expression parsing and work that sub-expression back up
+   * to this level. *)
   let rec parse_primary_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     match tokens with
     | {ttype = TokenType.Identifier; _} as id :: tl -> Ast.NodeTerm (NodeTermID {id}), tl
@@ -72,6 +77,8 @@ module Parser = struct
     | _ -> failwith @@ Printf.sprintf "parse_primary_expr () failed. Unknown token: %s"
                          (unwrap (peek tokens)).Token.value
 
+  (* The fourth level of expression parsing. Deals with equality
+   * operators `==`, `<`, `>=` etc. *)
   and parse_eq_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
@@ -83,6 +90,8 @@ module Parser = struct
     let (lhs : Ast.node_expr), tokens = parse_primary_expr tokens in
     aux tokens lhs
 
+  (* The third level of expression parsing. Deals with multiplicative
+   * operators `*`, `/` etc. *)
   and parse_mult_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
@@ -94,6 +103,8 @@ module Parser = struct
     let (lhs : Ast.node_expr), tokens = parse_eq_expr tokens in
     aux tokens lhs
 
+  (* The second level of expression parsing. Deals with additive
+   * operators `+`, `-` etc. *)
   and parse_add_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
@@ -105,6 +116,8 @@ module Parser = struct
     let (lhs : Ast.node_expr), tokens = parse_mult_expr tokens in
     aux tokens lhs
 
+  (* The first level of expression parsing. All expressions
+   * that need parsing will call this function. *)
   and parse_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let (expr : Ast.node_expr), tokens = parse_add_expr tokens in
     expr, tokens
@@ -164,6 +177,8 @@ module Parser = struct
     NodeStmtFuncDef {id = func_name.value; params; rtype; compound_stmt}, tokens
   ;;
 
+  (* Given a list of tokens, will parse the "outer" statements
+   * aka function defs, structs etc. *)
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Keyword TokenType.Proc; _} :: tl -> parse_func_def tl
