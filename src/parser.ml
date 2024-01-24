@@ -37,7 +37,7 @@ module Parser = struct
   (* Takes a list and discards the head of it
    * but returns the tail of it. Should be used
    * when wanting to discard the head. *)
-  let rem (lst : Token.t list) : Token.t list =
+  let ignore (lst : Token.t list) : Token.t list =
     match lst with
     | []      -> failwith "called rem () with no tokens"
     | _ :: tl -> tl
@@ -59,12 +59,39 @@ module Parser = struct
     match lst with
     | []      -> None
     | hd :: _ -> Some hd
-  ;;
 
   let rec parse_primary_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
-    failwith "parse_primary_expr () todo"
+    match tokens with
+    | [] -> failwith "parse_primary_expr () failed with no tokens"
+    | {ttype = TokenType.Identifier; _} as id :: tl -> Ast.NodeTerm (NodeTermID {id}), tl
+    | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.NodeTerm (NodeTermIntLit {intlit}), tl
+    | {ttype = TokenType.LParen; _} :: tl ->
+       let expr, tokens = parse_expr tl in
+       let _, tokens = expect tokens TokenType.RParen in
+       expr, tokens
+    | _ -> failwith @@ Printf.sprintf "parse_primary_expr () failed. Unknown token: %s"
+                         (unwrap (peek tokens)).Token.value
+
+  and parse_eq_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let (lhs : Ast.node_expr), tokens = parse_primary_expr tokens in
+    failwith "parse_eq_expr unimplemented"
+
+  and parse_mult_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let (lhs : Ast.node_expr), tokens = parse_eq_expr tokens in
+    failwith "parse_mult_expr unimplemented"
+
+  and parse_add_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let (lhs : Ast.node_expr), tokens = parse_mult_expr tokens in
+    failwith "parse_add_expr unimplemented"
+
+  and parse_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
+    let (expr : Ast.node_expr), tokens = parse_add_expr tokens in
+    expr, tokens
   ;;
 
+  (* Given a list of tokens, will parse a compound statement
+   * aka { ... }. This function is used when parsing statements
+   * inside of a function (let, if, while etc). *)
   let rec parse_compound_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
       : Ast.node_stmt_compound * Token.t list =
     match tokens with
@@ -72,11 +99,11 @@ module Parser = struct
     | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
     | {ttype = TokenType.Keyword TokenType.Let; _} :: tl ->
        let id, tokens = expect tl TokenType.Identifier in
-       let _, tokens = expect tl TokenType.Colon in
-       let vtype, tokens = expect tl TokenType.Type in
-       let _, tokens = expect tl TokenType.Equals in
-       let expr, tokens = parse_primary_expr tokens in
-       let _, tokens = expect tl TokenType.Semicolon in
+       let _, tokens = expect tokens TokenType.Colon in
+       let vtype, tokens = expect tokens TokenType.Type in
+       let _, tokens = expect tokens TokenType.Equals in
+       let expr, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.Semicolon in
        parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
     | {ttype = TokenType.Identifier; value = id} as hd :: tl -> failwith "mutability unimplemented"
     | _ -> failwith "parse_compound_stmt () failed with unsupported token"
@@ -96,7 +123,7 @@ module Parser = struct
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
           | {ttype = TokenType.Comma; _}  -> gather_params tokens @@ acc @ [id.value, ptype.ttype]
-          | _ -> failwith "malformed function params")
+          | _                             -> failwith "malformed function params")
       | _ -> failwith "invalid func params"
     in
 
