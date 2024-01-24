@@ -37,7 +37,7 @@ module Parser = struct
   (* Takes a list and discards the head of it
    * but returns the tail of it. Should be used
    * when wanting to discard the head. *)
-  let ignore (lst : Token.t list) : Token.t list =
+  let rem (lst : Token.t list) : Token.t list =
     match lst with
     | []      -> failwith "called rem () with no tokens"
     | _ :: tl -> tl
@@ -62,13 +62,13 @@ module Parser = struct
 
   let rec parse_primary_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     match tokens with
-    | [] -> failwith "parse_primary_expr () failed with no tokens"
     | {ttype = TokenType.Identifier; _} as id :: tl -> Ast.NodeTerm (NodeTermID {id}), tl
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.NodeTerm (NodeTermIntLit {intlit}), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
+    | [] -> failwith "parse_primary_expr () failed with no tokens"
     | _ -> failwith @@ Printf.sprintf "parse_primary_expr () failed. Unknown token: %s"
                          (unwrap (peek tokens)).Token.value
 
@@ -76,7 +76,7 @@ module Parser = struct
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
       | {ttype = TokenType.DoubleEquals; _} as op :: tl ->
-         let (rhs : Ast.node_expr), tokens = parse_primary_expr tokens in
+         let (rhs : Ast.node_expr), tokens = parse_primary_expr tl in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
       | _ -> lhs, tokens
     in
@@ -87,7 +87,7 @@ module Parser = struct
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
       | {ttype = TokenType.Asterisk; _} | {ttype = TokenType.ForwardSlash; _} as op :: tl ->
-         let (rhs : Ast.node_expr), tokens = parse_eq_expr tokens in
+         let (rhs : Ast.node_expr), tokens = parse_eq_expr tl in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
       | _ -> lhs, tokens
     in
@@ -98,7 +98,7 @@ module Parser = struct
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
       | {ttype = TokenType.Plus; _} | {ttype = TokenType.Minus; _} as op :: tl ->
-         let (rhs : Ast.node_expr), tokens = parse_mult_expr tokens in
+         let (rhs : Ast.node_expr), tokens = parse_mult_expr tl in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
       | _ -> lhs, tokens
     in
@@ -126,7 +126,12 @@ module Parser = struct
        let expr, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.Semicolon in
        parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
-    | {ttype = TokenType.Identifier; value = id} as hd :: tl -> failwith "mutability unimplemented"
+    | {ttype = TokenType.Identifier; value = id} as hd :: tl ->
+       let id, tokens = pop tokens in
+       let _, tokens = expect tokens TokenType.Equals in
+       let expr, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.Colon in
+       parse_compound_stmt tokens (acc @ [Ast.NodeStmtMut {id = id.value; expr}])
     | _ -> failwith "parse_compound_stmt () failed with unsupported token"
   ;;
 
@@ -156,7 +161,7 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LBrace in
 
     let compound_stmt, tokens = parse_compound_stmt tokens [] in
-    NodeStmtFuncDef {id = func_name.value; params; rtype; stmts = compound_stmt.stmts}, tokens
+    NodeStmtFuncDef {id = func_name.value; params; rtype; compound_stmt}, tokens
   ;;
 
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =

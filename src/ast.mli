@@ -16,7 +16,7 @@ module Ast : sig
     { id : string
     ; params : (string * TokenType.t) list
     ; rtype : Token.t
-    ; stmts : node_stmt list
+    ; compound_stmt : node_stmt_compound
     }
 
   and node_stmt_func_call =
