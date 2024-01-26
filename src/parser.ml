@@ -6,9 +6,10 @@
 module Parser = struct
   open Token
   open Ast
+  open Err
   open Printf
 
-  let err (msg : string) : unit = eprintf "[Score Parser ERR]: %s" msg;;
+  let err file func line msg = eprintf "[%s:%s:%d]: %s" file func line msg
 
   (* Takes some option and attempts
    * to unwrap it, returning the inner value.
@@ -24,7 +25,7 @@ module Parser = struct
     match token with
     | Some token' ->
        let value, ttype, line, ch = token'.Token.value, TokenType.to_string token'.ttype, token'.r, token'.c in
-       sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
+       sprintf "SYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
     | None -> sprintf "\nSYNTAX ERROR\n"
 
   (* Takes a list of tokens and an expected token type.
@@ -40,7 +41,7 @@ module Parser = struct
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp
        and se = serr @@ Some hd in
-       let _ = printf "%s\nexpected %s but got %s" se expected actual in
+       err __FILE__ __FUNCTION__ __LINE__ (sprintf "%sexpected %s but got %s\n" se expected actual);
        exit 1
     | hd :: tl -> hd, tl
   ;;
@@ -176,9 +177,9 @@ module Parser = struct
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
           | {ttype = TokenType.Comma; _} -> gather_params tokens @@ acc
-          | _ -> let _ = err @@ serr (Some next) ^ "invalid function parameter" in exit 1)
-      | hd :: _ -> let _ = err @@ serr (Some hd) ^ "invalid function parameter" in exit 1
-      | [] -> let _ = err @@ serr None ^ "unterminated function definition" in exit 1
+          | _ -> eprintf "%s\n" @@ serr (Some next) ^ "invalid function parameter"; exit 1)
+      | hd :: _ -> eprintf "%s\n" @@ serr (Some hd) ^ "invalid function parameter"; exit 1
+      | [] -> eprintf "%s\n" @@ serr None ^ "unterminated function definition"; exit 1
     in
 
     let func_name, tokens = expect tokens TokenType.Identifier in
