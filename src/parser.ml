@@ -6,8 +6,9 @@
 module Parser = struct
   open Token
   open Ast
+  open Printf
 
-  let err (msg : string) : unit = Printf.eprintf "[Score Parser ERR]: %s" msg;;
+  let err (msg : string) : unit = eprintf "[Score Parser ERR]: %s" msg;;
 
   (* Takes some option and attempts
    * to unwrap it, returning the inner value.
@@ -23,8 +24,8 @@ module Parser = struct
     match token with
     | Some token' ->
        let value, ttype, line, ch = token'.Token.value, TokenType.to_string token'.ttype, token'.r, token'.c in
-       Printf.sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
-    | None -> Printf.sprintf "\nSYNTAX ERROR\n"
+       sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
+    | None -> sprintf "\nSYNTAX ERROR\n"
 
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
@@ -39,7 +40,7 @@ module Parser = struct
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp
        and se = serr @@ Some hd in
-       let _ = Printf.printf "%s\nexpected %s but got %s" se expected actual in
+       let _ = printf "%s\nexpected %s but got %s" se expected actual in
        exit 1
     | hd :: tl -> hd, tl
   ;;
@@ -84,7 +85,7 @@ module Parser = struct
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
     | [] -> failwith "parse_primary_expr () failed with no tokens"
-    | _ -> failwith @@ Printf.sprintf "parse_primary_expr () failed. Unknown token: %s"
+    | _ -> failwith @@ sprintf "parse_primary_expr () failed. Unknown token: %s"
                          (unwrap (peek tokens)).Token.value
 
   (* The fourth level of expression parsing. Deals with equality
