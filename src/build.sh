@@ -10,10 +10,10 @@ elif [ "$1" == "clean" ]
 then
     rm *.cmo *.cmi main
 else
-    ocamlc -c err.mli
-    ocamlc -c err.ml
     ocamlc -c token.mli
     ocamlc -c token.ml
+    ocamlc -c err.mli
+    ocamlc -c err.ml
     ocamlc -c lexer.mli
     ocamlc -c lexer.ml
     ocamlc -c ast.mli
