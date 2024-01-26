@@ -19,13 +19,13 @@ module Ast = struct
     ; compound_stmt : node_stmt_compound
     }
 
+  and node_stmt_compound =
+    { stmts : node_stmt list
+    }
+
   and node_stmt_func_call =
     { id : string
     ; args : node_expr list
-    }
-
-  and node_stmt_compound =
-    { stmts : node_stmt list
     }
 
   and node_stmt_let =
@@ -60,5 +60,42 @@ module Ast = struct
   and node_term_intlit =
     { intlit : Token.t
     }
+
+  let dump_ast (prog : node_prog) =
+    let open Printf in
+
+    let indent d = let s = ref "" in for i = 1 to d do s := !s ^ "  " done; !s in
+
+    let rec dump_expr (expr : node_expr) : unit =
+      failwith "dump_expr unimplemented"
+    in
+
+    let rec dump_compound_stmt (stmt : node_stmt_compound) (depth : int) : unit =
+      let spaces = indent depth in
+      List.iter (fun ns ->
+          match ns with
+          | NodeStmtFuncDef ns' -> dump_node_stmt_func_def ns' (depth+1)
+          | NodeStmtFuncCall ns' -> failwith "NodeStmtFuncCall unimplemented"
+          | NodeStmtCompound ns' -> dump_compound_stmt ns' (depth+1)
+          | NodeStmtLet ns' -> printf "%sLET %s =\n" spaces ns'.id; dump_expr ns'.expr
+          | NodeStmtMut ns' -> failwith "NodeStmtMut unimplemented"
+        ) stmt.stmts
+
+    and dump_node_stmt_func_def (stmt : node_stmt_func_def) (depth : int) : unit =
+      let spaces = indent depth in
+      printf "%s%s (" spaces stmt.id;
+
+      List.iter (fun p -> printf "%s%s," spaces @@ fst p) stmt.params;
+      printf "%s)\n" spaces;
+
+      dump_compound_stmt stmt.compound_stmt (depth+1)
+    in
+
+    List.iter (fun s ->
+        match s with
+        | NodeStmtFuncDef s' -> dump_node_stmt_func_def s' 0
+        | _ -> failwith "unimplemented"
+      ) prog.stmts
+  ;;
 
 end

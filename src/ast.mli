@@ -61,4 +61,6 @@ module Ast : sig
     { intlit : Token.t
     }
 
+  val dump_ast : node_prog -> unit
+
 end

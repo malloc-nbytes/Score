@@ -1,6 +1,7 @@
 open Token
 open Lexer
 open Parser
+open Ast
 
 let file_to_str filename =
   let ch = open_in_bin filename in
@@ -9,12 +10,12 @@ let file_to_str filename =
   s
 ;;
 
-let make_prog () =
+let () =
   let filepath = "./input.txt" in
   let data = file_to_str filepath in
   let _ = Lexer.populate_keywords () in
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
   (* let _ = Lexer.print_tokens tokens in *)
   let ast = Parser.produce_ast tokens in
-  ast
+  Ast.dump_ast ast
 ;;

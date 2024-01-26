@@ -7,6 +7,8 @@ module Parser = struct
   open Token
   open Ast
 
+  let err (msg : string) : unit = Printf.eprintf "[Score Parser ERR]: %s" msg;;
+
   (* Takes some option and attempts
    * to unwrap it, returning the inner value.
    * Will panic if `k` is None. *)
@@ -17,23 +19,26 @@ module Parser = struct
   ;;
 
   (* Takes a token and returns a string in a syntax error-like message. *)
-  let syntax_error (token : Token.t) : string =
-    let value, ttype, line, ch = token.Token.value, TokenType.to_string token.ttype, token.r, token.c in
-    Printf.sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")" line ch ttype value
+  let serr (token : Token.t option) : string =
+    match token with
+    | Some token' ->
+       let value, ttype, line, ch = token'.Token.value, TokenType.to_string token'.ttype, token'.r, token'.c in
+       Printf.sprintf "\nSYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
+    | None -> Printf.sprintf "\nSYNTAX ERROR\n"
 
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
    * it will fail. It will also fail if `lst` is empty. Will
    * return the head and tail split from each other. This function
    * should be used instead of `pop ()` when we want to assure a
-   * specific type *)
+   * specific type. *)
   let expect (lst : Token.t list) (exp : TokenType.t) : Token.t * Token.t list =
     match lst with
-    | []                           -> failwith "call to expect () with an empty list"
+    | [] -> failwith "call to expect () with an empty list"
     | hd :: _ when hd.ttype <> exp ->
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp
-       and se = syntax_error hd in
+       and se = serr @@ Some hd in
        let _ = Printf.printf "%s\nexpected %s but got %s" se expected actual in
        exit 1
     | hd :: tl -> hd, tl
@@ -44,7 +49,7 @@ module Parser = struct
    * when wanting to discard the head. *)
   let rem (lst : Token.t list) : Token.t list =
     match lst with
-    | []      -> failwith "called rem () with no tokens"
+    | [] -> failwith "called rem () with no tokens"
     | _ :: tl -> tl
   ;;
 
@@ -53,7 +58,7 @@ module Parser = struct
    * consume the head, but still use it. *)
   let pop (lst : Token.t list) : Token.t * Token.t list =
     match lst with
-    | []       -> failwith "called pop () with no tokens"
+    | [] -> failwith "called pop () with no tokens"
     | hd :: tl -> hd, tl
   ;;
 
@@ -62,7 +67,7 @@ module Parser = struct
    * Otherwise, return None. *)
   let peek (lst : Token.t list) : Token.t option =
     match lst with
-    | []      -> None
+    | [] -> None
     | hd :: _ -> Some hd
 
   (* The last level of expression parsing. Checks for an
@@ -100,7 +105,8 @@ module Parser = struct
   and parse_mult_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
-      | {ttype = TokenType.Asterisk; _} | {ttype = TokenType.ForwardSlash; _} as op :: tl ->
+      | {ttype = TokenType.Asterisk; _}
+        | {ttype = TokenType.ForwardSlash; _} as op :: tl ->
          let (rhs : Ast.node_expr), tokens = parse_eq_expr tl in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
       | _ -> lhs, tokens
@@ -113,7 +119,8 @@ module Parser = struct
   and parse_add_expr (tokens : Token.t list) : Ast.node_expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.node_expr) : Ast.node_expr * Token.t list =
       match tokens with
-      | {ttype = TokenType.Plus; _} | {ttype = TokenType.Minus; _} as op :: tl ->
+      | {ttype = TokenType.Plus; _}
+        | {ttype = TokenType.Minus; _} as op :: tl ->
          let (rhs : Ast.node_expr), tokens = parse_mult_expr tl in
          aux tokens (NodeBinExpr {lhs; rhs; op = op.value})
       | _ -> lhs, tokens
@@ -144,7 +151,7 @@ module Parser = struct
        let expr, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.Semicolon in
        parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
-    | {ttype = TokenType.Identifier; value = id} as hd :: tl ->
+    | {ttype = TokenType.Identifier; value = id} :: tl ->
        let id, tokens = pop tokens in
        let _, tokens = expect tokens TokenType.Equals in
        let expr, tokens = parse_expr tokens in
@@ -159,7 +166,7 @@ module Parser = struct
     let rec gather_params (tokens : Token.t list) (acc : (string * TokenType.t) list)
             : ((string * TokenType.t) list) * Token.t list =
       match tokens with
-      | {ttype = TokenType.RParen; _} :: tl           -> acc, tl
+      | {ttype = TokenType.RParen; _} :: tl -> acc, tl
       | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
          let ptype, tokens = expect tokens TokenType.Type in
@@ -167,9 +174,10 @@ module Parser = struct
          let acc = acc @ [id.value, ptype.ttype] in
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
-          | {ttype = TokenType.Comma; _}  -> gather_params tokens @@ acc
-          | _                             -> failwith "malformed function params")
-      | _ -> failwith "invalid func params"
+          | {ttype = TokenType.Comma; _} -> gather_params tokens @@ acc
+          | _ -> let _ = err @@ serr (Some next) ^ "invalid function parameter" in exit 1)
+      | hd :: _ -> let _ = err @@ serr (Some hd) ^ "invalid function parameter" in exit 1
+      | [] -> let _ = err @@ serr None ^ "unterminated function definition" in exit 1
     in
 
     let func_name, tokens = expect tokens TokenType.Identifier in
@@ -194,13 +202,11 @@ module Parser = struct
   (* Entrypoint of the parser. Takes a list of tokens and produces
    * a node_prog. *)
   let produce_ast (tokens : Token.t list) : Ast.node_prog =
-    let rec f = function
-      | []                                          -> []
+    let rec aux = function
+      | [] -> []
       | hd :: _ when hd.Token.ttype = TokenType.Eof -> []
-      | tokens'                                     ->
-         let stmt, rest = parse_primary_stmt tokens' in
-         [stmt] @ f rest in
-    Ast.{stmts = f tokens}
+      | tokens' -> let stmt, rest = parse_primary_stmt tokens' in [stmt] @ aux rest in
+    Ast.{stmts = aux tokens}
   ;;
 
 end
