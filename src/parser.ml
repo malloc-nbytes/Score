@@ -9,24 +9,15 @@ module Parser = struct
   open Err
   open Printf
 
-  let err file func line msg = eprintf "[%s:%s:%d]: %s" file func line msg
-
   (* Takes some option and attempts
    * to unwrap it, returning the inner value.
    * Will panic if `k` is None. *)
   let unwrap k =
     match k with
     | Some k' -> k'
-    | None -> failwith "unwrapped None value"
+    | None -> Err.err Err.ParserFatalErr __FILE__ __FUNCTION__ ~msg:"unwrapped None value" None;
+              exit 1
   ;;
-
-  (* Takes a token and returns a string in a syntax error-like message. *)
-  let serr (token : Token.t option) : string =
-    match token with
-    | Some token' ->
-       let value, ttype, line, ch = token'.Token.value, TokenType.to_string token'.ttype, token'.r, token'.c in
-       sprintf "SYNTAX ERROR\n(line %d, char %d, %s \"%s\")\n" line ch ttype value
-    | None -> sprintf "\nSYNTAX ERROR\n"
 
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
@@ -36,12 +27,14 @@ module Parser = struct
    * specific type. *)
   let expect (lst : Token.t list) (exp : TokenType.t) : Token.t * Token.t list =
     match lst with
-    | [] -> failwith "call to expect () with an empty list"
+    | [] ->
+       Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None;
+       exit 1
     | hd :: _ when hd.ttype <> exp ->
        let actual = TokenType.to_string hd.ttype
-       and expected = TokenType.to_string exp
-       and se = serr @@ Some hd in
-       err __FILE__ __FUNCTION__ __LINE__ (sprintf "%sexpected %s but got %s\n" se expected actual);
+       and expected = TokenType.to_string exp in
+       Err.err Err.ParserExpectErr __FILE__ __FUNCTION__
+         ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd;
        exit 1
     | hd :: tl -> hd, tl
   ;;
@@ -51,7 +44,7 @@ module Parser = struct
    * when wanting to discard the head. *)
   let rem (lst : Token.t list) : Token.t list =
     match lst with
-    | [] -> failwith "called rem () with no tokens"
+    | [] -> Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None; exit 1
     | _ :: tl -> tl
   ;;
 
@@ -60,7 +53,9 @@ module Parser = struct
    * consume the head, but still use it. *)
   let pop (lst : Token.t list) : Token.t * Token.t list =
     match lst with
-    | [] -> failwith "called pop () with no tokens"
+    | [] ->
+       Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None;
+       exit 1
     | hd :: tl -> hd, tl
   ;;
 
@@ -85,9 +80,10 @@ module Parser = struct
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
-    | [] -> failwith "parse_primary_expr () failed with no tokens"
-    | _ -> failwith @@ sprintf "parse_primary_expr () failed. Unknown token: %s"
-                         (unwrap (peek tokens)).Token.value
+    | [] -> Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None; exit 1
+    | hd :: _ ->
+       Err.err Err.ParserUnknownTokenErr __FILE__ __FUNCTION__ @@ Some hd;
+       exit 1
 
   (* The fourth level of expression parsing. Deals with equality
    * operators `==`, `<`, `>=` etc. *)
@@ -143,7 +139,7 @@ module Parser = struct
   let rec parse_block_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
           : Ast.node_stmt_block * Token.t list =
     match tokens with
-    | [] -> failwith "parse_block_stmt () failed with no tokens"
+    | [] -> Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None; exit 1
     | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
     | {ttype = TokenType.Let; _} :: tl ->
        let id, tokens = expect tl TokenType.Identifier in
@@ -159,11 +155,13 @@ module Parser = struct
        let expr, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.Semicolon in
        parse_block_stmt tokens (acc @ [Ast.NodeStmtMut {id = id.value; expr}])
-    | _ -> failwith "parse_block_stmt () failed with unsupported token"
+    | hd :: _ ->
+       Err.err Err.ParserUnknownTokenErr __FILE__ __FUNCTION__ @@ Some hd;
+       exit 1
   ;;
 
   (* Given a list of tokens, will parse a function definition
-   * returning a Ast.node_stmt w/ constr. Ast.node_stmt_compound. *)
+   * returning a Ast.node_stmt w/ constructor Ast.node_stmt_block. *)
   let parse_func_def (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     let rec gather_params (tokens : Token.t list) (acc : (string * TokenType.t) list)
             : ((string * TokenType.t) list) * Token.t list =
@@ -177,9 +175,12 @@ module Parser = struct
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
           | {ttype = TokenType.Comma; _} -> gather_params tokens @@ acc
-          | _ -> eprintf "%s\n" @@ serr (Some next) ^ "invalid function parameter"; exit 1)
-      | hd :: _ -> eprintf "%s\n" @@ serr (Some hd) ^ "invalid function parameter"; exit 1
-      | [] -> eprintf "%s\n" @@ serr None ^ "unterminated function definition"; exit 1
+          | _ -> Err.err Err.ParserMalformedFuncDef __FILE__ __FUNCTION__ None; exit 1)
+      | hd :: _ -> Err.err Err.ParserMalformedFuncDef __FILE__ __FUNCTION__ None; exit 1
+      | [] ->
+         Err.err Err.ParserMalformedFuncDef
+           __FILE__ __FUNCTION__ ~msg:"unterminated function definition" None;
+         exit 1
     in
 
     let func_name, tokens = expect tokens TokenType.Identifier in
@@ -198,7 +199,12 @@ module Parser = struct
   let parse_primary_stmt (tokens : Token.t list) : Ast.node_stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Proc; _} :: tl -> parse_func_def tl
-    | _ -> failwith "parse_primary_stmt () unsupported token"
+    | hd :: _ ->
+       Err.err Err.ParserUnknownTokenErr __FILE__ __FUNCTION__ @@ Some hd;
+       exit 1
+    | [] ->
+       Err.err Err.ParserExhaustedTokensErr __FILE__ __FUNCTION__ None;
+       exit 1
   ;;
 
   (* Entrypoint of the parser. Takes a list of tokens and produces

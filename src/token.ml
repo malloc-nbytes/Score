@@ -76,5 +76,6 @@ module Token = struct
 
   (* Convert a Token to a string *)
   let to_string token =
-    Printf.sprintf "%s: %s (r: %d, c: %d)" (TokenType.to_string token.ttype) token.value token.r token.c
+    Printf.sprintf "(line %d, char %d, %s `%s`)"
+      token.r token.c (TokenType.to_string token.ttype) token.value
 end

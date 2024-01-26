@@ -1,13 +1,30 @@
-module Err : sig
-  type err_type =
-    | SyntaxError
+module Err = struct
+  open Token
 
-  val err : string -> string -> int -> string -> unit
-end = struct
   type err_type =
-    | SyntaxError
+    | ParserFatalErr
+    | ParserExpectErr
+    | ParserExhaustedTokensErr
+    | ParserUnknownTokenErr
+    | ParserMalformedFuncDef
 
-  let err file func line msg =
-    Printf.eprintf "[%s:%s%d]: %s" file func line msg
+  let err_to_str err_type =
+    match err_type with
+    | ParserFatalErr -> "ParserFatalErr"
+    | ParserExpectErr -> "ParserExpectErr"
+    | ParserExhaustedTokensErr -> "ParserExhaustedTokensErr"
+    | ParserUnknownTokenErr -> "ParserUnknownTokenErr"
+    | ParserMalformedFuncDef -> "ParserMalformedFuncDef"
+
+  let err err_type file func ?(msg="") token =
+    let s = err_to_str err_type in
+    match token with
+    | Some token' ->
+       let msg = (if msg = "" then msg else "[ERR] " ^ msg ^ "\n") in
+       Printf.eprintf
+         "[ERR] %s [%s:%s]:\n%s[ERR] conflicting token: %s\n"
+         s file func msg (Token.to_string token')
+    | None -> Printf.eprintf "[ERR] %s [%s:%s]:\n[ERR] %s\n" s file func msg
   ;;
+
 end
