@@ -106,7 +106,7 @@ module Ast = struct
     List.iter (fun s ->
         match s with
         | NodeStmtFuncDef s' -> dump_node_stmt_func_def s' 0
-        | _ -> failwith "unimplemented"
+        | _ -> failwith "Could not traverse AST"
       ) prog.stmts
   ;;
 

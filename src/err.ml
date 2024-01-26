@@ -8,7 +8,7 @@ module Err = struct
     | ParserUnknownTokenErr
     | ParserMalformedFuncDef
 
-  let err_to_str err_type =
+  let err_to_str (err_type : err_type) : string =
     match err_type with
     | ParserFatalErr -> "ParserFatalErr"
     | ParserExpectErr -> "ParserExpectErr"
@@ -16,7 +16,8 @@ module Err = struct
     | ParserUnknownTokenErr -> "ParserUnknownTokenErr"
     | ParserMalformedFuncDef -> "ParserMalformedFuncDef"
 
-  let err err_type file func ?(msg="") token =
+  let err (err_type : err_type) (file : string) (func : string)
+        ?(msg="") (token : Token.t option) : unit =
     let s = err_to_str err_type in
     match token with
     | Some token' ->
