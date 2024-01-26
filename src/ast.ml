@@ -66,8 +66,17 @@ module Ast = struct
 
     let indent d = let s = ref "" in for i = 1 to d do s := !s ^ "  " done; !s in
 
-    let rec dump_expr (expr : node_expr) : unit =
-      failwith "dump_expr unimplemented"
+    let rec dump_expr (expr : node_expr) (depth : int) : unit =
+      let spaces = indent depth in
+      match expr with
+      | NodeBinExpr e ->
+         printf "%slhs:\n" spaces;
+         dump_expr e.lhs (depth+1);
+         printf "%s%s\n" spaces e.op;
+         printf "%srhs:\n" spaces;
+         dump_expr e.rhs (depth+1)
+      | NodeTerm NodeTermID e -> printf "%s%s\n" spaces e.id.value
+      | NodeTerm NodeTermIntLit e -> printf "%s%s\n" spaces e.intlit.value
     in
 
     let rec dump_compound_stmt (stmt : node_stmt_compound) (depth : int) : unit =
@@ -77,7 +86,7 @@ module Ast = struct
           | NodeStmtFuncDef ns' -> dump_node_stmt_func_def ns' (depth+1)
           | NodeStmtFuncCall ns' -> failwith "NodeStmtFuncCall unimplemented"
           | NodeStmtCompound ns' -> dump_compound_stmt ns' (depth+1)
-          | NodeStmtLet ns' -> printf "%sLET %s =\n" spaces ns'.id; dump_expr ns'.expr
+          | NodeStmtLet ns' -> printf "%sLET %s =\n" spaces ns'.id; dump_expr ns'.expr (depth+1)
           | NodeStmtMut ns' -> failwith "NodeStmtMut unimplemented"
         ) stmt.stmts
 
