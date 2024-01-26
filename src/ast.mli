@@ -8,7 +8,7 @@ module Ast : sig
   and node_stmt =
     | NodeStmtFuncDef  of node_stmt_func_def
     | NodeStmtFuncCall of node_stmt_func_call
-    | NodeStmtCompound of node_stmt_compound
+    | NodeStmtBlock of node_stmt_block
     | NodeStmtLet      of node_stmt_let
     | NodeStmtMut      of node_stmt_mut
 
@@ -16,7 +16,7 @@ module Ast : sig
     { id : string
     ; params : (string * TokenType.t) list
     ; rtype : Token.t
-    ; compound_stmt : node_stmt_compound
+    ; block_stmt : node_stmt_block
     }
 
   and node_stmt_func_call =
@@ -24,7 +24,7 @@ module Ast : sig
     ; args : node_expr list
     }
 
-  and node_stmt_compound =
+  and node_stmt_block =
     { stmts : node_stmt list
     }
 

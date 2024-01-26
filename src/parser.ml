@@ -135,13 +135,13 @@ module Parser = struct
     expr, tokens
   ;;
 
-  (* Given a list of tokens, will parse a compound statement
+  (* Given a list of tokens, will parse a block statement
    * aka { ... }. This function is used when parsing statements
    * inside of a function (let, if, while etc). *)
-  let rec parse_compound_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
-          : Ast.node_stmt_compound * Token.t list =
+  let rec parse_block_stmt (tokens : Token.t list) (acc : Ast.node_stmt list)
+          : Ast.node_stmt_block * Token.t list =
     match tokens with
-    | [] -> failwith "parse_compound_stmt () failed with no tokens"
+    | [] -> failwith "parse_block_stmt () failed with no tokens"
     | {ttype = TokenType.RBrace; _} :: tl -> Ast.{stmts = acc}, tl
     | {ttype = TokenType.Let; _} :: tl ->
        let id, tokens = expect tl TokenType.Identifier in
@@ -150,14 +150,14 @@ module Parser = struct
        let _, tokens = expect tokens TokenType.Equals in
        let expr, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.Semicolon in
-       parse_compound_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
+       parse_block_stmt tokens (acc @ [Ast.NodeStmtLet {id = id.value; expr; mut = true}])
     | {ttype = TokenType.Identifier; value = id} :: tl ->
        let id, tokens = pop tokens in
        let _, tokens = expect tokens TokenType.Equals in
        let expr, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.Semicolon in
-       parse_compound_stmt tokens (acc @ [Ast.NodeStmtMut {id = id.value; expr}])
-    | _ -> failwith "parse_compound_stmt () failed with unsupported token"
+       parse_block_stmt tokens (acc @ [Ast.NodeStmtMut {id = id.value; expr}])
+    | _ -> failwith "parse_block_stmt () failed with unsupported token"
   ;;
 
   (* Given a list of tokens, will parse a function definition
@@ -187,8 +187,8 @@ module Parser = struct
     let rtype, tokens = expect tokens TokenType.Type in
     let _, tokens = expect tokens TokenType.LBrace in
 
-    let compound_stmt, tokens = parse_compound_stmt tokens [] in
-    NodeStmtFuncDef {id = func_name.value; params; rtype; compound_stmt}, tokens
+    let block_stmt, tokens = parse_block_stmt tokens [] in
+    NodeStmtFuncDef {id = func_name.value; params; rtype; block_stmt}, tokens
   ;;
 
   (* Given a list of tokens, will parse the "outer" statements

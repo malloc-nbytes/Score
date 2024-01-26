@@ -8,7 +8,7 @@ module Ast = struct
   and node_stmt =
     | NodeStmtFuncDef  of node_stmt_func_def
     | NodeStmtFuncCall of node_stmt_func_call
-    | NodeStmtCompound of node_stmt_compound
+    | NodeStmtBlock    of node_stmt_block
     | NodeStmtLet      of node_stmt_let
     | NodeStmtMut      of node_stmt_mut
 
@@ -16,10 +16,10 @@ module Ast = struct
     { id : string
     ; params : (string * TokenType.t) list
     ; rtype : Token.t
-    ; compound_stmt : node_stmt_compound
+    ; block_stmt : node_stmt_block
     }
 
-  and node_stmt_compound =
+  and node_stmt_block =
     { stmts : node_stmt list
     }
 
@@ -61,9 +61,11 @@ module Ast = struct
     { intlit : Token.t
     }
 
+  (* Used for dumping the AST for debugging purposes. *)
   let dump_ast (prog : node_prog) =
     let open Printf in
 
+    (* Construct a string of `d` spaces. *)
     let indent d = let s = ref "" in for i = 1 to d do s := !s ^ "  " done; !s in
 
     let rec dump_expr (expr : node_expr) (depth : int) : unit =
@@ -79,25 +81,26 @@ module Ast = struct
       | NodeTerm NodeTermIntLit e -> printf "%s%s\n" spaces e.intlit.value
     in
 
-    let rec dump_compound_stmt (stmt : node_stmt_compound) (depth : int) : unit =
+    let rec dump_compound_stmt (stmt : node_stmt_block) (depth : int) : unit =
       let spaces = indent depth in
       List.iter (fun ns ->
           match ns with
           | NodeStmtFuncDef ns' -> dump_node_stmt_func_def ns' (depth+1)
           | NodeStmtFuncCall ns' -> failwith "NodeStmtFuncCall unimplemented"
-          | NodeStmtCompound ns' -> dump_compound_stmt ns' (depth+1)
+          | NodeStmtBlock ns' -> dump_compound_stmt ns' (depth+1)
           | NodeStmtLet ns' -> printf "%sLET %s =\n" spaces ns'.id; dump_expr ns'.expr (depth+1)
-          | NodeStmtMut ns' -> failwith "NodeStmtMut unimplemented"
+          | NodeStmtMut ns' -> printf "%sMUT %s =\n" spaces ns'.id; dump_expr ns'.expr (depth+1)
         ) stmt.stmts
 
     and dump_node_stmt_func_def (stmt : node_stmt_func_def) (depth : int) : unit =
       let spaces = indent depth in
-      printf "%s%s (" spaces stmt.id;
+      printf "%sPROC %s (" spaces stmt.id;
 
+      (* Printing the function's parameters. *)
       List.iter (fun p -> printf "%s%s," spaces @@ fst p) stmt.params;
       printf "%s)\n" spaces;
 
-      dump_compound_stmt stmt.compound_stmt (depth+1)
+      dump_compound_stmt stmt.block_stmt (depth+1)
     in
 
     List.iter (fun s ->
