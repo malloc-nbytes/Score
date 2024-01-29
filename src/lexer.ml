@@ -7,11 +7,11 @@ module Lexer = struct
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
     let _ = Hashtbl.add keywords "i32" Type in
-    let _ = Hashtbl.add keywords "void" Type in
     let _ = Hashtbl.add keywords "proc" @@ Proc in
     let _ = Hashtbl.add keywords "ret" @@ Ret in
     let _ = Hashtbl.add keywords "let" @@ Let in
     let _ = Hashtbl.add keywords "if" @@ If in
+    let _ = Hashtbl.add keywords "void" Void in
     ()
   ;;
 

@@ -31,6 +31,7 @@ module TokenType : sig
     | Ret
     | Let
     | If
+    | Void
 
   val to_string : t -> string
 end
