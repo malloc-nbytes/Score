@@ -2,11 +2,11 @@ module Err : sig
   open Token
 
   type err_type =
-    | ParserFatalErr
-    | ParserExpectErr
-    | ParserExhaustedTokensErr
-    | ParserUnknownTokenErr
-    | ParserMalformedFuncDef
+    | Fatal
+    | Expect
+    | Exhausted_tokens
+    | Unknown_token
+    | Malformed_func_def
 
   val err : err_type -> string -> string -> ?msg:string -> Token.t option -> unit
 end

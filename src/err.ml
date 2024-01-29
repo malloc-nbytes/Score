@@ -2,19 +2,19 @@ module Err = struct
   open Token
 
   type err_type =
-    | ParserFatalErr
-    | ParserExpectErr
-    | ParserExhaustedTokensErr
-    | ParserUnknownTokenErr
-    | ParserMalformedFuncDef
+    | Fatal
+    | Expect
+    | Exhausted_tokens
+    | Unknown_token
+    | Malformed_func_def
 
   let err_to_str (err_type : err_type) : string =
     match err_type with
-    | ParserFatalErr -> "ParserFatalErr"
-    | ParserExpectErr -> "ParserExpectErr"
-    | ParserExhaustedTokensErr -> "ParserExhaustedTokensErr"
-    | ParserUnknownTokenErr -> "ParserUnknownTokenErr"
-    | ParserMalformedFuncDef -> "ParserMalformedFuncDef"
+    | Fatal -> "Fatal"
+    | Expect -> "Expect"
+    | Exhausted_tokens -> "Exhausted_tokens"
+    | Unknown_token -> "Unknown_token"
+    | Malformed_func_def -> "Malformed_func_def"
 
   let err (err_type : err_type) (file : string) (func : string)
         ?(msg="") (token : Token.t option) : unit =

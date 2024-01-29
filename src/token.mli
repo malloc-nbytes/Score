@@ -30,6 +30,7 @@ module TokenType : sig
     | Proc
     | Ret
     | Let
+    | If
 
   val to_string : t -> string
 end

@@ -2,11 +2,11 @@
 
 set -xe
 
-if [ "$1" == "switch" ]
+if [ "$1" == "s" ]
 then
     opam switch 5.0.0
     eval $(opam env)
-elif [ "$1" == "clean" ]
+elif [ "$1" == "c" ]
 then
     rm *.cmo *.cmi main
 else
@@ -20,5 +20,6 @@ else
     ocamlc -c ast.ml
     ocamlc -c parser.mli
     ocamlc -c parser.ml
-    ocamlc -o main token.cmo err.cmo ast.cmo lexer.cmo parser.cmo main.ml
+    ocamlc -c main.ml
+    ocamlc -o main token.cmo err.cmo ast.cmo lexer.cmo parser.cmo main.cmo
 fi

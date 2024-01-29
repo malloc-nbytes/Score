@@ -6,11 +6,12 @@ module Lexer = struct
   (* Fill the keywords hashtable with the correct words
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
+    let _ = Hashtbl.add keywords "i32" Type in
+    let _ = Hashtbl.add keywords "void" Type in
     let _ = Hashtbl.add keywords "proc" @@ Proc in
     let _ = Hashtbl.add keywords "ret" @@ Ret in
     let _ = Hashtbl.add keywords "let" @@ Let in
-    let _ = Hashtbl.add keywords "i32" Type in
-    let _ = Hashtbl.add keywords "void" Type in
+    let _ = Hashtbl.add keywords "if" @@ If in
     ()
   ;;
 
@@ -74,11 +75,14 @@ module Lexer = struct
     | '/' :: '/' :: tl     -> let comment, rest = consume_while tl (fun c -> c = '\n') in
                               [Token.{value = comment; ttype = Comment; r; c = c+2+(String.length comment)}]
                               @ lex_file tl r (c+2+String.length comment)
+    | ':' :: ':' :: tl     -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
+    | '-' :: '>' :: tl     -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
+    | '=' :: '=' :: tl     -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
     | '"' :: tl            -> let strlit, rest = consume_while tl (fun c -> c = '"') in
                               [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
                               @ lex_file (List.tl tl) r (c+2+String.length strlit)
-    | ':' :: ':' :: tl     -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
-    | '-' :: '>' :: tl     -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
+    | '>' :: tl            -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
+    | '<' :: tl            -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
     | ':' :: tl            -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
     | ',' :: tl            -> [Token.{value = ","; ttype = Comma; r; c}] @ lex_file tl r (c+1)
     | '(' :: tl            -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)

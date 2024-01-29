@@ -30,6 +30,7 @@ module TokenType = struct
     | Proc
     | Ret
     | Let
+    | If
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -63,6 +64,7 @@ module TokenType = struct
     | Proc -> "Proc"
     | Ret -> "Ret"
     | Let -> "Let"
+    | If -> "If"
 
 end
 
