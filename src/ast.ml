@@ -67,31 +67,40 @@ module Ast = struct
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
       let spaces = indent depth in
-      let _ = printf "%s%s = \n" spaces stmt.id.value in
-      expr_dump stmt.expr (depth + 1) in
+      let _ = printf "%sMUT %s =\n" spaces stmt.id.value in
+      expr_dump stmt.expr depth in
 
     let let_stmt_dump (stmt : let_stmt) (depth : int) : unit =
       let spaces = indent depth in
-      let _ = printf "%sLET %s = " spaces stmt.id.value in
-      expr_dump stmt.expr (depth + 1) in
+      let _ = printf "%sLET %s =\n" spaces stmt.id.value in
+      expr_dump stmt.expr depth in
 
-    let rec block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
-      match stmt.stmts with
-      | [] -> ()
-      | hd :: tl ->
-         (match hd with
-          | Proc_def p -> assert false
-          | Block b -> assert false
-          | Let l -> assert false
-          | Mut m -> assert false) in
+    let rec proc_def_stmt_dump (stmt : proc_def_stmt) (depth : int) : unit =
+      let spaces = indent depth in
+      let _ = printf "%sPROC %s(" spaces stmt.id.value in
+      let _ = List.iter(fun param ->
+                  let pval = (fst param).Token.value
+                  and ptype = (snd param) |> TokenType.to_string in
+                  printf "%s %s," pval ptype) stmt.params in
+      let _ = printf "): %s {\n" @@ TokenType.to_string stmt.rettype in
+      let _ = block_stmt_dump stmt.block (depth + 1) in
+      printf "}\n"
 
-    let proc_def_stmt_dump (stmt : proc_def_stmt) (depth : int) : unit =
-      assert false in
+    and stmt_dump (stmt : stmt) (depth : int) : unit =
+      match stmt with
+      | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
+      | Block b -> block_stmt_dump b (depth + 1)
+      | Let l -> let_stmt_dump l (depth + 1)
+      | Mut m -> mut_stmt_dump m (depth + 1)
+
+    and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
+      List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
 
     let toplvl_stmt_dump (stmt : toplvl_stmt) : unit =
       match stmt with
-      | Proc_def s -> assert false
-      | Let s -> assert false in
+      | Proc_def s -> proc_def_stmt_dump s 0
+      | Let s -> let_stmt_dump s 0 in
+
     List.iter toplvl_stmt_dump program
 
 end

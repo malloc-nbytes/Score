@@ -10,13 +10,13 @@ let file_to_str filename =
   s
 ;;
 
-let repl_produce_ast () =
-  let filepath = "./input.txt" in
-  let data = file_to_str filepath in
-  let _ = Lexer.populate_keywords () in
-  let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
-  (* let _ = Lexer.print_tokens tokens in *)
-  Parser.produce_ast tokens
+(* let repl_produce_ast () = *)
+(*   let filepath = "./input.txt" in *)
+(*   let data = file_to_str filepath in *)
+(*   let _ = Lexer.populate_keywords () in *)
+(*   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in *)
+(*   (\* let _ = Lexer.print_tokens tokens in *\) *)
+(*   Parser.produce_ast tokens *)
 
 let () =
   let filepath = "./input.txt" in
@@ -24,7 +24,6 @@ let () =
   let _ = Lexer.populate_keywords () in
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
   (* let _ = Lexer.print_tokens tokens in *)
-  let _ = Parser.produce_ast tokens in
-  ()
-  (* Ast.dump_ast ast *)
+  let ast = Parser.produce_ast tokens in
+  Ast.ast_dump ast
 ;;
