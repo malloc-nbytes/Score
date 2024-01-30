@@ -17,6 +17,7 @@ module Ast : sig
     { id : Token.t
     ; params : (Token.t * TokenType.t) list
     ; block : block_stmt
+    ; rettype : TokenType.t
     }
 
   and let_stmt =
@@ -45,5 +46,7 @@ module Ast : sig
   and term_expr =
     | Ident of Token.t
     | Intlit of Token.t
+
+  val ast_dump : program -> unit
 
 end

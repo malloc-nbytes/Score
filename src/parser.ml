@@ -136,23 +136,27 @@ module Parser = struct
     expr, tokens
   ;;
 
+  (* Parses the block statement aka `{...}`. Does not consume
+   * `{`, as it is the job of the higher order function. *)
   let rec parse_block_stmt (tokens : Token.t list) : Ast.block_stmt * Token.t list =
-    assert false
-  ;;
-
-(*
-  proc something(a: i32, b: i32): i32 {
-    let s: i32 = 1 + (a*(32/4));
-  }
-*)
+    let rec aux (tokens : Token.t list) (acc : Ast.stmt list) : Ast.stmt list * Token.t list =
+      match tokens with
+      | [] ->
+         let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
+         exit 1
+      | {ttype = TokenType.RBrace; _} :: tl -> acc, tl
+      | lst ->
+         let stmt, tokens = parse_stmt lst in
+         aux tokens @@ acc @ [stmt] in
+    let stmts, tokens = aux tokens [] in
+    Ast.{stmts}, tokens
 
   (* Given a list of tokens, will parse a function definition
    * returning a Ast.node_stmt w/ constructor Ast.node_stmt_block. 
    * Does not need to consume `proc` keyword as the higher order
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
-  let rec parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
-
-    let rec aux (tokens : Token.t list) (acc : (Token.t * TokenType.t) list)
+  and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
+    let rec gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.t) list)
             : (Token.t * TokenType.t) list * Token.t list =
       match tokens with
       | {ttype = TokenType.RParen; _} :: tl -> acc, tl
@@ -163,7 +167,7 @@ module Parser = struct
          let acc = acc @ [id, type_.ttype] in
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
-          | {ttype = TokenType.Comma; _} -> aux tokens acc
+          | {ttype = TokenType.Comma; _} -> gather_params tokens acc
           | _ ->
              let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
              exit 1)
@@ -181,28 +185,29 @@ module Parser = struct
     match peek tokens 0 with
     | Some {ttype = TokenType.Void; _} -> failwith "`void` not implemented for proc defs"
     | Some {ttype = TokenType.Identifier; _} ->
-       let params, tokens = aux tokens [] in
+       let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
+       let _, tokens = expect tokens TokenType.Colon in
+       let rettype, tokens = expect tokens TokenType.Type in
+       let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
-       Ast.{id; params; block}, tokens
+       Ast.{id; params; block; rettype = rettype.ttype}, tokens
     | Some t ->
        let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
        exit 1
     | None ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
-  ;;
 
-  let parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
+  and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; expr}, tokens
-  ;;
 
   (* Parses the statement of `let`. The `let` keyword 
    * has already been consumed by higher order function `parse_stmt`. *)
-  let parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
+  and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.Colon in
     let type_, tokens = expect tokens TokenType.Type in
@@ -210,22 +215,20 @@ module Parser = struct
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; type_; expr}, tokens
-  ;;
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
-  let parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
+  and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Proc; _} :: tl ->
-       let stmt, tokens = parse_proc_def_stmt tokens in
+       let stmt, tokens = parse_proc_def_stmt tl in
        Proc_def stmt, tokens
     | {ttype = TokenType.Let; _} :: tl ->
-       let stmt, tokens = parse_let_stmt tokens in
+       let stmt, tokens = parse_let_stmt tl in
        Let stmt, tokens
-    | {ttype = TokenType.Identifier (* as id *); _} :: tl ->
-       let stmt, tokens = parse_mut_stmt tokens in
+    | {ttype = TokenType.Identifier; _} as hd :: tl ->
+       let stmt, tokens = parse_mut_stmt (hd :: tl) in
        Mut stmt, tokens
-    | {ttype = TokenType.LBrace; _} :: tl -> assert false
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ Some hd in exit 1
@@ -237,10 +240,10 @@ module Parser = struct
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Proc; _} :: tl ->
-       let stmt, tokens = parse_proc_def_stmt tokens in
+       let stmt, tokens = parse_proc_def_stmt tl in
        Proc_def stmt, tokens
     | {ttype = TokenType.Let; _} :: tl ->
-       let stmt, toknes = parse_let_stmt tokens in
+       let stmt, toknes = parse_let_stmt tl in
        Let stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
