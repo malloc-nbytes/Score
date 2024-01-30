@@ -17,7 +17,6 @@ module Parser = struct
     | None ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"unwrapped None value" None in
        exit 1
-  ;;
 
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
@@ -37,7 +36,6 @@ module Parser = struct
        let _ = Err.err Err.Expect __FILE__ __FUNCTION__
          ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
     | hd :: tl -> hd, tl
-  ;;
 
   (* Takes a list and discards the head of it
    * but returns the tail of it. Should be used
@@ -46,7 +44,6 @@ module Parser = struct
     match lst with
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | _ :: tl -> tl
-  ;;
 
   (* Takes a list and splits the head from the tail
    * and returns both. Should be used when wanting to
@@ -57,7 +54,6 @@ module Parser = struct
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
     | hd :: tl -> hd, tl
-  ;;
 
   (* Takes a token list and will peek the top
    * token. If something exists, return Some (`hd`).
@@ -134,7 +130,6 @@ module Parser = struct
   and parse_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     let expr, tokens = parse_add_expr tokens in
     expr, tokens
-  ;;
 
   (* Parses the block statement aka `{...}`. Does not consume
    * `{`, as it is the job of the higher order function. *)
@@ -152,7 +147,7 @@ module Parser = struct
     Ast.{stmts}, tokens
 
   (* Given a list of tokens, will parse a function definition
-   * returning a Ast.node_stmt w/ constructor Ast.node_stmt_block. 
+   * returning a Ast.node_stmt w/ constructor Ast.node_stmt_block.
    * Does not need to consume `proc` keyword as the higher order
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
@@ -205,7 +200,7 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; expr}, tokens
 
-  (* Parses the statement of `let`. The `let` keyword 
+  (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)
   and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
@@ -215,6 +210,9 @@ module Parser = struct
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; type_; expr}, tokens
+
+  and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =
+    assert false
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
@@ -229,13 +227,15 @@ module Parser = struct
     | {ttype = TokenType.Identifier; _} as hd :: tl ->
        let stmt, tokens = parse_mut_stmt (hd :: tl) in
        Mut stmt, tokens
+    | {ttype = TokenType.If; _} :: tl ->
+       let stmt, tokens = parse_if_stmt tl in
+       If stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ Some hd in exit 1
     | _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ None in exit 1
-  ;;
 
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
@@ -248,10 +248,9 @@ module Parser = struct
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
        exit 1
-    | _ -> 
+    | _ ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
-  ;;
 
   (* Entrypoint of the parser. Takes a list of tokens and produces
    * a node_prog. *)
@@ -261,6 +260,5 @@ module Parser = struct
       | hd :: _ when hd.Token.ttype = TokenType.Eof -> []
       | tokens' -> let stmt, rest = parse_toplvl_stmt tokens' in [stmt] @ aux rest in
     aux tokens
-  ;;
 
 end

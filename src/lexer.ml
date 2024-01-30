@@ -64,7 +64,7 @@ module Lexer = struct
   ;;
 
   (* Given `src` (source code converted to a char list), will lex
-   * all chars into tokensl `r` and `c` are the rows and columns that
+   * all chars into tokens `r` and `c` are the rows and columns that
    * will be added to a created token. *)
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with

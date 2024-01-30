@@ -12,6 +12,14 @@ module Ast : sig
     | Block of block_stmt
     | Let of let_stmt
     | Mut of mut_stmt
+    | If of if_stmt
+
+  and block_stmt = { stmts : stmt list}
+
+  and if_stmt =
+    { expr : expr
+    ; block : block_stmt
+    }
 
   and proc_def_stmt =
     { id : Token.t
@@ -30,8 +38,6 @@ module Ast : sig
     { id : Token.t
     ; expr : expr
     }
-
-  and block_stmt = { stmts : stmt list}
 
   and expr =
     | Binary of binary_expr

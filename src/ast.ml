@@ -12,6 +12,14 @@ module Ast = struct
     | Block of block_stmt
     | Let of let_stmt
     | Mut of mut_stmt
+    | If of if_stmt
+
+  and block_stmt = { stmts : stmt list}
+
+  and if_stmt =
+    { expr : expr
+    ; block : block_stmt
+    }
 
   and proc_def_stmt =
     { id : Token.t
@@ -30,8 +38,6 @@ module Ast = struct
     { id : Token.t
     ; expr : expr
     }
-
-  and block_stmt = { stmts : stmt list}
 
   and expr =
     | Binary of binary_expr
@@ -92,6 +98,7 @@ module Ast = struct
       | Block b -> block_stmt_dump b (depth + 1)
       | Let l -> let_stmt_dump l (depth + 1)
       | Mut m -> mut_stmt_dump m (depth + 1)
+      | _ -> failwith "could not dump stmt. unimplemented stmt"
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
