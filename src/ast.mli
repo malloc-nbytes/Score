@@ -13,8 +13,14 @@ module Ast : sig
     | Let of let_stmt
     | Mut of mut_stmt
     | If of if_stmt
+    | While of while_stmt
 
   and block_stmt = { stmts : stmt list}
+
+  and while_stmt =
+    { expr : expr
+    ; block : block_stmt
+    }
 
   and if_stmt =
     { expr : expr

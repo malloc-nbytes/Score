@@ -1,24 +1,24 @@
 (* MIT License
 
-* Copyright (c) 2023 malloc-nbytes
+   * Copyright (c) 2023 malloc-nbytes
 
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
 
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE. *)
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE. *)
 
 module Lexer = struct
   open Token
@@ -34,6 +34,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "let" @@ Let in
     let _ = Hashtbl.add keywords "if" @@ If in
     let _ = Hashtbl.add keywords "void" Void in
+    let _ = Hashtbl.add keywords "while" While in
     ()
   ;;
 
@@ -90,45 +91,45 @@ module Lexer = struct
    * will be added to a created token. *)
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with
-    | []                   -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
-    | '\n' :: tl           -> lex_file tl (r+1) 1
-    | '\t' :: tl           -> lex_file tl r (c+1)
-    | ' ' :: tl            -> lex_file tl r (c+1)
-    | '/' :: '/' :: tl     -> let comment, rest = consume_while tl (fun c -> c = '\n') in
-                              [Token.{value = comment; ttype = Comment; r; c = c+2+(String.length comment)}]
-                              @ lex_file tl r (c+2+String.length comment)
-    | ':' :: ':' :: tl     -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
-    | '-' :: '>' :: tl     -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
-    | '=' :: '=' :: tl     -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
-    | '"' :: tl            -> let strlit, rest = consume_while tl (fun c -> c = '"') in
-                              [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
-                              @ lex_file (List.tl tl) r (c+2+String.length strlit)
-    | '>' :: tl            -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
-    | '<' :: tl            -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
-    | ':' :: tl            -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
-    | ',' :: tl            -> [Token.{value = ","; ttype = Comma; r; c}] @ lex_file tl r (c+1)
-    | '(' :: tl            -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
-    | ')' :: tl            -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
-    | '{' :: tl            -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
-    | '}' :: tl            -> [Token.{value = "}"; ttype = RBrace; r; c}] @ lex_file tl r (c+1)
-    | '[' :: tl            -> [Token.{value = "["; ttype = LBracket; r; c}] @ lex_file tl r (c+1)
-    | ']' :: tl            -> [Token.{value = "]"; ttype = RBracket; r; c}] @ lex_file tl r (c+1)
-    | ';' :: tl            -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
-    | '+' :: tl            -> [Token.{value = "+"; ttype = Plus; r; c}] @ lex_file tl r (c+1)
-    | '-' :: tl            -> [Token.{value = "-"; ttype = Minus; r; c}] @ lex_file tl r (c+1)
-    | '*' :: tl            -> [Token.{value = "*"; ttype = Asterisk; r; c}] @ lex_file tl r (c+1)
-    | '/' :: tl            -> [Token.{value = "/"; ttype = ForwardSlash; r; c}] @ lex_file tl r (c+1)
-    | '%' :: tl            -> [Token.{value = "%"; ttype = Percent; r; c}] @ lex_file tl r (c+1)
-    | '=' :: tl            -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
-    | '.' :: tl            -> [Token.{value = "."; ttype = TokenType.Period; r; c}] @ lex_file tl r (c+1)
+    | [] -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
+    | '\n' :: tl -> lex_file tl (r+1) 1
+    | '\t' :: tl -> lex_file tl r (c+1)
+    | ' ' :: tl -> lex_file tl r (c+1)
+    | '/' :: '/' :: tl -> let comment, rest = consume_while tl (fun c -> c = '\n') in
+                          [Token.{value = comment; ttype = Comment; r; c = c+2+(String.length comment)}]
+                          @ lex_file tl r (c+2+String.length comment)
+    | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
+    | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
+    | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
+    | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c = '"') in
+                   [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
+                   @ lex_file (List.tl tl) r (c+2+String.length strlit)
+    | '>' :: tl -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
+    | '<' :: tl -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
+    | ':' :: tl -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
+    | ',' :: tl -> [Token.{value = ","; ttype = Comma; r; c}] @ lex_file tl r (c+1)
+    | '(' :: tl -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
+    | ')' :: tl -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
+    | '{' :: tl -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
+    | '}' :: tl -> [Token.{value = "}"; ttype = RBrace; r; c}] @ lex_file tl r (c+1)
+    | '[' :: tl -> [Token.{value = "["; ttype = LBracket; r; c}] @ lex_file tl r (c+1)
+    | ']' :: tl -> [Token.{value = "]"; ttype = RBracket; r; c}] @ lex_file tl r (c+1)
+    | ';' :: tl -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
+    | '+' :: tl -> [Token.{value = "+"; ttype = Plus; r; c}] @ lex_file tl r (c+1)
+    | '-' :: tl -> [Token.{value = "-"; ttype = Minus; r; c}] @ lex_file tl r (c+1)
+    | '*' :: tl -> [Token.{value = "*"; ttype = Asterisk; r; c}] @ lex_file tl r (c+1)
+    | '/' :: tl -> [Token.{value = "/"; ttype = ForwardSlash; r; c}] @ lex_file tl r (c+1)
+    | '%' :: tl -> [Token.{value = "%"; ttype = Percent; r; c}] @ lex_file tl r (c+1)
+    | '=' :: tl -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
+    | '.' :: tl -> [Token.{value = "."; ttype = TokenType.Period; r; c}] @ lex_file tl r (c+1)
     | '0'..'9' as hd :: tl -> let intlit, rest = consume_while (hd :: tl) (fun c -> isnum c) in
                               [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
                               @ lex_file rest r (c+String.length intlit)
-    | hd :: tl             -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
-                              let word = String.make 1 hd ^ word in
-                              (match is_keyword word with
-                               | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
-                               | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
+    | hd :: tl -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+                  let word = String.make 1 hd ^ word in
+                  (match is_keyword word with
+                   | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
+                   | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
   ;;
 
   (* Debug function to print a list of tokens. *)

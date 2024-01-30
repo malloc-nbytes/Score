@@ -1,24 +1,24 @@
 (* MIT License
 
-* Copyright (c) 2023 malloc-nbytes
+   * Copyright (c) 2023 malloc-nbytes
 
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
 
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE. *)
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE. *)
 
 (* TODO:
  *   Factor out the repeating code
@@ -56,7 +56,7 @@ module Parser = struct
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp in
        let _ = Err.err Err.Expect __FILE__ __FUNCTION__
-         ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
+                 ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
     | hd :: tl -> hd, tl
 
   (* Takes a list and discards the head of it
@@ -242,6 +242,13 @@ module Parser = struct
     let block, tokens = parse_block_stmt tokens in
     Ast.{expr; block}, tokens
 
+  (* Parses the while statement. *)
+  and parse_while_stmt (tokens : Token.t list) : Ast.while_stmt * Token.t list =
+    let expr, tokens = parse_expr tokens in
+    let _, tokens = expect tokens TokenType.LBrace in
+    let block, tokens = parse_block_stmt tokens in
+    Ast.{expr; block}, tokens
+
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
   and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
@@ -258,6 +265,9 @@ module Parser = struct
     | {ttype = TokenType.If; _} :: tl ->
        let stmt, tokens = parse_if_stmt tl in
        If stmt, tokens
+    | {ttype = TokenType.While; _} :: tl ->
+       let stmt, tokens = parse_while_stmt tl in
+       While stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ Some hd in exit 1

@@ -1,24 +1,24 @@
 (* MIT License
 
-* Copyright (c) 2023 malloc-nbytes
+   * Copyright (c) 2023 malloc-nbytes
 
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
 
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE. *)
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE. *)
 
 module Ast = struct
   open Token
@@ -35,8 +35,14 @@ module Ast = struct
     | Let of let_stmt
     | Mut of mut_stmt
     | If of if_stmt
+    | While of while_stmt
 
   and block_stmt = { stmts : stmt list}
+
+  and while_stmt =
+    { expr : expr
+    ; block : block_stmt
+    }
 
   and if_stmt =
     { expr : expr
@@ -122,6 +128,14 @@ module Ast = struct
       let _ = block_stmt_dump stmt.block (depth + 1) in
       printf "%s}\n" spaces
 
+    and while_stmt_dump (stmt : while_stmt) (depth : int) : unit =
+      let spaces = indent depth in
+      let _ = printf "%sWHILE\n" spaces in
+      let _ = expr_dump stmt.expr depth in
+      let _ = printf "%s{\n" spaces in
+      let _ = block_stmt_dump stmt.block (depth + 1) in
+      printf "%s}\n" spaces
+
     and stmt_dump (stmt : stmt) (depth : int) : unit =
       match stmt with
       | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
@@ -129,6 +143,7 @@ module Ast = struct
       | Let l -> let_stmt_dump l (depth + 1)
       | Mut m -> mut_stmt_dump m (depth + 1)
       | If i -> if_stmt_dump i (depth + 1)
+      | While w -> while_stmt_dump w (depth + 1)
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
