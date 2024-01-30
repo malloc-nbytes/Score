@@ -1,3 +1,25 @@
+(* MIT License
+
+* Copyright (c) 2023 malloc-nbytes
+
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE. *)
+
 (* TODO:
  *   Factor out the repeating code
  *   of the `aux` inner functions inside
@@ -193,6 +215,8 @@ module Parser = struct
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
 
+  (* Used when parsing a statement of mutating a value
+   * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.Equals in
@@ -211,6 +235,7 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; type_; expr}, tokens
 
+  (* Parses the if statement. *)
   and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.LBrace in
@@ -240,6 +265,7 @@ module Parser = struct
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ None in exit 1
 
+  (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Proc; _} :: tl ->
@@ -256,7 +282,7 @@ module Parser = struct
        exit 1
 
   (* Entrypoint of the parser. Takes a list of tokens and produces
-   * a node_prog. *)
+   * a program. *)
   let produce_ast (tokens : Token.t list) : Ast.program =
     let rec aux = function
       | [] -> []
