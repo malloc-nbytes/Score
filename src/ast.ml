@@ -92,13 +92,22 @@ module Ast = struct
       let _ = block_stmt_dump stmt.block (depth + 1) in
       printf "}\n"
 
+    and if_stmt_dump (stmt : if_stmt) (depth : int) : unit =
+      let spaces = indent depth in
+      let _ = printf "%sIF\n" spaces in
+      let _ = expr_dump stmt.expr depth in
+      let _ = printf "%s{\n" spaces in
+      let _ = block_stmt_dump stmt.block (depth + 1) in
+      printf "%s}\n" spaces
+
     and stmt_dump (stmt : stmt) (depth : int) : unit =
       match stmt with
       | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
       | Block b -> block_stmt_dump b (depth + 1)
       | Let l -> let_stmt_dump l (depth + 1)
       | Mut m -> mut_stmt_dump m (depth + 1)
-      | _ -> failwith "could not dump stmt. unimplemented stmt"
+      | If i -> if_stmt_dump i (depth + 1)
+      (* | _ -> failwith "could not dump stmt. unimplemented stmt" *)
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in

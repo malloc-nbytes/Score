@@ -212,7 +212,10 @@ module Parser = struct
     Ast.{id; type_; expr}, tokens
 
   and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =
-    assert false
+    let expr, tokens = parse_expr tokens in
+    let _, tokens = expect tokens TokenType.LBrace in
+    let block, tokens = parse_block_stmt tokens in
+    Ast.{expr; block}, tokens
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
