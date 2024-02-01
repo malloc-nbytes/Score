@@ -2,13 +2,14 @@ module Gen = struct
   open Ast
   open Opcode
 
-  let evaluate_expr (expr : Ast.expr) : (Opcode.t * Opcode.byte) list =
+  let evaluate_expr (expr : Ast.expr) : Opcode.byte list =
     match expr with
     | Ast.Binary bin -> assert false
     | Ast.Term Ast.Ident ident -> failwith "Ident Term expr not implemented"
     | Ast.Term Ast.Intlit term ->
-       let value = int_of_string term.value in
-       [Opcode.IPush, value]
+       let value = int_of_string term.value
+       and bytecode = Opcode.get_instr Opcode.IPush in
+       [bytecode; value]
 
   let evaluate_mut_stmt (stmt : Ast.mut_stmt) : Opcode.byte =
     assert false
@@ -24,7 +25,7 @@ module Gen = struct
 
   let evaluate_stmt (stmt : Ast.stmt) : Opcode.byte list =
     match stmt with
-    | Ast.Proc_def procdef -> assert false
+    | Ast.Proc_def procdef -> evaluate_proc_def_stmt procdef
     | Ast.Block block -> assert false
     | Ast.Let letstmt -> assert false
     | Ast.Mut mutstmt -> assert false
