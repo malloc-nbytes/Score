@@ -1,47 +1,45 @@
 module Gen = struct
   open Ast
-  open Opcode
 
-  let evaluate_expr (expr : Ast.expr) : Opcode.byte list =
+  let asm = ref ""
+
+  let evaluate_expr (expr : Ast.expr) : unit =
     match expr with
     | Ast.Binary bin -> assert false
-    | Ast.Term Ast.Ident ident -> failwith "Ident Term expr not implemented"
-    | Ast.Term Ast.Intlit term ->
-       let value = int_of_string term.value
-       and bytecode = Opcode.get_instr Opcode.IPush in
-       [bytecode; value]
+    | Ast.Term Ast.Ident ident -> assert false
+    | Ast.Term Ast.Intlit term -> assert false
 
-  let evaluate_mut_stmt (stmt : Ast.mut_stmt) : Opcode.byte =
+  let evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false
 
-  let evaluate_let_stmt (stmt : Ast.let_stmt) : Opcode.byte =
+  let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert false
 
-  let evaluate_block_stmt (stmt : Ast.block_stmt) : Opcode.byte list =
+  let evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
     assert false
 
-  let evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : Opcode.byte list =
+  let evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
     assert false
 
-  let evaluate_stmt (stmt : Ast.stmt) : Opcode.byte list =
+  let evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with
-    | Ast.Proc_def procdef -> evaluate_proc_def_stmt procdef
+    | Ast.Proc_def procdef -> assert false
     | Ast.Block block -> assert false
     | Ast.Let letstmt -> assert false
     | Ast.Mut mutstmt -> assert false
-    | Ast.If ifstmt -> failwith "traversing if_stmt not implemented"
-    | Ast.While whilestmt -> failwith "traversing while_stmt not implemented"
+    | Ast.If ifstmt -> assert false
+    | Ast.While whilestmt -> assert false
 
-  let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : Opcode.byte list =
+  let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def stmt' -> assert false
     | Ast.Let stmt' -> assert false
 
-  let generate_bytecode (program : Ast.program) : Opcode.byte list =
-    let rec aux (stmts : Ast.toplvl_stmt list) : Opcode.byte list =
-      match stmts with
-      | [] -> []
-      | hd :: tl -> evaluate_toplvl_stmt hd @ aux tl in
+  let generate_bytecode (program : Ast.program) : string =
+    let rec aux = function
+      | [] -> !asm
+      | hd :: tl -> let _ = evaluate_toplvl_stmt hd in aux tl in
+    let _ = aux program in
     aux program
 
 end

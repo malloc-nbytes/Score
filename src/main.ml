@@ -2,7 +2,6 @@ open Token
 open Lexer
 open Parser
 open Ast
-open Opcode
 open Gen
 
 let file_to_str filename =
@@ -20,6 +19,6 @@ let () =
   (* let _ = Lexer.print_tokens tokens in *)
   let program = Parser.produce_ast tokens in
   (* Ast.ast_dump ast *)
-  let _ : Opcode.byte list = Gen.generate_bytecode program in
+  let _ : string = Gen.generate_bytecode program in
   ()
 ;;
