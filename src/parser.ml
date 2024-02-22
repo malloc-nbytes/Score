@@ -249,6 +249,9 @@ module Parser = struct
     let block, tokens = parse_block_stmt tokens in
     Ast.{expr; block}, tokens
 
+  and parse_proc_call (tokens : Token.t list) : Ast.proc_call_expr * Token.t list =
+    failwith "parse_proc_call unimplemented"
+
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
   and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
@@ -260,8 +263,18 @@ module Parser = struct
        let stmt, tokens = parse_let_stmt tl in
        Let stmt, tokens
     | {ttype = TokenType.Identifier; _} as hd :: tl ->
-       let stmt, tokens = parse_mut_stmt (hd :: tl) in
-       Mut stmt, tokens
+       (match peek tl 0 with
+        (* Procedure call *)
+        | Some {ttype = TokenType.LParen; _} ->
+           let stmt, tokens = parse_proc_call (hd :: tl) in
+           Ast.Stmt_expr (Ast.Proc_call stmt), tokens
+        (* Mutating variable *)
+        | Some _ -> 
+           let stmt, tokens = parse_mut_stmt (hd :: tl) in
+           Mut stmt, tokens
+        | _ ->
+           let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
+           exit 1)
     | {ttype = TokenType.If; _} :: tl ->
        let stmt, tokens = parse_if_stmt tl in
        If stmt, tokens
