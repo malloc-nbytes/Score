@@ -95,9 +95,9 @@ module Lexer = struct
     | '\n' :: tl -> lex_file tl (r+1) 1
     | '\t' :: tl -> lex_file tl r (c+1)
     | ' ' :: tl -> lex_file tl r (c+1)
-    | '/' :: '/' :: tl -> failwith "comments unimplemented"
-       (* let comment, rest = consume_while tl (fun c -> c <> '\n') in *)
-       (* lex_file tl r (c+2+String.length comment) *)
+    | '/' :: '/' :: tl -> 
+       let comment, rest = consume_while tl (fun c -> c <> '\n') in
+       lex_file tl r (c+2+String.length comment)
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)

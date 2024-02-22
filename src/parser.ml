@@ -259,7 +259,6 @@ module Parser = struct
          (match peek tokens 0 with
           | Some {ttype = TokenType.Comma; _} -> parse_args (List.tl tokens) (acc @ [expr])
           | _ -> acc, tokens) in
-
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.LParen in
     let args, tokens = parse_args tokens [] in
@@ -279,12 +278,10 @@ module Parser = struct
        Let stmt, tokens
     | {ttype = TokenType.Identifier; _} as hd :: tl ->
        (match peek tl 0 with
-        (* Procedure call *)
-        | Some {ttype = TokenType.LParen; _} ->
+        | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
            let stmt, tokens = parse_proc_call (hd :: tl) in
            Ast.Stmt_expr (Ast.Proc_call stmt), tokens
-        (* Mutating variable *)
-        | Some _ -> 
+        | Some _ -> (* Mutating variable *)
            let stmt, tokens = parse_mut_stmt (hd :: tl) in
            Mut stmt, tokens
         | _ ->
