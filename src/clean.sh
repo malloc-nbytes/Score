@@ -2,4 +2,4 @@
 
 set -xe
 
-rm *.cmo *.cmi main
+rm -rf *.cmo *.cmi *.ssa main

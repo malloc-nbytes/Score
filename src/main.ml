@@ -16,9 +16,14 @@ let write_to_file filepath content =
   let _ = Printf.fprintf oc "%s" content in
   close_out oc
 
+let run_qbe filepath =
+  let cmd = Printf.sprintf "qbe %s" filepath in
+  (* TODO: Deal with exit failure *)
+  let _ = Sys.command cmd in ()
+
 let () =
-  let filepath = "./input.txt" in
-  let data = file_to_str filepath in
+  let infp = "./input.txt" in
+  let data = file_to_str infp in
   let _ = Lexer.populate_keywords () in
 
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
@@ -30,5 +35,6 @@ let () =
   let code : string = Gen.generate_inter_lang program in
   let _ = print_endline code in
 
-  write_to_file "./out.ssa" code
-;;
+  let outfp = "./out.ssa" in
+  let _ = write_to_file outfp code in
+  run_qbe outfp

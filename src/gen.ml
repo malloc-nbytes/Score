@@ -19,7 +19,7 @@ module Gen = struct
     assert false
 
   let evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
-    ()
+    func_section := sprintf "%s    ret 0\n" !func_section
 
   let evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
     func_section :=
@@ -47,3 +47,4 @@ module Gen = struct
     !func_section ^ !data_section
 
 end
+
