@@ -14,6 +14,7 @@ module Ast : sig
     | Mut of mut_stmt
     | If of if_stmt
     | While of while_stmt
+    | Stmt_expr of stmt_expr
 
   and block_stmt = { stmts : stmt list}
 
@@ -48,6 +49,10 @@ module Ast : sig
   and expr =
     | Binary of binary_expr
     | Term of term_expr
+    | Proc_call of proc_call_expr
+
+  and stmt_expr =
+    | Proc_call of proc_call_expr
 
   and binary_expr =
     { lhs : expr
@@ -58,6 +63,11 @@ module Ast : sig
   and term_expr =
     | Ident of Token.t
     | Intlit of Token.t
+
+  and proc_call_expr =
+    { id : Token.t
+    ; args : expr list
+    }
 
   val ast_dump : program -> unit
 
