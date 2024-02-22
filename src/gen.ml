@@ -10,6 +10,7 @@ module Gen = struct
     | Ast.Binary bin -> assert false
     | Ast.Term Ast.Ident ident -> assert false
     | Ast.Term Ast.Intlit term -> assert false
+    | Ast.Proc_call pc -> assert false
 
   let evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false
@@ -34,6 +35,7 @@ module Gen = struct
     | Ast.Mut mutstmt -> assert false
     | Ast.If ifstmt -> assert false
     | Ast.While whilestmt -> assert false
+    | Ast.Stmt_expr se -> assert false
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with

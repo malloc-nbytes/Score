@@ -107,7 +107,8 @@ module Ast = struct
          let _ = printf "%s%s\n" spaces b.op.value in
          expr_dump b.rhs (depth + 1)
       | Term Ident i -> printf "%s%s\n" spaces i.value
-      | Term Intlit t -> printf "%s%s\n" spaces t.value in
+      | Term Intlit t -> printf "%s%s\n" spaces t.value
+      | Proc_call pc -> failwith "Proc_call dump unimplemented" in
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
       let spaces = indent depth in
@@ -154,6 +155,7 @@ module Ast = struct
       | Mut m -> mut_stmt_dump m (depth + 1)
       | If i -> if_stmt_dump i (depth + 1)
       | While w -> while_stmt_dump w (depth + 1)
+      | Stmt_expr se -> failwith "Stmt_expr dump unimplemented"
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
