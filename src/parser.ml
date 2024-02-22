@@ -249,8 +249,23 @@ module Parser = struct
     let block, tokens = parse_block_stmt tokens in
     Ast.{expr; block}, tokens
 
+  (* Parses the stmt_expr of a procedure call. *)
   and parse_proc_call (tokens : Token.t list) : Ast.proc_call_expr * Token.t list =
-    failwith "parse_proc_call unimplemented"
+    let rec parse_args (tokens : Token.t list) (acc : Ast.expr list) : Ast.expr list * Token.t list =
+      match tokens with
+      | {ttype = TokenType.RParen; _} :: tl -> acc, tokens (* Case for no args *)
+      | tokens ->
+         let expr, tokens = parse_expr tokens in
+         (match peek tokens 0 with
+          | Some {ttype = TokenType.Comma; _} -> parse_args (List.tl tokens) (acc @ [expr])
+          | _ -> acc, tokens) in
+
+    let id, tokens = expect tokens TokenType.Identifier in
+    let _, tokens = expect tokens TokenType.LParen in
+    let args, tokens = parse_args tokens [] in
+    let _, tokens = expect tokens TokenType.RParen in
+    let _, tokens = expect tokens TokenType.Semicolon in
+    Ast.{id; args}, tokens
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
