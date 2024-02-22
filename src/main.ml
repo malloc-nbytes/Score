@@ -15,10 +15,17 @@ let () =
   let filepath = "./input.txt" in
   let data = file_to_str filepath in
   let _ = Lexer.populate_keywords () in
+
   let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
   (* let _ = Lexer.print_tokens tokens in *)
+
   let program = Parser.produce_ast tokens in
-  (* Ast.ast_dump ast *)
-  let _ : string = Gen.generate_bytecode program in
-  ()
+  (* Ast.ast_dump program; *)
+
+  let intermediate_code : string = Gen.generate_inter_lang program in
+  let _ = print_endline intermediate_code in
+
+  let oc = open_out "out.ssa" in
+  let _ = Printf.fprintf oc "%s" intermediate_code in
+  close_out oc
 ;;
