@@ -5,37 +5,40 @@ module Gen = struct
   let func_section = ref ""
   let data_section = ref ""
 
-  let evaluate_expr (expr : Ast.expr) : unit =
+  let evaluate_expr (expr : Ast.expr) : string =
     match expr with
     | Ast.Binary bin -> assert false
     | Ast.Term Ast.Ident ident -> assert false
-    | Ast.Term Ast.Intlit term -> assert false
+    | Ast.Term Ast.Intlit intlit -> "copy " ^ intlit.value
     | Ast.Proc_call pc -> assert false
 
-  let evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    assert false
-
-  let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
-    assert false
-
-  let evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
-    func_section := sprintf "%s    ret 0\n" !func_section
-
-  let evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
-    func_section :=
-      sprintf "%sexport function w $%s() {\n@start\n" !func_section stmt.id.value;
-    evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s}\n" !func_section
-
-  let evaluate_stmt (stmt : Ast.stmt) : unit =
+  let rec evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with
     | Ast.Proc_def procdef -> assert false
     | Ast.Block block -> assert false
-    | Ast.Let letstmt -> assert false
+    | Ast.Let letstmt -> evaluate_let_stmt letstmt
     | Ast.Mut mutstmt -> assert false
     | Ast.If ifstmt -> assert false
     | Ast.While whilestmt -> assert false
     | Ast.Stmt_expr se -> assert false
+
+  and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
+    assert false
+
+  and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
+    func_section :=
+      sprintf "%s    %%%s =w %s\n" !func_section stmt.id.value
+        (evaluate_expr stmt.expr)
+
+  and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
+    List.iter evaluate_stmt stmt.stmts
+
+  and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
+    func_section :=
+      sprintf "%sexport function w $%s() {\n@start\n" !func_section stmt.id.value;
+    evaluate_block_stmt stmt.block;
+    func_section := sprintf "%s    ret 0\n" !func_section;
+    func_section := sprintf "%s}\n" !func_section
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
