@@ -147,6 +147,14 @@ module Ast = struct
       let _ = block_stmt_dump stmt.block (depth + 1) in
       printf "%s}\n" spaces
 
+    and stmt_expr_dump (stmt : stmt_expr) (depth : int) : unit =
+      let spaces = indent depth in
+      match stmt with
+      | Proc_call pc ->
+        let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.value in
+        let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
+        printf "%s)\n" spaces
+
     and stmt_dump (stmt : stmt) (depth : int) : unit =
       match stmt with
       | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
@@ -155,7 +163,7 @@ module Ast = struct
       | Mut m -> mut_stmt_dump m (depth + 1)
       | If i -> if_stmt_dump i (depth + 1)
       | While w -> while_stmt_dump w (depth + 1)
-      | Stmt_expr se -> failwith "Stmt_expr dump unimplemented"
+      | Stmt_expr se -> stmt_expr_dump se (depth + 1)
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in

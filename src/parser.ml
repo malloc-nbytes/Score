@@ -256,8 +256,9 @@ module Parser = struct
       | {ttype = TokenType.RParen; _} :: tl -> acc, tokens (* Case for no args *)
       | tokens ->
          let expr, tokens = parse_expr tokens in
+         let acc = acc @ [expr] in
          (match peek tokens 0 with
-          | Some {ttype = TokenType.Comma; _} -> parse_args (List.tl tokens) (acc @ [expr])
+          | Some {ttype = TokenType.Comma; _} -> parse_args (List.tl tokens) acc
           | _ -> acc, tokens) in
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.LParen in
