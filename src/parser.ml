@@ -193,6 +193,7 @@ module Parser = struct
           | _ ->
              let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
              exit 1)
+      | {ttype = TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
       | hd :: _ ->
          let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ @@ Some hd in
          exit 1
@@ -205,8 +206,7 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LParen in
 
     match peek tokens 0 with
-    | Some {ttype = TokenType.Void; _} -> failwith "`void` not implemented for proc defs"
-    | Some {ttype = TokenType.Identifier; _} ->
+    | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
        let rettype, tokens = expect tokens TokenType.Type in
