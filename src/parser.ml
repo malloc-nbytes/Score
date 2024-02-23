@@ -93,7 +93,12 @@ module Parser = struct
    * to this level. *)
   let rec parse_primary_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     match tokens with
-    | {ttype = TokenType.Identifier; _} as id :: tl -> Ast.Term (Ast.Ident id), tl
+    | {ttype = TokenType.Identifier; _} as id :: tl ->
+      (match peek tl 0 with
+      | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
+         let proc_call, tokens = parse_proc_call (id :: tl) in
+         Ast.Proc_call proc_call, tokens
+      | _ -> Ast.Term (Ast.Ident id), tl)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
@@ -155,7 +160,7 @@ module Parser = struct
 
   (* Parses the block statement aka `{...}`. Does not consume
    * `{`, as it is the job of the higher order function. *)
-  let rec parse_block_stmt (tokens : Token.t list) : Ast.block_stmt * Token.t list =
+  and parse_block_stmt (tokens : Token.t list) : Ast.block_stmt * Token.t list =
     let rec aux (tokens : Token.t list) (acc : Ast.stmt list) : Ast.stmt list * Token.t list =
       match tokens with
       | [] ->
@@ -264,7 +269,7 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LParen in
     let args, tokens = parse_args tokens [] in
     let _, tokens = expect tokens TokenType.RParen in
-    let _, tokens = expect tokens TokenType.Semicolon in
+    (* let _, tokens = expect tokens TokenType.Semicolon in *)
     Ast.{id; args}, tokens
 
   and parse_ret_stmt (tokens : Token.t list) : Ast.ret_stmt * Token.t list =
@@ -286,6 +291,7 @@ module Parser = struct
        (match peek tl 0 with
         | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
            let stmt, tokens = parse_proc_call (hd :: tl) in
+           let _, tokens = expect tokens TokenType.Semicolon in
            Ast.Stmt_expr (Ast.Proc_call stmt), tokens
         | Some _ -> (* Mutating variable *)
            let stmt, tokens = parse_mut_stmt (hd :: tl) in

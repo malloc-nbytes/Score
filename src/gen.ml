@@ -44,6 +44,11 @@ module Gen = struct
     | TokenType.ForwardSlash -> "div"
     | _ -> failwith "Invalid binary operator"
 
+    (* and proc_call_expr =
+      { id : Token.t
+      ; args : expr list
+      } *)
+
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
     | Ast.Binary bin ->
@@ -54,7 +59,13 @@ module Gen = struct
       !tmpreg
     | Ast.Term Ast.Ident ident -> "%" ^ ident.value
     | Ast.Term Ast.Intlit intlit -> intlit.value
-    | Ast.Proc_call pc -> "call " ^ pc.id.value
+    | Ast.Proc_call pc ->
+      let args = (List.fold_left (fun acc e ->
+        acc ^ "w " ^ evaluate_expr e ^ ", "
+      ) "" pc.args) in
+      let cons_arsg = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
+      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg ()) cons_arsg;
+      !tmpreg
 
   let rec evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with
@@ -75,18 +86,20 @@ module Gen = struct
     assert false
 
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
-    func_section :=
-      sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value
-        (evaluate_expr stmt.expr)
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
 
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
     List.iter evaluate_stmt stmt.stmts
 
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
+    let params : string = List.fold_left (fun acc p ->
+      let id = (fst p).Token.value in (* TODO: Types for params *)
+      acc ^ "w %" ^ id ^ ", "
+    ) "" stmt.params in
     func_section :=
-      sprintf "%sexport function w $%s() {\n@start\n" !func_section stmt.id.value;
+      sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.value params;
     evaluate_block_stmt stmt.block;
-    (* func_section := sprintf "%s    ret 0\n" !func_section; *)
     func_section := sprintf "%s}\n" !func_section
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
@@ -99,4 +112,3 @@ module Gen = struct
     !func_section ^ !data_section
 
 end
-
