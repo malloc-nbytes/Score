@@ -21,6 +21,7 @@ module Gen = struct
     | Ast.If ifstmt -> assert false
     | Ast.While whilestmt -> assert false
     | Ast.Stmt_expr se -> assert false
+    | Ast.Ret ret -> assert false
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false

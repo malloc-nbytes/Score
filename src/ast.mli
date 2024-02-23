@@ -15,8 +15,11 @@ module Ast : sig
     | If of if_stmt
     | While of while_stmt
     | Stmt_expr of stmt_expr
+    | Ret of ret_stmt
 
-  and block_stmt = { stmts : stmt list}
+  and block_stmt = { stmts : stmt list }
+
+  and ret_stmt = { expr : expr }
 
   and while_stmt =
     { expr : expr

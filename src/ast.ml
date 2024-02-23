@@ -37,8 +37,11 @@ module Ast = struct
     | If of if_stmt
     | While of while_stmt
     | Stmt_expr of stmt_expr
+    | Ret of ret_stmt
 
-  and block_stmt = { stmts : stmt list}
+  and block_stmt = { stmts : stmt list }
+
+  and ret_stmt = { expr : expr }
 
   and while_stmt =
     { expr : expr
@@ -155,6 +158,11 @@ module Ast = struct
         let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
         printf "%s)\n" spaces
 
+    and ret_stmt_dump (stmt : ret_stmt) (depth : int) : unit =
+      let spaces = indent depth in
+      let _ = printf "%sRETURN\n" spaces in
+      expr_dump stmt.expr (depth + 1)
+
     and stmt_dump (stmt : stmt) (depth : int) : unit =
       match stmt with
       | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
@@ -164,6 +172,7 @@ module Ast = struct
       | If i -> if_stmt_dump i (depth + 1)
       | While w -> while_stmt_dump w (depth + 1)
       | Stmt_expr se -> stmt_expr_dump se (depth + 1)
+      | Ret r -> ret_stmt_dump r (depth + 1)
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in

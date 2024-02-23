@@ -267,6 +267,11 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; args}, tokens
 
+  and parse_ret_stmt (tokens : Token.t list) : Ast.ret_stmt * Token.t list =
+    let expr, tokens = parse_expr tokens in
+    let _, tokens = expect tokens TokenType.Semicolon in
+    Ast.{expr}, tokens
+
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
   and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
@@ -294,6 +299,9 @@ module Parser = struct
     | {ttype = TokenType.While; _} :: tl ->
        let stmt, tokens = parse_while_stmt tl in
        While stmt, tokens
+    | {ttype = TokenType.Ret; _} :: tl ->
+       let stmt, tokens = parse_ret_stmt tl in
+       Ret stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ Some hd in exit 1
