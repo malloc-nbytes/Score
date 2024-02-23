@@ -5,11 +5,11 @@ module Gen = struct
   let func_section = ref ""
   let data_section = ref ""
 
-  let evaluate_expr (expr : Ast.expr) : string =
+  let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
     | Ast.Binary bin -> assert false
     | Ast.Term Ast.Ident ident -> assert false
-    | Ast.Term Ast.Intlit intlit -> "copy " ^ intlit.value
+    | Ast.Term Ast.Intlit intlit -> intlit.value
     | Ast.Proc_call pc -> assert false
 
   let rec evaluate_stmt (stmt : Ast.stmt) : unit =
@@ -21,14 +21,18 @@ module Gen = struct
     | Ast.If ifstmt -> assert false
     | Ast.While whilestmt -> assert false
     | Ast.Stmt_expr se -> assert false
-    | Ast.Ret ret -> assert false
+    | Ast.Ret ret -> evaluate_ret_stmt ret
+
+  and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    ret %s\n" !func_section expr
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false
 
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     func_section :=
-      sprintf "%s    %%%s =w %s\n" !func_section stmt.id.value
+      sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value
         (evaluate_expr stmt.expr)
 
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
@@ -38,7 +42,7 @@ module Gen = struct
     func_section :=
       sprintf "%sexport function w $%s() {\n@start\n" !func_section stmt.id.value;
     evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s    ret 0\n" !func_section;
+    (* func_section := sprintf "%s    ret 0\n" !func_section; *)
     func_section := sprintf "%s}\n" !func_section
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
