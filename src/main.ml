@@ -17,8 +17,12 @@ let write_to_file filepath content =
   close_out oc
 
 let run_qbe filepath =
-  let cmd = Printf.sprintf "qbe %s" filepath in
+  let cmd = Printf.sprintf "qbe -o out.s %s" filepath in
   (* TODO: Deal with exit failure *)
+  let _ = Sys.command cmd in ()
+
+let assemble () =
+  let cmd = "cc -o out out.s" in
   let _ = Sys.command cmd in ()
 
 let () =
@@ -37,4 +41,6 @@ let () =
 
   let outfp = "./out.ssa" in
   let _ = write_to_file outfp code in
-  run_qbe outfp
+  let _ = run_qbe outfp in
+
+  let _ = assemble () in ()

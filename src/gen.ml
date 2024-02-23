@@ -1,16 +1,38 @@
 module Gen = struct
   open Ast
   open Printf
+  open Token
 
   let func_section = ref ""
   let data_section = ref ""
+  let tmpreg = ref "%__SCORE_TMP_REG"
+  let tmpreg_c = ref 0
+
+  let cons_tmpreg () : string =
+    let tmp = !tmpreg_c in
+    tmpreg_c := !tmpreg_c + 1;
+    tmpreg := "%__SCORE_TMP_REG" ^ (string_of_int tmp);
+    !tmpreg
+
+  let evaluate_binop (op : Token.t) : string =
+    match op.ttype with
+    | TokenType.Plus -> "add"
+    | TokenType.Minus -> "sub"
+    | TokenType.Asterisk -> "mul"
+    | TokenType.ForwardSlash -> "div"
+    | _ -> failwith "Invalid binary operator"
 
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
-    | Ast.Binary bin -> assert false
-    | Ast.Term Ast.Ident ident -> assert false
+    | Ast.Binary bin ->
+      let lhs = evaluate_expr bin.lhs in
+      let rhs = evaluate_expr bin.rhs in
+      func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg ())
+        (evaluate_binop bin.op) lhs rhs;
+      !tmpreg
+    | Ast.Term Ast.Ident ident -> "%" ^ ident.value
     | Ast.Term Ast.Intlit intlit -> intlit.value
-    | Ast.Proc_call pc -> assert false
+    | Ast.Proc_call pc -> "call " ^ pc.id.value
 
   let rec evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with

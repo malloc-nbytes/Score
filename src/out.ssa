@@ -1,5 +1,0 @@
-export function w $main() {
-@start
-    %x =w copy 99
-    ret 1 + 3
-}
