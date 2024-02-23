@@ -1,16 +1,60 @@
+(* MIT License
+
+   * Copyright (c) 2023 malloc-nbytes
+
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
+
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
+
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE. *)
+
 module Gen = struct
   open Ast
   open Printf
+  open Token
 
   let func_section = ref ""
   let data_section = ref ""
+  let tmpreg = ref "%__SCORE_TMP_REG"
+  let tmpreg_c = ref 0
 
-  let evaluate_expr (expr : Ast.expr) : string =
+  let cons_tmpreg () : string =
+    let tmp = !tmpreg_c in
+    tmpreg_c := !tmpreg_c + 1;
+    tmpreg := "%__SCORE_TMP_REG" ^ (string_of_int tmp);
+    !tmpreg
+
+  let evaluate_binop (op : Token.t) : string =
+    match op.ttype with
+    | TokenType.Plus -> "add"
+    | TokenType.Minus -> "sub"
+    | TokenType.Asterisk -> "mul"
+    | TokenType.ForwardSlash -> "div"
+    | _ -> failwith "Invalid binary operator"
+
+  let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
-    | Ast.Binary bin -> assert false
-    | Ast.Term Ast.Ident ident -> assert false
-    | Ast.Term Ast.Intlit intlit -> "copy " ^ intlit.value
-    | Ast.Proc_call pc -> assert false
+    | Ast.Binary bin ->
+      let lhs = evaluate_expr bin.lhs in
+      let rhs = evaluate_expr bin.rhs in
+      func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg ())
+        (evaluate_binop bin.op) lhs rhs;
+      !tmpreg
+    | Ast.Term Ast.Ident ident -> "%" ^ ident.value
+    | Ast.Term Ast.Intlit intlit -> intlit.value
+    | Ast.Proc_call pc -> "call " ^ pc.id.value
 
   let rec evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with
@@ -21,13 +65,18 @@ module Gen = struct
     | Ast.If ifstmt -> assert false
     | Ast.While whilestmt -> assert false
     | Ast.Stmt_expr se -> assert false
+    | Ast.Ret ret -> evaluate_ret_stmt ret
+
+  and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    ret %s\n" !func_section expr
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false
 
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     func_section :=
-      sprintf "%s    %%%s =w %s\n" !func_section stmt.id.value
+      sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value
         (evaluate_expr stmt.expr)
 
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
@@ -37,7 +86,7 @@ module Gen = struct
     func_section :=
       sprintf "%sexport function w $%s() {\n@start\n" !func_section stmt.id.value;
     evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s    ret 0\n" !func_section;
+    (* func_section := sprintf "%s    ret 0\n" !func_section; *)
     func_section := sprintf "%s}\n" !func_section
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
