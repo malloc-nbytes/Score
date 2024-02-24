@@ -245,7 +245,12 @@ module Parser = struct
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.LBrace in
     let block, tokens = parse_block_stmt tokens in
-    Ast.{expr; block}, tokens
+    (match tokens with
+     | {ttype = TokenType.Else; _} :: {ttype = TokenType.If; _} :: tl -> failwith "if-else-if unimplemented"
+     | {ttype = TokenType.Else; _} :: tl ->
+        let else_, tokens = parse_block_stmt tl in
+        Ast.{expr; block; else_ = Some else_}, tokens
+     | _ -> Ast.{expr; block; else_ = None}, tokens)
 
   (* Parses the while statement. *)
   and parse_while_stmt (tokens : Token.t list) : Ast.while_stmt * Token.t list =

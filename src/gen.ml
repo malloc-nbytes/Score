@@ -62,17 +62,6 @@ module Gen = struct
       func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg ()) cons_args;
       !tmpreg
 
-  let rec evaluate_stmt (stmt : Ast.stmt) : unit =
-    match stmt with
-    | Ast.Proc_def procdef -> assert false
-    | Ast.Block block -> assert false
-    | Ast.Let letstmt -> evaluate_let_stmt letstmt
-    | Ast.Mut mutstmt -> assert false
-    | Ast.If ifstmt -> assert false
-    | Ast.While whilestmt -> assert false
-    | Ast.Stmt_expr se -> assert false
-    | Ast.Ret ret -> evaluate_ret_stmt ret
-
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    ret %s\n" !func_section expr
@@ -86,6 +75,20 @@ module Gen = struct
 
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
     List.iter evaluate_stmt stmt.stmts
+
+  and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
+    assert false
+
+  and evaluate_stmt (stmt : Ast.stmt) : unit =
+    match stmt with
+    | Ast.Proc_def procdef -> assert false
+    | Ast.Block block -> assert false
+    | Ast.Let letstmt -> evaluate_let_stmt letstmt
+    | Ast.Mut mutstmt -> assert false
+    | Ast.If ifstmt -> evaluate_if_stmt ifstmt
+    | Ast.While whilestmt -> assert false
+    | Ast.Stmt_expr se -> assert false
+    | Ast.Ret ret -> evaluate_ret_stmt ret
 
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
     let params : string = List.fold_left (fun acc p ->

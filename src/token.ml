@@ -53,6 +53,7 @@ module TokenType = struct
     | Ret
     | Let
     | If
+    | Else
     | Void
     | While
 
@@ -89,6 +90,7 @@ module TokenType = struct
     | Ret -> "Ret"
     | Let -> "Let"
     | If -> "If"
+    | Else -> "Else"
     | Void -> "Void"
     | While -> "While"
 

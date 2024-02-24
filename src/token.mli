@@ -31,6 +31,7 @@ module TokenType : sig
     | Ret
     | Let
     | If
+    | Else
     | Void
     | While
 

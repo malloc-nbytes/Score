@@ -51,6 +51,7 @@ module Ast = struct
   and if_stmt =
     { expr : expr
     ; block : block_stmt
+    ; else_ : block_stmt option
     }
 
   and proc_def_stmt =
