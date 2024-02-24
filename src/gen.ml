@@ -102,6 +102,7 @@ module Gen = struct
   let else_lbl = ref "@else"
   let done_lbl = ref "@done"
   let if_c = ref 0
+  let didret = ref false (* TODO: Find a better solution *)
 
   let cons_if_lbl () : string * string * string =
     let tmp = string_of_int !if_c in
@@ -148,7 +149,8 @@ module Gen = struct
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    ret %s\n" !func_section expr
+    func_section := sprintf "%s    ret %s\n" !func_section expr;
+    didret := true
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert false
@@ -161,28 +163,26 @@ module Gen = struct
     List.iter evaluate_stmt stmt.stmts
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    (* let expr = evaluate_expr stmt.expr in
-    let iflbl, elselbl = cons_if_lbl () in
-    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl elselbl;
-    func_section := sprintf "%s%s\n" !func_section iflbl;
-    evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s%s\n" !func_section elselbl;
-    match stmt.else_ with
-    | Some block -> evaluate_block_stmt block
-    | None -> () *)
     let expr = evaluate_expr stmt.expr in
     let iflbl, elselbl, donelbl = cons_if_lbl () in
-    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl elselbl;
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl (if stmt.else_ = None then donelbl else elselbl);
     func_section := sprintf "%s%s\n" !func_section iflbl;
     evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s    jmp %s\n" !func_section donelbl;
-    func_section := sprintf "%s%s\n" !func_section elselbl;
-    match stmt.else_ with
-    | Some block -> evaluate_block_stmt block
-    | None -> ();
+
+    (* Currently, if you have instructions after `ret` in QBE, it
+     * fails. This is a QAD solution to this issue. *)
+    if not !didret then
+      func_section := sprintf "%s    jmp %s\n" !func_section donelbl;
+
+    (match stmt.else_ with
+    | Some block ->
+      func_section := sprintf "%s%s\n" !func_section elselbl;
+      evaluate_block_stmt block
+    | None -> ());
     func_section := sprintf "%s%s\n" !func_section donelbl
 
   and evaluate_stmt (stmt : Ast.stmt) : unit =
+    didret := false;
     match stmt with
     | Ast.Proc_def procdef -> assert false
     | Ast.Block block -> assert false

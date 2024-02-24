@@ -166,7 +166,10 @@ module Parser = struct
       | [] ->
          let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
          exit 1
-      | {ttype = TokenType.RBrace; _} :: tl -> acc, tl
+      | {ttype = TokenType.RBrace; _} :: tl ->
+         print_endline "HERE";
+         List.iter (fun x -> print_endline @@ Token.to_string x) tl;
+         acc, tl
       | lst ->
          let stmt, tokens = parse_stmt lst in
          aux tokens @@ acc @ [stmt] in
@@ -250,11 +253,11 @@ module Parser = struct
       let tokens = tl1 :: tl2 in
       let else_, tokens = parse_block_stmt tokens in
       Ast.{expr; block; else_ = Some else_}, tokens
-      | {ttype = TokenType.Else; _} :: tl ->
-        let _, tokens = expect tl TokenType.LBrace in
-        let else_, tokens = parse_block_stmt tokens in
-        Ast.{expr; block; else_ = Some else_}, tokens
-     | _ -> Ast.{expr; block; else_ = None}, tokens)
+    | {ttype = TokenType.Else; _} :: tl ->
+      let _, tokens = expect tl TokenType.LBrace in
+      let else_, tokens = parse_block_stmt tokens in
+      Ast.{expr; block; else_ = Some else_}, tokens
+    | _ -> Ast.{expr; block; else_ = None}, tokens)
 
   (* Parses the while statement. *)
   and parse_while_stmt (tokens : Token.t list) : Ast.while_stmt * Token.t list =
