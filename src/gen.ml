@@ -58,8 +58,8 @@ module Gen = struct
       let args = (List.fold_left (fun acc e ->
         acc ^ "w " ^ evaluate_expr e ^ ", "
       ) "" pc.args) in
-      let cons_arsg = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
-      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg ()) cons_arsg;
+      let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
+      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg ()) cons_args;
       !tmpreg
 
   let rec evaluate_stmt (stmt : Ast.stmt) : unit =
