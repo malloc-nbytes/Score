@@ -20,6 +20,73 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
+   (* export function w $main() {
+    @start
+      call $dputs(l $prologue, w 1)
+    @loop
+      %r =w call $read(w 0, l $ch, w 1)
+      %cmp =w ceqw %r, 1
+      jnz %cmp, @maybeleft, @eof	# %cmp == 1 ? @maybeleft : @eof
+    @maybeleft
+      %b =w loadub $ch		# Bytes must be loaded as words
+      %cmp =w ceqw %b, 60		# <
+      jnz %cmp, @isleft, @mayberight
+    @isleft
+      call $dputs(l $left, w 1)
+      jmp @loop
+    @mayberight
+      %cmp =w ceqw %b, 62		# >
+      jnz %cmp, @isright, @maybedec
+    @isright
+      call $dputs(l $right, w 1)
+      jmp @loop
+    @maybedec
+      %cmp =w ceqw %b, 45		# -
+      jnz %cmp, @isdec, @maybeinc
+    @isdec
+      call $dputs(l $dec, w 1)
+      jmp @loop
+    @maybeinc
+      %cmp =w ceqw %b, 43		# +
+      jnz %cmp, @isinc, @maybegetchar
+    @isinc
+      call $dputs(l $inc, w 1)
+      jmp @loop
+    @maybegetchar
+      %cmp =w ceqw %b, 44		# ,
+      jnz %cmp, @isgetchar, @maybeputchar
+    @isgetchar
+      call $dputs(l $gchar, w 1)
+      jmp @loop
+    @maybeputchar
+      %cmp =w ceqw %b, 46		# .
+      jnz %cmp, @isputchar, @maybelopen
+    @isputchar
+      call $dputs(l $pchar, w 1)
+      jmp @loop
+    @maybelopen
+      %cmp =w ceqw %b, 91		# [
+      jnz %cmp, @islopen, @maybelclose
+    @islopen
+      call $islopen()
+      jmp @loop
+    @maybelclose
+      %cmp =w ceqw %b, 93		# ]
+      jnz %cmp, @islclose, @loop
+    @islclose
+      call $islclose()
+      jmp @loop
+    @eof
+      %d =w loadsw $depth
+      jnz %d, @mismatch, @done
+    @mismatch
+      call $mismatch()
+      ret 0
+    @done
+      call $dputs(l $epilogue, w 1)
+      ret 0
+    } *)
+
 module Gen = struct
   open Ast
   open Printf
@@ -27,8 +94,24 @@ module Gen = struct
 
   let func_section = ref ""
   let data_section = ref ""
+
   let tmpreg = ref "%__SCORE_TMP_REG"
   let tmpreg_c = ref 0
+
+  let if_lbl = ref "@if"
+  let else_lbl = ref "@else"
+  let done_lbl = ref "@done"
+  let if_c = ref 0
+
+  let cons_if_lbl () : string * string * string =
+    let tmp = string_of_int !if_c in
+    if_c := !if_c + 1;
+
+    if_lbl := "@if" ^ tmp;
+    else_lbl := "@else" ^ tmp;
+    done_lbl := "@done" ^ tmp;
+
+    !if_lbl, !else_lbl, !done_lbl
 
   let cons_tmpreg () : string =
     let tmp = !tmpreg_c in
@@ -42,7 +125,8 @@ module Gen = struct
     | TokenType.Minus -> "sub"
     | TokenType.Asterisk -> "mul"
     | TokenType.ForwardSlash -> "div"
-    | _ -> failwith "Invalid binary operator"
+    | TokenType.DoubleEquals -> "ceqw"
+    | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value
 
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
@@ -77,7 +161,26 @@ module Gen = struct
     List.iter evaluate_stmt stmt.stmts
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    assert false
+    (* let expr = evaluate_expr stmt.expr in
+    let iflbl, elselbl = cons_if_lbl () in
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl elselbl;
+    func_section := sprintf "%s%s\n" !func_section iflbl;
+    evaluate_block_stmt stmt.block;
+    func_section := sprintf "%s%s\n" !func_section elselbl;
+    match stmt.else_ with
+    | Some block -> evaluate_block_stmt block
+    | None -> () *)
+    let expr = evaluate_expr stmt.expr in
+    let iflbl, elselbl, donelbl = cons_if_lbl () in
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl elselbl;
+    func_section := sprintf "%s%s\n" !func_section iflbl;
+    evaluate_block_stmt stmt.block;
+    func_section := sprintf "%s    jmp %s\n" !func_section donelbl;
+    func_section := sprintf "%s%s\n" !func_section elselbl;
+    match stmt.else_ with
+    | Some block -> evaluate_block_stmt block
+    | None -> ();
+    func_section := sprintf "%s%s\n" !func_section donelbl
 
   and evaluate_stmt (stmt : Ast.stmt) : unit =
     match stmt with

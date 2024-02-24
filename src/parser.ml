@@ -246,9 +246,13 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LBrace in
     let block, tokens = parse_block_stmt tokens in
     (match tokens with
-     | {ttype = TokenType.Else; _} :: {ttype = TokenType.If; _} :: tl -> failwith "if-else-if unimplemented"
-     | {ttype = TokenType.Else; _} :: tl ->
-        let else_, tokens = parse_block_stmt tl in
+    | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _} as tl1) :: tl2 ->
+      let tokens = tl1 :: tl2 in
+      let else_, tokens = parse_block_stmt tokens in
+      Ast.{expr; block; else_ = Some else_}, tokens
+      | {ttype = TokenType.Else; _} :: tl ->
+        let _, tokens = expect tl TokenType.LBrace in
+        let else_, tokens = parse_block_stmt tokens in
         Ast.{expr; block; else_ = Some else_}, tokens
      | _ -> Ast.{expr; block; else_ = None}, tokens)
 

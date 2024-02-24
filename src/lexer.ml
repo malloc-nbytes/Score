@@ -28,13 +28,14 @@ module Lexer = struct
   (* Fill the keywords hashtable with the correct words
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
-    let _ = Hashtbl.add keywords "i32" Type in
-    let _ = Hashtbl.add keywords "proc" @@ Proc in
-    let _ = Hashtbl.add keywords "ret" @@ Ret in
-    let _ = Hashtbl.add keywords "let" @@ Let in
-    let _ = Hashtbl.add keywords "if" @@ If in
-    let _ = Hashtbl.add keywords "void" Void in
-    let _ = Hashtbl.add keywords "while" While in
+    let _ = Hashtbl.add keywords "i32" TokenType.Type in
+    let _ = Hashtbl.add keywords "proc" @@ TokenType.Proc in
+    let _ = Hashtbl.add keywords "ret" @@ TokenType.Ret in
+    let _ = Hashtbl.add keywords "let" @@ TokenType.Let in
+    let _ = Hashtbl.add keywords "if" @@ TokenType.If in
+    let _ = Hashtbl.add keywords "else" @@ TokenType.Else in
+    let _ = Hashtbl.add keywords "void" TokenType.Void in
+    let _ = Hashtbl.add keywords "while" TokenType.While in
     ()
   ;;
 
