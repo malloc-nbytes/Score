@@ -44,11 +44,6 @@ module Gen = struct
     | TokenType.ForwardSlash -> "div"
     | _ -> failwith "Invalid binary operator"
 
-    (* and proc_call_expr =
-      { id : Token.t
-      ; args : expr list
-      } *)
-
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
     | Ast.Binary bin ->
