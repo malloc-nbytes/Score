@@ -26,52 +26,52 @@
     @loop
       %r =w call $read(w 0, l $ch, w 1)
       %cmp =w ceqw %r, 1
-      jnz %cmp, @maybeleft, @eof	# %cmp == 1 ? @maybeleft : @eof
+      jnz %cmp, @maybeleft, @eof        # %cmp == 1 ? @maybeleft : @eof
     @maybeleft
-      %b =w loadub $ch		# Bytes must be loaded as words
-      %cmp =w ceqw %b, 60		# <
+      %b =w loadub $ch          # Bytes must be loaded as words
+      %cmp =w ceqw %b, 60               # <
       jnz %cmp, @isleft, @mayberight
     @isleft
       call $dputs(l $left, w 1)
       jmp @loop
     @mayberight
-      %cmp =w ceqw %b, 62		# >
+      %cmp =w ceqw %b, 62               # >
       jnz %cmp, @isright, @maybedec
     @isright
       call $dputs(l $right, w 1)
       jmp @loop
     @maybedec
-      %cmp =w ceqw %b, 45		# -
+      %cmp =w ceqw %b, 45               # -
       jnz %cmp, @isdec, @maybeinc
     @isdec
       call $dputs(l $dec, w 1)
       jmp @loop
     @maybeinc
-      %cmp =w ceqw %b, 43		# +
+      %cmp =w ceqw %b, 43               # +
       jnz %cmp, @isinc, @maybegetchar
     @isinc
       call $dputs(l $inc, w 1)
       jmp @loop
     @maybegetchar
-      %cmp =w ceqw %b, 44		# ,
+      %cmp =w ceqw %b, 44               # ,
       jnz %cmp, @isgetchar, @maybeputchar
     @isgetchar
       call $dputs(l $gchar, w 1)
       jmp @loop
     @maybeputchar
-      %cmp =w ceqw %b, 46		# .
+      %cmp =w ceqw %b, 46               # .
       jnz %cmp, @isputchar, @maybelopen
     @isputchar
       call $dputs(l $pchar, w 1)
       jmp @loop
     @maybelopen
-      %cmp =w ceqw %b, 91		# [
+      %cmp =w ceqw %b, 91               # [
       jnz %cmp, @islopen, @maybelclose
     @islopen
       call $islopen()
       jmp @loop
     @maybelclose
-      %cmp =w ceqw %b, 93		# ]
+      %cmp =w ceqw %b, 93               # ]
       jnz %cmp, @islclose, @loop
     @islclose
       call $islclose()
@@ -98,9 +98,6 @@ module Gen = struct
   (* Data section. A list of different globals. *)
   let data_section = ref ""
 
-  (* Map to map local/global vars -> global names. *)
-  let datamap : (string, 'a) Hashtbl.t = Hashtbl.create 10
-
   (* Variable to use when a computation takes multiple steps. *)
   let tmpreg = ref "%__SCORE_TMP_REG"
 
@@ -123,10 +120,10 @@ module Gen = struct
 
     !if_lbl, !else_lbl, !done_lbl
 
-  let cons_tmpreg () : string =
+  let cons_tmpreg (global : bool) : string =
     let tmp = !tmpreg_c in
     tmpreg_c := !tmpreg_c + 1;
-    tmpreg := "%__SCORE_TMP_REG" ^ (string_of_int tmp);
+    tmpreg := (if global then "$" else "%") ^ "__SCORE_TMP_REG" ^ (string_of_int tmp);
     !tmpreg
 
   let evaluate_binop (op : Token.t) : string =
@@ -143,18 +140,21 @@ module Gen = struct
     | Ast.Binary bin ->
       let lhs = evaluate_expr bin.lhs in
       let rhs = evaluate_expr bin.rhs in
-      func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg ())
+      func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
         (evaluate_binop bin.op) lhs rhs;
       !tmpreg
     | Ast.Term Ast.Ident ident -> "%" ^ ident.value
     | Ast.Term Ast.Intlit intlit -> intlit.value
-    | Ast.Term Ast.Strlit strlit -> failwith "gen.ml strlit unimplemented"
+    | Ast.Term Ast.Strlit strlit ->
+       data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
+                         !data_section (cons_tmpreg true) strlit.value;
+      !tmpreg
     | Ast.Proc_call pc ->
       let args = (List.fold_left (fun acc e ->
         acc ^ "w " ^ evaluate_expr e ^ ", "
       ) "" pc.args) in
       let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
-      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg ()) cons_args;
+      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
       !tmpreg
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =

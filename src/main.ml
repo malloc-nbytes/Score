@@ -56,7 +56,7 @@ let () =
   (* let _ = Lexer.print_tokens tokens in *)
 
   let program = Parser.produce_ast tokens in
-  Ast.ast_dump program;
+  (* Ast.ast_dump program; *)
 
   let code : string = Gen.generate_inter_lang program in
   let _ = print_endline code in
