@@ -89,6 +89,7 @@ module Ast = struct
   and term_expr =
     | Ident of Token.t
     | Intlit of Token.t
+    | Strlit of Token.t
 
   and proc_call_expr =
     { id : Token.t
@@ -112,6 +113,7 @@ module Ast = struct
          expr_dump b.rhs (depth + 1)
       | Term Ident i -> printf "%s%s\n" spaces i.value
       | Term Intlit t -> printf "%s%s\n" spaces t.value
+      | Term Strlit s -> printf "%s\"%s\"\n" spaces s.value
       | Proc_call pc -> failwith "Proc_call dump unimplemented" in
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =

@@ -92,10 +92,19 @@ module Gen = struct
   open Printf
   open Token
 
+  (* Main program. A list of functions. *)
   let func_section = ref ""
+
+  (* Data section. A list of different globals. *)
   let data_section = ref ""
 
+  (* Map to map local/global vars -> global names. *)
+  let datamap : (string, 'a) Hashtbl.t = Hashtbl.create 10
+
+  (* Variable to use when a computation takes multiple steps. *)
   let tmpreg = ref "%__SCORE_TMP_REG"
+
+  (* Variable to use to make `tmpreg` unqiue. *)
   let tmpreg_c = ref 0
 
   let if_lbl = ref "@if"
@@ -139,6 +148,7 @@ module Gen = struct
       !tmpreg
     | Ast.Term Ast.Ident ident -> "%" ^ ident.value
     | Ast.Term Ast.Intlit intlit -> intlit.value
+    | Ast.Term Ast.Strlit strlit -> failwith "gen.ml strlit unimplemented"
     | Ast.Proc_call pc ->
       let args = (List.fold_left (fun acc e ->
         acc ^ "w " ^ evaluate_expr e ^ ", "

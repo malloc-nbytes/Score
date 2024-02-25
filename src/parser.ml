@@ -100,6 +100,7 @@ module Parser = struct
          Ast.Proc_call proc_call, tokens
       | _ -> Ast.Term (Ast.Ident id), tl)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
+    | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
@@ -166,10 +167,7 @@ module Parser = struct
       | [] ->
          let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
          exit 1
-      | {ttype = TokenType.RBrace; _} :: tl ->
-         print_endline "HERE";
-         List.iter (fun x -> print_endline @@ Token.to_string x) tl;
-         acc, tl
+      | {ttype = TokenType.RBrace; _} :: tl -> acc, tl
       | lst ->
          let stmt, tokens = parse_stmt lst in
          aux tokens @@ acc @ [stmt] in
@@ -249,10 +247,11 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LBrace in
     let block, tokens = parse_block_stmt tokens in
     (match tokens with
-    | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _} as tl1) :: tl2 ->
-      let tokens = tl1 :: tl2 in
+    | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _}) :: tl2 ->
+      failwith "if else if unimplemented"
+      (* let tokens = tl1 :: tl2 in
       let else_, tokens = parse_block_stmt tokens in
-      Ast.{expr; block; else_ = Some else_}, tokens
+      Ast.{expr; block; else_ = Some else_}, tokens *)
     | {ttype = TokenType.Else; _} :: tl ->
       let _, tokens = expect tl TokenType.LBrace in
       let else_, tokens = parse_block_stmt tokens in

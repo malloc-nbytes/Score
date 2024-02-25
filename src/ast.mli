@@ -67,6 +67,7 @@ module Ast : sig
   and term_expr =
     | Ident of Token.t
     | Intlit of Token.t
+    | Strlit of Token.t
 
   and proc_call_expr =
     { id : Token.t

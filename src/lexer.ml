@@ -29,6 +29,7 @@ module Lexer = struct
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
     let _ = Hashtbl.add keywords "i32" TokenType.Type in
+    let _ = Hashtbl.add keywords "str" TokenType.Type in
     let _ = Hashtbl.add keywords "proc" @@ TokenType.Proc in
     let _ = Hashtbl.add keywords "ret" @@ TokenType.Ret in
     let _ = Hashtbl.add keywords "let" @@ TokenType.Let in
@@ -102,9 +103,10 @@ module Lexer = struct
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
-    | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c = '"') in
+    | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
+                   let rest = List.tl rest in (* consume_while does not consume closing quote. *)
                    [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
-                   @ lex_file (List.tl tl) r (c+2+String.length strlit)
+                   @ lex_file rest r (c+2+String.length strlit)
     | '>' :: tl -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
     | '<' :: tl -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
     | ':' :: tl -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
