@@ -110,11 +110,12 @@ module Parser = struct
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
        exit 1
 
+  (* The fifth level of expression parsing. Deals with logical
+   * operators `&&`, `||` etc. *)
   and parse_logical_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
       match tokens with
       | {ttype = TokenType.DoubleAmpersand; _} as op :: tl ->
-         print_endline "HERE";
          let (rhs : Ast.expr), tokens = parse_primary_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens
@@ -329,7 +330,7 @@ module Parser = struct
     | {ttype = TokenType.While; _} :: tl ->
        let stmt, tokens = parse_while_stmt tl in
        While stmt, tokens
-    | {ttype = TokenType.Ret; _} :: tl ->
+    | {ttype = TokenType.Return; _} :: tl ->
        let stmt, tokens = parse_ret_stmt tl in
        Ret stmt, tokens
     | hd :: _ ->

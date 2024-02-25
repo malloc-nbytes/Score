@@ -28,7 +28,7 @@ module TokenType : sig
     | ForwardSlash
     | Percent
     | Proc
-    | Ret
+    | Return
     | Let
     | If
     | Else

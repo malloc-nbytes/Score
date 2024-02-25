@@ -50,7 +50,7 @@ module TokenType = struct
     | ForwardSlash
     | Percent
     | Proc
-    | Ret
+    | Return
     | Let
     | If
     | Else
@@ -88,7 +88,7 @@ module TokenType = struct
     | ForwardSlash -> "ForwardSlash"
     | Percent -> "Percent"
     | Proc -> "Proc"
-    | Ret -> "Ret"
+    | Return -> "Return"
     | Let -> "Let"
     | If -> "If"
     | Else -> "Else"

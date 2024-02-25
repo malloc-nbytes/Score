@@ -31,7 +31,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "i32" TokenType.Type in
     let _ = Hashtbl.add keywords "str" TokenType.Type in
     let _ = Hashtbl.add keywords "proc" @@ TokenType.Proc in
-    let _ = Hashtbl.add keywords "ret" @@ TokenType.Ret in
+    let _ = Hashtbl.add keywords "return" @@ TokenType.Return in
     let _ = Hashtbl.add keywords "let" @@ TokenType.Let in
     let _ = Hashtbl.add keywords "if" @@ TokenType.If in
     let _ = Hashtbl.add keywords "else" @@ TokenType.Else in
@@ -97,9 +97,10 @@ module Lexer = struct
     | '\n' :: tl -> lex_file tl (r+1) 1
     | '\t' :: tl -> lex_file tl r (c+1)
     | ' ' :: tl -> lex_file tl r (c+1)
-    | '/' :: '/' :: tl -> 
+    | '/' :: '/' :: tl ->
        let comment, rest = consume_while tl (fun c -> c <> '\n') in
-       lex_file tl r (c+2+String.length comment)
+       Printf.printf "comment: %s\n" comment;
+       lex_file rest r (c+2+String.length comment)
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
