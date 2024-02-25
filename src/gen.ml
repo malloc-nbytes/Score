@@ -76,6 +76,13 @@ module Gen = struct
     | "str" -> "l"
     | _ -> failwith @@ sprintf "gen.ml: invalid type `%s`" token.Token.value
 
+  let intrinsic_print_int : string =
+    "export function w $print_int(w %i) {\n\
+     @start\n\
+     call $puts(\"%d\\n\", w %i)\n\
+     ret\n\
+     }\n"
+
   let evaluate_binop (op : Token.t) : string =
     match op.ttype with
     | TokenType.Plus -> "add"
@@ -110,6 +117,12 @@ module Gen = struct
          let cons_args = "call $puts(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
+       else if pc.id.value = "printf"
+       then
+          let _ = assert (List.length pc.args = 2) in
+          let cons_args = "call $printf(" ^ args ^ ")" in
+          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+          !tmpreg
        else
          let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
