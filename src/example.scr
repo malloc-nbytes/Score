@@ -1,0 +1,57 @@
+-- This is an example file of what this compiler
+-- is currently able to compile. Comments start
+-- with `--` and read until EOL.
+
+-- The classic "FizzBuzz" problem.
+proc fizzbuzz(void): i32 {
+     let i: i32 = 1;
+
+     while (i < 101) {
+         if ((i%5) == 0) && ((i%3) == 0) {
+            printf("FizzBuzz\n");
+         } else { if (i%5) == 0 {
+            printf("Fizz\n");
+         } else { if (i%3) == 0 {
+            printf("Buzz\n");
+         } else {
+            printf("%d\n", i);
+         }}}
+         i = i+1;
+     }
+
+     return 0;
+}
+
+-- Calculate the fibonacci sequence of
+-- a given number.
+proc fibonacci(n: i32): i32 {
+     if n == 0 { return 0; }
+     if n == 1 { return 1; }
+     return fibonacci(n-1) + fibonacci(n-2);
+}
+
+-- Print the range of numbers from start..end.
+proc print_range(start: i32, end: i32): i32 {
+     while start < end {
+         printf("%d ", start);
+         start = start+1;
+     }
+     return 0;
+}
+
+-- Given a first and last name, print the names.
+proc print_name(fname: str, lname: str): i32 {
+     printf("Your name is: %s %s\n", fname, lname);
+     return 0;
+}
+
+-- Entrypoint
+proc main(void): i32 {
+    let n: i32 = 10;
+    printf("fib of %d is %d\n", n, fibonacci(n));
+    fizzbuzz();
+    print_range(0, 10);
+    printf("\n");
+    print_name("John", "Doe");
+    return 0;
+}

@@ -99,9 +99,8 @@ module Lexer = struct
     | '\t' :: tl -> lex_file tl r (c+1)
     | ' ' :: tl -> lex_file tl r (c+1)
     (* Comments *)
-    | '/' :: '/' :: tl ->
+    | '-' :: '-' :: tl ->
        let comment, rest = consume_while tl (fun c -> c <> '\n') in
-       Printf.printf "comment: %s\n" comment;
        lex_file rest r (c+2+String.length comment)
     (* Multi-char symbols *)
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
