@@ -91,9 +91,10 @@ module Gen = struct
        let args = (List.fold_left (fun acc e ->
                        acc ^ "w " ^ evaluate_expr e ^ ", "
                      ) "" pc.args) in
-       if pc.id.value = "println"
+       if pc.id.value = "puts"
        then
-         let cons_args = "call $println(" ^ args ^ ")" in
+         let _ = assert (List.length pc.args = 1) in
+         let cons_args = "call $puts(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
@@ -135,6 +136,10 @@ module Gen = struct
      | None -> ());
     func_section := sprintf "%s%s\n" !func_section donelbl
 
+  and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
+    let expr = evaluate_expr stmt in
+    func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr
+
   and evaluate_stmt (stmt : Ast.stmt) : unit =
     didret := false;
     match stmt with
@@ -144,7 +149,7 @@ module Gen = struct
     | Ast.Mut mutstmt -> assert false
     | Ast.If ifstmt -> evaluate_if_stmt ifstmt
     | Ast.While whilestmt -> assert false
-    | Ast.Stmt_expr se -> assert false
+    | Ast.Stmt_expr se -> evaluate_expr_stmt se
     | Ast.Ret ret -> evaluate_ret_stmt ret
 
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =

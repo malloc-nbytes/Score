@@ -56,8 +56,7 @@ module Ast : sig
     | Term of term_expr
     | Proc_call of proc_call_expr
 
-  and stmt_expr =
-    | Proc_call of proc_call_expr
+  and stmt_expr = expr
 
   and binary_expr =
     { lhs : expr

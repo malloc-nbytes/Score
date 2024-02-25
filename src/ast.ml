@@ -78,8 +78,7 @@ module Ast = struct
     | Term of term_expr
     | Proc_call of proc_call_expr
 
-  and stmt_expr =
-    | Proc_call of proc_call_expr
+  and stmt_expr = expr
 
   and binary_expr =
     { lhs : expr
@@ -161,6 +160,7 @@ module Ast = struct
          let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.value in
          let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
          printf "%s)\n" spaces
+      | _ -> assert false
 
     and ret_stmt_dump (stmt : ret_stmt) (depth : int) : unit =
       let spaces = indent depth in
