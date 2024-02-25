@@ -19,7 +19,6 @@
    * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
-
 module Gen = struct
   open Ast
   open Printf
@@ -92,9 +91,15 @@ module Gen = struct
        let args = (List.fold_left (fun acc e ->
                        acc ^ "w " ^ evaluate_expr e ^ ", "
                      ) "" pc.args) in
-       let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
-       func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
-       !tmpreg
+       if pc.id.value = "println"
+       then
+         let cons_args = "call $println(" ^ args ^ ")" in
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg
+       else
+         let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
