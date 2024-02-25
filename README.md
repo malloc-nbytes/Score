@@ -2,7 +2,7 @@
 
 Score is a compiled language written in OCaml QBE.
 
-See `example.src` for what is currently possible.
+See `example.scr` for what is currently possible.
 
 # Current Plans
 - FizzBuzz [X]
