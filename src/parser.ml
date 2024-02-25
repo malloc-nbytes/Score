@@ -110,14 +110,11 @@ module Parser = struct
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
        exit 1
 
-  (* The fourth level of expression parsing. Deals with equality
-   * operators `==`, `<`, `>=` etc. *)
-  and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
+  and parse_logical_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
       match tokens with
-      | {ttype = TokenType.DoubleEquals; _}
-        | {ttype = TokenType.GreaterThan; _}
-        | {ttype = TokenType.LessThan; _} as op :: tl ->
+      | {ttype = TokenType.DoubleAmpersand; _} as op :: tl ->
+         print_endline "HERE";
          let (rhs : Ast.expr), tokens = parse_primary_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens
@@ -125,13 +122,29 @@ module Parser = struct
     let lhs, tokens = parse_primary_expr tokens in
     aux tokens lhs
 
+   (* The fourth level of expression parsing. Deals with equality
+   * operators `==`, `<`, `>=` etc. *)
+   and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
+      let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
+         match tokens with
+         | {ttype = TokenType.DoubleEquals; _}
+            | {ttype = TokenType.GreaterThan; _}
+            | {ttype = TokenType.LessThan; _} as op :: tl ->
+            let (rhs : Ast.expr), tokens = parse_logical_expr tl in
+            aux tokens (Binary {lhs; rhs; op})
+         | _ -> lhs, tokens
+      in
+      let lhs, tokens = parse_logical_expr tokens in
+      aux tokens lhs
+
   (* The third level of expression parsing. Deals with multiplicative
    * operators `*`, `/` etc. *)
   and parse_mult_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
       match tokens with
       | {ttype = TokenType.Asterisk; _}
-        | {ttype = TokenType.ForwardSlash; _} as op :: tl ->
+        | {ttype = TokenType.ForwardSlash; _}
+          | {ttype = TokenType.Percent; _} as op :: tl ->
          let (rhs : Ast.expr), tokens = parse_eq_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens

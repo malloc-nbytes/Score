@@ -56,6 +56,7 @@ module TokenType = struct
     | Else
     | Void
     | While
+    | DoubleAmpersand
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -93,6 +94,7 @@ module TokenType = struct
     | Else -> "Else"
     | Void -> "Void"
     | While -> "While"
+    | DoubleAmpersand -> "DoubleAmpersand"
 
 end
 

@@ -103,6 +103,7 @@ module Lexer = struct
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
+    | '&' :: '&' :: tl -> [Token.{value = "&&"; ttype = DoubleAmpersand; r; c}] @ lex_file tl r (c+2)
     | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
                    let rest = List.tl rest in (* consume_while does not consume closing quote. *)
                    [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]

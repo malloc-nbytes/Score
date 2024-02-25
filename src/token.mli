@@ -34,6 +34,7 @@ module TokenType : sig
     | Else
     | Void
     | While
+    | DoubleAmpersand
 
   val to_string : t -> string
 end

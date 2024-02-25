@@ -91,6 +91,8 @@ module Gen = struct
     | TokenType.ForwardSlash -> "div"
     | TokenType.DoubleEquals -> "ceqw"
     | TokenType.LessThan -> "csltw"
+    | TokenType.Percent -> "rem"
+    | TokenType.DoubleAmpersand -> "and"
     | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value
 
   let rec evaluate_expr (expr : Ast.expr) : string =
@@ -119,7 +121,6 @@ module Gen = struct
          !tmpreg
        else if pc.id.value = "printf"
        then
-          let _ = assert (List.length pc.args = 2) in
           let cons_args = "call $printf(" ^ args ^ ")" in
           func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
           !tmpreg
