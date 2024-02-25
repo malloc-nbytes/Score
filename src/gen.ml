@@ -40,6 +40,11 @@ module Gen = struct
   let else_lbl = ref "@else"
   let done_lbl = ref "@done"
   let if_c = ref 0
+  let loop_lbl = ref "@loop"
+  let loop_c = ref 0
+  let loop_start_lbl = ref "@loop_start"
+  let loop_end_lbl = ref "@loop_end"
+
   let didret = ref false (* TODO: Find a better solution *)
 
   let cons_if_lbl () : string * string * string =
@@ -51,6 +56,13 @@ module Gen = struct
     done_lbl := "@done" ^ tmp;
 
     !if_lbl, !else_lbl, !done_lbl
+
+  let const_loop_lbl () : string * string * string =
+    let tmp = string_of_int !loop_c in
+    loop_lbl := "@loop" ^ tmp;
+    loop_start_lbl := "@loop_start" ^ tmp;
+    loop_end_lbl := "@loop_end" ^ tmp;
+    !loop_lbl, !loop_start_lbl, !loop_end_lbl
 
   let cons_tmpreg (global : bool) : string =
     let tmp = !tmpreg_c in
@@ -71,6 +83,7 @@ module Gen = struct
     | TokenType.Asterisk -> "mul"
     | TokenType.ForwardSlash -> "div"
     | TokenType.DoubleEquals -> "ceqw"
+    | TokenType.LessThan -> "csltw"
     | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value
 
   let rec evaluate_expr (expr : Ast.expr) : string =
@@ -141,6 +154,21 @@ module Gen = struct
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
 
+  and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
+    let looplbl, loopstartlbl, loopendlbl = const_loop_lbl () in
+    func_section := sprintf "%s%s\n" !func_section looplbl;
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
+    func_section := sprintf "%s%s\n" !func_section loopstartlbl;
+    evaluate_block_stmt stmt.block;
+
+    (* Currently, if you have instructions after `ret` in QBE, it
+     * fails. This is a QAD solution to this issue. *)
+    if not !didret then (* TODO: Find a better solution *)
+      func_section := sprintf "%s    jmp %s\n" !func_section looplbl;
+
+    func_section := sprintf "%s%s\n" !func_section loopendlbl
+
   and evaluate_stmt (stmt : Ast.stmt) : unit =
     didret := false;
     match stmt with
@@ -149,7 +177,7 @@ module Gen = struct
     | Ast.Let letstmt -> evaluate_let_stmt letstmt
     | Ast.Mut mutstmt -> evaluate_mut_stmt mutstmt
     | Ast.If ifstmt -> evaluate_if_stmt ifstmt
-    | Ast.While whilestmt -> assert false
+    | Ast.While whilestmt -> evaluate_while_stmt whilestmt
     | Ast.Stmt_expr se -> evaluate_expr_stmt se
     | Ast.Ret ret -> evaluate_ret_stmt ret
 
