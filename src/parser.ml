@@ -94,11 +94,11 @@ module Parser = struct
   let rec parse_primary_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     match tokens with
     | {ttype = TokenType.Identifier; _} as id :: tl ->
-      (match peek tl 0 with
-      | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
-         let proc_call, tokens = parse_proc_call (id :: tl) in
-         Ast.Proc_call proc_call, tokens
-      | _ -> Ast.Term (Ast.Ident id), tl)
+       (match peek tl 0 with
+        | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
+           let proc_call, tokens = parse_proc_call (id :: tl) in
+           Ast.Proc_call proc_call, tokens
+        | _ -> Ast.Term (Ast.Ident id), tl)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.LParen; _} :: tl ->
@@ -179,15 +179,15 @@ module Parser = struct
    * Does not need to consume `proc` keyword as the higher order
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
-    let rec gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.t) list)
-            : (Token.t * TokenType.t) list * Token.t list =
+    let rec gather_params (tokens : Token.t list) (acc : (Token.t * Token.t) list)
+            : (Token.t * Token.t) list * Token.t list =
       match tokens with
       | {ttype = TokenType.RParen; _} :: tl -> acc, tl
       | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
          let type_, tokens = expect tokens TokenType.Type in
          let next, tokens = pop tokens in
-         let acc = acc @ [id, type_.ttype] in
+         let acc = acc @ [id, type_] in
          (match next with
           | {ttype = TokenType.RParen; _} -> acc, tokens
           | {ttype = TokenType.Comma; _} -> gather_params tokens acc
@@ -247,16 +247,16 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LBrace in
     let block, tokens = parse_block_stmt tokens in
     (match tokens with
-    | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _}) :: tl2 ->
-      failwith "if else if unimplemented"
-      (* let tokens = tl1 :: tl2 in
-      let else_, tokens = parse_block_stmt tokens in
-      Ast.{expr; block; else_ = Some else_}, tokens *)
-    | {ttype = TokenType.Else; _} :: tl ->
-      let _, tokens = expect tl TokenType.LBrace in
-      let else_, tokens = parse_block_stmt tokens in
-      Ast.{expr; block; else_ = Some else_}, tokens
-    | _ -> Ast.{expr; block; else_ = None}, tokens)
+     | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _}) :: tl2 ->
+        failwith "if else if unimplemented"
+     (* let tokens = tl1 :: tl2 in
+        let else_, tokens = parse_block_stmt tokens in
+        Ast.{expr; block; else_ = Some else_}, tokens *)
+     | {ttype = TokenType.Else; _} :: tl ->
+        let _, tokens = expect tl TokenType.LBrace in
+        let else_, tokens = parse_block_stmt tokens in
+        Ast.{expr; block; else_ = Some else_}, tokens
+     | _ -> Ast.{expr; block; else_ = None}, tokens)
 
   (* Parses the while statement. *)
   and parse_while_stmt (tokens : Token.t list) : Ast.while_stmt * Token.t list =

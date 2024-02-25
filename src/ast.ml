@@ -56,7 +56,8 @@ module Ast = struct
 
   and proc_def_stmt =
     { id : Token.t
-    ; params : (Token.t * TokenType.t) list
+    (* param * type *)
+    ; params : (Token.t * Token.t) list
     ; block : block_stmt
     ; rettype : TokenType.t
     }
@@ -131,7 +132,7 @@ module Ast = struct
       let _ = printf "%sPROC %s(" spaces stmt.id.value in
       let _ = List.iter(fun param ->
                   let pval = (fst param).Token.value
-                  and ptype = (snd param) |> TokenType.to_string in
+                  and ptype = (snd param).Token.ttype |> TokenType.to_string in
                   printf "%s %s," pval ptype) stmt.params in
       let _ = printf "): %s {\n" @@ TokenType.to_string stmt.rettype in
       let _ = block_stmt_dump stmt.block (depth + 1) in
@@ -157,9 +158,9 @@ module Ast = struct
       let spaces = indent depth in
       match stmt with
       | Proc_call pc ->
-        let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.value in
-        let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
-        printf "%s)\n" spaces
+         let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.value in
+         let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
+         printf "%s)\n" spaces
 
     and ret_stmt_dump (stmt : ret_stmt) (depth : int) : unit =
       let spaces = indent depth in

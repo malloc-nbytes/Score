@@ -20,73 +20,6 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-   (* export function w $main() {
-    @start
-      call $dputs(l $prologue, w 1)
-    @loop
-      %r =w call $read(w 0, l $ch, w 1)
-      %cmp =w ceqw %r, 1
-      jnz %cmp, @maybeleft, @eof        # %cmp == 1 ? @maybeleft : @eof
-    @maybeleft
-      %b =w loadub $ch          # Bytes must be loaded as words
-      %cmp =w ceqw %b, 60               # <
-      jnz %cmp, @isleft, @mayberight
-    @isleft
-      call $dputs(l $left, w 1)
-      jmp @loop
-    @mayberight
-      %cmp =w ceqw %b, 62               # >
-      jnz %cmp, @isright, @maybedec
-    @isright
-      call $dputs(l $right, w 1)
-      jmp @loop
-    @maybedec
-      %cmp =w ceqw %b, 45               # -
-      jnz %cmp, @isdec, @maybeinc
-    @isdec
-      call $dputs(l $dec, w 1)
-      jmp @loop
-    @maybeinc
-      %cmp =w ceqw %b, 43               # +
-      jnz %cmp, @isinc, @maybegetchar
-    @isinc
-      call $dputs(l $inc, w 1)
-      jmp @loop
-    @maybegetchar
-      %cmp =w ceqw %b, 44               # ,
-      jnz %cmp, @isgetchar, @maybeputchar
-    @isgetchar
-      call $dputs(l $gchar, w 1)
-      jmp @loop
-    @maybeputchar
-      %cmp =w ceqw %b, 46               # .
-      jnz %cmp, @isputchar, @maybelopen
-    @isputchar
-      call $dputs(l $pchar, w 1)
-      jmp @loop
-    @maybelopen
-      %cmp =w ceqw %b, 91               # [
-      jnz %cmp, @islopen, @maybelclose
-    @islopen
-      call $islopen()
-      jmp @loop
-    @maybelclose
-      %cmp =w ceqw %b, 93               # ]
-      jnz %cmp, @islclose, @loop
-    @islclose
-      call $islclose()
-      jmp @loop
-    @eof
-      %d =w loadsw $depth
-      jnz %d, @mismatch, @done
-    @mismatch
-      call $mismatch()
-      ret 0
-    @done
-      call $dputs(l $epilogue, w 1)
-      ret 0
-    } *)
-
 module Gen = struct
   open Ast
   open Printf
@@ -126,6 +59,12 @@ module Gen = struct
     tmpreg := (if global then "$" else "%") ^ "__SCORE_TMP_REG" ^ (string_of_int tmp);
     !tmpreg
 
+  let scoretype_to_qbetype (token : Token.t) : string =
+    match token.Token.value with
+    | "i32" -> "w"
+    | "str" -> "l"
+    | _ -> failwith @@ sprintf "gen.ml: invalid type `%s`" token.Token.value
+
   let evaluate_binop (op : Token.t) : string =
     match op.ttype with
     | TokenType.Plus -> "add"
@@ -138,24 +77,24 @@ module Gen = struct
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
     | Ast.Binary bin ->
-      let lhs = evaluate_expr bin.lhs in
-      let rhs = evaluate_expr bin.rhs in
-      func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
-        (evaluate_binop bin.op) lhs rhs;
-      !tmpreg
+       let lhs = evaluate_expr bin.lhs in
+       let rhs = evaluate_expr bin.rhs in
+       func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
+                         (evaluate_binop bin.op) lhs rhs;
+       !tmpreg
     | Ast.Term Ast.Ident ident -> "%" ^ ident.value
     | Ast.Term Ast.Intlit intlit -> intlit.value
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.value;
-      !tmpreg
+       !tmpreg
     | Ast.Proc_call pc ->
-      let args = (List.fold_left (fun acc e ->
-        acc ^ "w " ^ evaluate_expr e ^ ", "
-      ) "" pc.args) in
-      let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
-      func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
-      !tmpreg
+       let args = (List.fold_left (fun acc e ->
+                       acc ^ "w " ^ evaluate_expr e ^ ", "
+                     ) "" pc.args) in
+       let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
+       func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+       !tmpreg
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
@@ -185,10 +124,10 @@ module Gen = struct
       func_section := sprintf "%s    jmp %s\n" !func_section donelbl;
 
     (match stmt.else_ with
-    | Some block ->
-      func_section := sprintf "%s%s\n" !func_section elselbl;
-      evaluate_block_stmt block
-    | None -> ());
+     | Some block ->
+        func_section := sprintf "%s%s\n" !func_section elselbl;
+        evaluate_block_stmt block
+     | None -> ());
     func_section := sprintf "%s%s\n" !func_section donelbl
 
   and evaluate_stmt (stmt : Ast.stmt) : unit =
@@ -204,10 +143,13 @@ module Gen = struct
     | Ast.Ret ret -> evaluate_ret_stmt ret
 
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
-    let params : string = List.fold_left (fun acc p ->
-      let id = (fst p).Token.value in (* TODO: Types for params *)
-      acc ^ "w %" ^ id ^ ", "
-    ) "" stmt.params in
+    let params : string =
+      List.fold_left (fun acc p ->
+          let id, type_ = (fst p).Token.value, snd p in
+          let qbe_type = scoretype_to_qbetype type_ in
+          let id = (fst p).Token.value in (* TODO: Types for params *)
+          acc ^ qbe_type ^ " %" ^ id ^ ", "
+        ) "" stmt.params in
     func_section :=
       sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.value params;
     evaluate_block_stmt stmt.block;
