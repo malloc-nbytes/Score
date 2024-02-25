@@ -98,7 +98,7 @@ module Parser = struct
         | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
            let proc_call, tokens = parse_proc_call (id :: tl) in
            Ast.Proc_call proc_call, tokens
-        | _ -> Ast.Term (Ast.Ident id), tl)
+        | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.LParen; _} :: tl ->
@@ -174,7 +174,7 @@ module Parser = struct
     expr, tokens
 
   (* Parses the block statement aka `{...}`. Does not consume
-   * `{`, as it is the job of the higher order function. *)
+   * `{`, as it is the job of the caller. *)
   and parse_block_stmt (tokens : Token.t list) : Ast.block_stmt * Token.t list =
     let rec aux (tokens : Token.t list) (acc : Ast.stmt list) : Ast.stmt list * Token.t list =
       match tokens with
@@ -189,8 +189,8 @@ module Parser = struct
     Ast.{stmts}, tokens
 
   (* Given a list of tokens, will parse a function definition
-   * returning a Ast.node_stmt w/ constructor Ast.node_stmt_block.
-   * Does not need to consume `proc` keyword as the higher order
+   * returning an Ast.node_stmt w/ constructor Ast.node_stmt_block.
+   * Does not need to consume `proc` keyword as the caller
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
     let rec gather_params (tokens : Token.t list) (acc : (Token.t * Token.t) list)

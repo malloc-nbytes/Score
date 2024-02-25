@@ -76,8 +76,8 @@ module Lexer = struct
   let isalnum (c : char) : bool = isalpha c || isnum c;;
 
   (* Takes a list of characters and a predicate. It will accumulate
-   * chars until a char satisfies `predicate`. It will then return
-   * the accumulated chars as a string, as well as the rest *)
+   * chars while the char satisfies `predicate`. It will then return
+   * the accumulated chars as a string, as well as the rest. *)
   let consume_while (lst : char list) (predicate : char -> bool) : string * char list =
     let rec aux lst acc =
       match lst with
@@ -89,26 +89,31 @@ module Lexer = struct
   ;;
 
   (* Given `src` (source code converted to a char list), will lex
-   * all chars into tokens `r` and `c` are the rows and columns that
-   * will be added to a created token. *)
+   * all chars into tokens. `r` and `c` are the rows and columns that
+   * will be added to a created token for error reporting. *)
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with
     | [] -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
+    (* Ignorable chars *)
     | '\n' :: tl -> lex_file tl (r+1) 1
     | '\t' :: tl -> lex_file tl r (c+1)
     | ' ' :: tl -> lex_file tl r (c+1)
+    (* Comments *)
     | '/' :: '/' :: tl ->
        let comment, rest = consume_while tl (fun c -> c <> '\n') in
        Printf.printf "comment: %s\n" comment;
        lex_file rest r (c+2+String.length comment)
+    (* Multi-char symbols *)
     | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
     | '&' :: '&' :: tl -> [Token.{value = "&&"; ttype = DoubleAmpersand; r; c}] @ lex_file tl r (c+2)
+    (* String literals *)
     | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
                    let rest = List.tl rest in (* consume_while does not consume closing quote. *)
                    [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
                    @ lex_file rest r (c+2+String.length strlit)
+    (* Single-char symbols *)
     | '>' :: tl -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
     | '<' :: tl -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
     | ':' :: tl -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
@@ -127,13 +132,17 @@ module Lexer = struct
     | '%' :: tl -> [Token.{value = "%"; ttype = Percent; r; c}] @ lex_file tl r (c+1)
     | '=' :: tl -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
     | '.' :: tl -> [Token.{value = "."; ttype = TokenType.Period; r; c}] @ lex_file tl r (c+1)
+    (* Integer literals *)
     | '0'..'9' as hd :: tl -> let intlit, rest = consume_while (hd :: tl) (fun c -> isnum c) in
                               [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
                               @ lex_file rest r (c+String.length intlit)
+    (* Identifier or keyword *)
     | hd :: tl -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
                   let word = String.make 1 hd ^ word in
                   (match is_keyword word with
+                   (* Keyword *)
                    | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
+                   (* Identifier *)
                    | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
   ;;
 
