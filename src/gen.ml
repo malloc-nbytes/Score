@@ -107,9 +107,6 @@ module Gen = struct
     func_section := sprintf "%s    ret %s\n" !func_section expr;
     didret := true
 
-  and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    assert false
-
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
@@ -140,13 +137,17 @@ module Gen = struct
     let expr = evaluate_expr stmt in
     func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr
 
+  and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
+
   and evaluate_stmt (stmt : Ast.stmt) : unit =
     didret := false;
     match stmt with
     | Ast.Proc_def procdef -> assert false
     | Ast.Block block -> assert false
     | Ast.Let letstmt -> evaluate_let_stmt letstmt
-    | Ast.Mut mutstmt -> assert false
+    | Ast.Mut mutstmt -> evaluate_mut_stmt mutstmt
     | Ast.If ifstmt -> evaluate_if_stmt ifstmt
     | Ast.While whilestmt -> assert false
     | Ast.Stmt_expr se -> evaluate_expr_stmt se
