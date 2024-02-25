@@ -6,7 +6,7 @@
 proc fizzbuzz(void): i32 {
      let i: i32 = 1;
 
-     while (i < 101) {
+     while i < 101 {
          if ((i%5) == 0) && ((i%3) == 0) {
             printf("FizzBuzz\n");
          } else { if (i%5) == 0 {
