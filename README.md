@@ -33,6 +33,7 @@ and will create an executable `./src/out`.
 - Functions [X]
 - Printing [X]
 - FizzBuzz [X]
+- Scope [X]
 - Fix the syntax for `if-else-if` statements [ ]
 - `for` loops [ ]
 - Arrays [ ]

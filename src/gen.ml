@@ -51,7 +51,17 @@ module Gen = struct
 
   let pop_scope () : unit = scope := List.tl !scope
 
-  let id_in_scope (id : string) : bool = List.exists (fun s -> Hashtbl.mem s id) !scope
+  let assert_id_not_in_scope (token : Token.t) : unit =
+    if List.exists (fun s -> Hashtbl.mem s token.lexeme) !scope then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared identifier `%s`" token.lexeme)
+                (Some token) in exit 1
+
+  let assert_id_in_scope (token : Token.t) : unit =
+    if not (List.exists (fun s -> Hashtbl.mem s token.lexeme) !scope) then
+      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "undeclared identifier `%s`" token.lexeme)
+                (Some token) in exit 1
 
   let add_id_to_scope (id : string) (token : Token.t) : unit =
     let s = List.hd !scope in
@@ -122,7 +132,9 @@ module Gen = struct
        func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
-    | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme
+    | Ast.Term Ast.Ident ident ->
+      assert_id_in_scope ident;
+      "%" ^ ident.lexeme
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
@@ -150,12 +162,8 @@ module Gen = struct
 
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
-    if id_in_scope stmt.id.lexeme then
-      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
-                ~msg:(Printf.sprintf "redeclaration of `%s`" stmt.id.lexeme)
-                (Some stmt.id) in exit 1
-    else
-      add_id_to_scope stmt.id.lexeme stmt.id;
+    assert_id_not_in_scope stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id;
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
@@ -193,13 +201,9 @@ module Gen = struct
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    if not (id_in_scope stmt.id.lexeme) then
-      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
-                ~msg:(Printf.sprintf "undeclared variable `%s`" stmt.id.lexeme)
-                (Some stmt.id) in exit 1;
-    else
-      let expr = evaluate_expr stmt.expr in
-      func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
+    assert_id_in_scope stmt.id;
+    let expr = evaluate_expr stmt.expr in
+    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
@@ -241,12 +245,8 @@ module Gen = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
-    if id_in_scope stmt.id.lexeme then
-      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
-                ~msg:(Printf.sprintf "redeclaration of `%s`" stmt.id.lexeme)
-                (Some stmt.id) in exit 1
-    else
-      add_id_to_scope stmt.id.lexeme stmt.id;
+    assert_id_not_in_scope stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id;
 
     push_scope ();
 
@@ -254,12 +254,8 @@ module Gen = struct
       List.fold_left (fun acc p ->
           let id, type_ = (fst p).Token.lexeme, snd p in
 
-          if id_in_scope id then
-            let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
-                      ~msg:(Printf.sprintf "redeclaration of `%s`" id)
-                      (Some (fst p)) in exit 1
-          else
-            add_id_to_scope id (fst p);
+          assert_id_not_in_scope (fst p);
+          add_id_to_scope id (fst p);
 
           let qbe_type = scoretype_to_qbetype type_ in
           let id = (fst p).Token.lexeme in
@@ -277,7 +273,9 @@ module Gen = struct
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def s -> evaluate_proc_def_stmt s
-    | Ast.Let s -> evaluate_let_stmt s
+    | Ast.Let s ->
+      let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                ~msg:"global let statements are unimplemented" None in exit 1
 
   (* Entrypoint *)
   let generate_inter_lang (program : Ast.program) : string =
