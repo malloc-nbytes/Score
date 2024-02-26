@@ -247,6 +247,9 @@ module Il = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
+    if stmt.rettype = TokenType.Void then
+      printf "[WARNING]: `void` return types are not fully functional. The function still must return a value\n";
+
     assert_id_not_in_scope stmt.id;
     add_id_to_scope stmt.id.lexeme stmt.id;
 
