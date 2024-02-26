@@ -22,6 +22,7 @@
 
 module Lexer = struct
   open Token
+  open Err
 
   let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 20
 
@@ -39,14 +40,6 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "while" TokenType.While in
     let _ = Hashtbl.add keywords "break" TokenType.Break in
     ()
-  ;;
-
-  (* Takes a message and prints it for error logging.
-   * Exits the program. *)
-  let err (msg : string) : unit =
-    let _ = Printf.printf "[Lexer ERR]: %s\n" msg in
-    exit 1
-  ;;
 
   (* Determines if the given string `s` is a
    * keyword or not. If it is, it returns the
@@ -55,14 +48,12 @@ module Lexer = struct
     match Hashtbl.find_opt keywords s with
     | Some t -> Some t
     | None -> None
-  ;;
 
   (* Takes a character and determines if
    * it is an alpha character. *)
   let isalpha (c : char) : bool =
     let c = int_of_char c in
     (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
-  ;;
 
   (* Takes a character and determines if
    * it is a number character. *)
@@ -70,7 +61,6 @@ module Lexer = struct
     let c = int_of_char c in
     let c = c - int_of_char '0' in
     (c >= 0) && (c <= 9)
-  ;;
 
   (* Takes a character and determines if
    * it is alphanumeric. *)
@@ -87,7 +77,6 @@ module Lexer = struct
       | hd :: tl -> acc, hd :: tl
     in
     aux lst ""
-  ;;
 
   (* Given `src` (source code converted to a char list), will lex
    * all chars into tokens. `r` and `c` are the rows and columns that
@@ -114,9 +103,16 @@ module Lexer = struct
     | '!' :: '=' :: tl -> [Token.{value = "!="; ttype = NotEqual; r; c}] @ lex_file tl r (c+2)
     (* String literals *)
     | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
-                   let rest = List.tl rest in (* consume_while does not consume closing quote. *)
-                   [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
-                   @ lex_file rest r (c+2+String.length strlit)
+                   if rest = []
+                   then
+                     let _ = Err.err Err.Fatal
+                               __FILE__ __FUNCTION__
+                               ~msg:(Printf.sprintf "unterminated string literal: %s" strlit)
+                               None in exit 1
+                   else
+                     let rest = List.tl rest in (* consume_while does not consume closing quote. *)
+                     [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
+                     @ lex_file rest r (c+2+String.length strlit)
     (* Single-char symbols *)
     | '>' :: tl -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
     | '<' :: tl -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
@@ -148,7 +144,6 @@ module Lexer = struct
                    | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
                    (* Identifier *)
                    | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
-  ;;
 
   (* Debug function to print a list of tokens. *)
   let rec print_tokens (tokens : Token.t list) : unit =
@@ -157,6 +152,5 @@ module Lexer = struct
     | hd :: tl ->
        print_endline (Token.to_string hd);
        print_tokens tl
-  ;;
 
 end

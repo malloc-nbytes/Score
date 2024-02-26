@@ -117,7 +117,7 @@ module Parser = struct
       match tokens with
       | {ttype = TokenType.Asterisk; _}
         | {ttype = TokenType.ForwardSlash; _}
-          | {ttype = TokenType.Percent; _} as op :: tl ->
+        | {ttype = TokenType.Percent; _} as op :: tl ->
          let (rhs : Ast.expr), tokens = parse_primary_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens
@@ -141,21 +141,21 @@ module Parser = struct
 
   (* The third level of expression parsing. Deals with equality
    * operators `==`, `<`, `>=` etc. *)
-   and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-      let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
-         match tokens with
-         | {ttype = TokenType.DoubleEquals; _}
-            | {ttype = TokenType.GreaterThan; _}
-            | {ttype = TokenType.GreaterThanEqual; _}
-            | {ttype = TokenType.LessThanEqual; _}
-            | {ttype = TokenType.NotEqual; _}
-            | {ttype = TokenType.LessThan; _} as op :: tl ->
-            let (rhs : Ast.expr), tokens = parse_add_expr tl in
-            aux tokens (Binary {lhs; rhs; op})
-         | _ -> lhs, tokens
-      in
-      let lhs, tokens = parse_add_expr tokens in
-      aux tokens lhs
+  and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
+    let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
+      match tokens with
+      | {ttype = TokenType.DoubleEquals; _}
+        | {ttype = TokenType.GreaterThan; _}
+        | {ttype = TokenType.GreaterThanEqual; _}
+        | {ttype = TokenType.LessThanEqual; _}
+        | {ttype = TokenType.NotEqual; _}
+        | {ttype = TokenType.LessThan; _} as op :: tl ->
+         let (rhs : Ast.expr), tokens = parse_add_expr tl in
+         aux tokens (Binary {lhs; rhs; op})
+      | _ -> lhs, tokens
+    in
+    let lhs, tokens = parse_add_expr tokens in
+    aux tokens lhs
 
   (* The second level of expression parsing. Deals with logical
    * operators `&&`, `||` etc. *)
@@ -163,7 +163,7 @@ module Parser = struct
     let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
       match tokens with
       | {ttype = TokenType.DoubleAmpersand; _}
-      | {ttype = TokenType.DoublePipe; _} as op :: tl ->
+        | {ttype = TokenType.DoublePipe; _} as op :: tl ->
          let (rhs : Ast.expr), tokens = parse_eq_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens
