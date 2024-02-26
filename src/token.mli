@@ -46,7 +46,7 @@ end
 
 module Token : sig
   type t =
-    { value : string
+    { lexeme : string
     ; ttype : TokenType.t
     ; r : int
     ; c : int

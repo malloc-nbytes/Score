@@ -110,28 +110,28 @@ module Ast = struct
       match expr with
       | Binary b ->
          let _ = expr_dump b.lhs (depth + 1) in
-         let _ = printf "%s%s\n" spaces b.op.value in
+         let _ = printf "%s%s\n" spaces b.op.lexeme in
          expr_dump b.rhs (depth + 1)
-      | Term Ident i -> printf "%s%s\n" spaces i.value
-      | Term Intlit t -> printf "%s%s\n" spaces t.value
-      | Term Strlit s -> printf "%s\"%s\"\n" spaces s.value
+      | Term Ident i -> printf "%s%s\n" spaces i.lexeme
+      | Term Intlit t -> printf "%s%s\n" spaces t.lexeme
+      | Term Strlit s -> printf "%s\"%s\"\n" spaces s.lexeme
       | Proc_call pc -> failwith "Proc_call dump unimplemented" in
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
       let spaces = indent depth in
-      let _ = printf "%sMUT %s =\n" spaces stmt.id.value in
+      let _ = printf "%sMUT %s =\n" spaces stmt.id.lexeme in
       expr_dump stmt.expr depth in
 
     let let_stmt_dump (stmt : let_stmt) (depth : int) : unit =
       let spaces = indent depth in
-      let _ = printf "%sLET %s =\n" spaces stmt.id.value in
+      let _ = printf "%sLET %s =\n" spaces stmt.id.lexeme in
       expr_dump stmt.expr depth in
 
     let rec proc_def_stmt_dump (stmt : proc_def_stmt) (depth : int) : unit =
       let spaces = indent depth in
-      let _ = printf "%sPROC %s(" spaces stmt.id.value in
+      let _ = printf "%sPROC %s(" spaces stmt.id.lexeme in
       let _ = List.iter(fun param ->
-                  let pval = (fst param).Token.value
+                  let pval = (fst param).Token.lexeme
                   and ptype = (snd param).Token.ttype |> TokenType.to_string in
                   printf "%s %s," pval ptype) stmt.params in
       let _ = printf "): %s {\n" @@ TokenType.to_string stmt.rettype in
@@ -158,7 +158,7 @@ module Ast = struct
       let spaces = indent depth in
       match stmt with
       | Proc_call pc ->
-         let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.value in
+         let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.lexeme in
          let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
          printf "%s)\n" spaces
       | _ -> assert false

@@ -109,7 +109,7 @@ end
 
 module Token = struct
   type t =
-    { value : string
+    { lexeme : string
     ; ttype : TokenType.t
     ; r : int
     ; c : int
@@ -118,5 +118,5 @@ module Token = struct
   (* Convert a Token to a string *)
   let to_string token =
     Printf.sprintf "(line %d, char %d, %s `%s`)"
-      token.r token.c (TokenType.to_string token.ttype) token.value
+      token.r token.c (TokenType.to_string token.ttype) token.lexeme
 end

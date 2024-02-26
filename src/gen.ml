@@ -77,10 +77,10 @@ module Gen = struct
 
   (* Convert the Score datatype to a QBE type. *)
   let scoretype_to_qbetype (token : Token.t) : string =
-    match token.Token.value with
+    match token.Token.lexeme with
     | "i32" -> "w"
     | "str" -> "l"
-    | _ -> failwith @@ sprintf "gen.ml: invalid type `%s`" token.Token.value
+    | _ -> failwith @@ sprintf "gen.ml: invalid type `%s`" token.Token.lexeme
 
   (* Get the QBE instruction for a binary operation. *)
   let evaluate_binop (op : Token.t) : string =
@@ -98,7 +98,7 @@ module Gen = struct
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
     | TokenType.DoublePipe -> "or"
-    | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value
+    | _ -> failwith @@ sprintf "Invalid binary operator %s" op.lexeme
 
   (* Evaluate an expression. *)
   let rec evaluate_expr (expr : Ast.expr) : string =
@@ -109,23 +109,23 @@ module Gen = struct
        func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
-    | Ast.Term Ast.Ident ident -> "%" ^ ident.value
-    | Ast.Term Ast.Intlit intlit -> intlit.value
+    | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme
+    | Ast.Term Ast.Intlit intlit -> intlit.lexeme
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
-                         !data_section (cons_tmpreg true) strlit.value;
+                         !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
     | Ast.Proc_call pc ->
        let args = (List.fold_left (fun acc e ->
                        acc ^ "w " ^ evaluate_expr e ^ ", "
                      ) "" pc.args) in
-       if pc.id.value = "printf"
+       if pc.id.lexeme = "printf"
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
-         let cons_args = "call $" ^ pc.id.value ^ "(" ^ args ^ ")" in
+         let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
 
@@ -138,7 +138,7 @@ module Gen = struct
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
+    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
@@ -172,7 +172,7 @@ module Gen = struct
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.value expr
+    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
@@ -214,13 +214,13 @@ module Gen = struct
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
     let params : string =
       List.fold_left (fun acc p ->
-          let id, type_ = (fst p).Token.value, snd p in
+          let id, type_ = (fst p).Token.lexeme, snd p in
           let qbe_type = scoretype_to_qbetype type_ in
-          let id = (fst p).Token.value in
+          let id = (fst p).Token.lexeme in
           acc ^ qbe_type ^ " %" ^ id ^ ", "
         ) "" stmt.params in
     func_section :=
-      sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.value params;
+      sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.lexeme params;
     evaluate_block_stmt stmt.block;
     func_section := sprintf "%s}\n" !func_section
 

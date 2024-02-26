@@ -83,67 +83,85 @@ module Lexer = struct
    * will be added to a created token for error reporting. *)
   let rec lex_file (src : char list) (r : int) (c : int) : Token.t list =
     match src with
-    | [] -> [Token.{value = "Eof"; ttype = TokenType.Eof; r; c}]
+
+    (* We are done with lexing *)
+    | [] -> [Token.{lexeme = "Eof"; ttype = TokenType.Eof; r; c}]
+
     (* Ignorable chars *)
     | '\n' :: tl -> lex_file tl (r+1) 1
     | '\t' :: tl -> lex_file tl r (c+1)
     | ' ' :: tl -> lex_file tl r (c+1)
+
     (* Comments *)
     | '-' :: '-' :: tl ->
        let comment, rest = consume_while tl (fun c -> c <> '\n') in
        lex_file rest r (c+2+String.length comment)
+
     (* Multi-char symbols *)
-    | ':' :: ':' :: tl -> [Token.{value = "::"; ttype = DoubleColon; r; c}] @ lex_file tl r (c+2)
-    | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
-    | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
-    | '&' :: '&' :: tl -> [Token.{value = "&&"; ttype = DoubleAmpersand; r; c}] @ lex_file tl r (c+2)
-    | '|' :: '|' :: tl -> [Token.{value = "||"; ttype = DoublePipe; r; c}] @ lex_file tl r (c+2)
-    | '<' :: '=' :: tl -> [Token.{value = "<="; ttype = LessThanEqual; r; c}] @ lex_file tl r (c+2)
-    | '>' :: '=' :: tl -> [Token.{value = ">="; ttype = GreaterThanEqual; r; c}] @ lex_file tl r (c+2)
-    | '!' :: '=' :: tl -> [Token.{value = "!="; ttype = NotEqual; r; c}] @ lex_file tl r (c+2)
+    | ':' :: ':' :: tl -> [Token.{lexeme = "::"; ttype = DoubleColon; r; c}]      @ lex_file tl r (c+2)
+    | '-' :: '>' :: tl -> [Token.{lexeme = "->"; ttype = RightArrow; r; c}]       @ lex_file tl r (c+2)
+    | '=' :: '=' :: tl -> [Token.{lexeme = "=="; ttype = DoubleEquals; r; c}]     @ lex_file tl r (c+2)
+    | '&' :: '&' :: tl -> [Token.{lexeme = "&&"; ttype = DoubleAmpersand; r; c}]  @ lex_file tl r (c+2)
+    | '|' :: '|' :: tl -> [Token.{lexeme = "||"; ttype = DoublePipe; r; c}]       @ lex_file tl r (c+2)
+    | '<' :: '=' :: tl -> [Token.{lexeme = "<="; ttype = LessThanEqual; r; c}]    @ lex_file tl r (c+2)
+    | '>' :: '=' :: tl -> [Token.{lexeme = ">="; ttype = GreaterThanEqual; r; c}] @ lex_file tl r (c+2)
+    | '!' :: '=' :: tl -> [Token.{lexeme = "!="; ttype = NotEqual; r; c}]         @ lex_file tl r (c+2)
+
     (* String literals *)
-    | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
-                   if rest = []
-                   then
-                     let _ = Err.err Err.Fatal
-                               __FILE__ __FUNCTION__
-                               ~msg:(Printf.sprintf "unterminated string literal: %s" strlit)
-                               None in exit 1
-                   else
-                     let rest = List.tl rest in (* consume_while does not consume closing quote. *)
-                     [Token.{value = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
-                     @ lex_file rest r (c+2+String.length strlit)
+    | '"' :: tl ->
+       let strlit, rest = consume_while tl (fun c -> c <> '"') in
+       if rest = []
+       then
+         let _ = Err.err Err.Fatal
+                   __FILE__ __FUNCTION__
+                   ~msg:(Printf.sprintf "unterminated string literal: %s" strlit)
+                   None in exit 1
+       else
+         let rest = List.tl rest in (* consume_while does not consume closing quote. *)
+         [Token.{lexeme = strlit; ttype = StringLiteral; r; c = c+2+(String.length strlit)}]
+         @ lex_file rest r (c+2+String.length strlit)
+
     (* Single-char symbols *)
-    | '>' :: tl -> [Token.{value = ">"; ttype = GreaterThan; r; c}] @ lex_file tl r (c+1)
-    | '<' :: tl -> [Token.{value = "<"; ttype = LessThan; r; c}] @ lex_file tl r (c+1)
-    | ':' :: tl -> [Token.{value = ":"; ttype = Colon; r; c}] @ lex_file tl r (c+1)
-    | ',' :: tl -> [Token.{value = ","; ttype = Comma; r; c}] @ lex_file tl r (c+1)
-    | '(' :: tl -> [Token.{value = "("; ttype = LParen; r; c}] @ lex_file tl r (c+1)
-    | ')' :: tl -> [Token.{value = ")"; ttype = RParen; r; c}] @ lex_file tl r (c+1)
-    | '{' :: tl -> [Token.{value = "{"; ttype = LBrace; r; c}] @ lex_file tl r (c+1)
-    | '}' :: tl -> [Token.{value = "}"; ttype = RBrace; r; c}] @ lex_file tl r (c+1)
-    | '[' :: tl -> [Token.{value = "["; ttype = LBracket; r; c}] @ lex_file tl r (c+1)
-    | ']' :: tl -> [Token.{value = "]"; ttype = RBracket; r; c}] @ lex_file tl r (c+1)
-    | ';' :: tl -> [Token.{value = ";"; ttype = Semicolon; r; c}] @ lex_file tl r (c+1)
-    | '+' :: tl -> [Token.{value = "+"; ttype = Plus; r; c}] @ lex_file tl r (c+1)
-    | '-' :: tl -> [Token.{value = "-"; ttype = Minus; r; c}] @ lex_file tl r (c+1)
-    | '*' :: tl -> [Token.{value = "*"; ttype = Asterisk; r; c}] @ lex_file tl r (c+1)
-    | '/' :: tl -> [Token.{value = "/"; ttype = ForwardSlash; r; c}] @ lex_file tl r (c+1)
-    | '%' :: tl -> [Token.{value = "%"; ttype = Percent; r; c}] @ lex_file tl r (c+1)
-    | '=' :: tl -> [Token.{value = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
-    | '.' :: tl -> [Token.{value = "."; ttype = TokenType.Period; r; c}] @ lex_file tl r (c+1)
+    | '>' :: tl -> [Token.{lexeme = ">"; ttype = GreaterThan; r; c}]      @ lex_file tl r (c+1)
+    | '<' :: tl -> [Token.{lexeme = "<"; ttype = LessThan; r; c}]         @ lex_file tl r (c+1)
+    | ':' :: tl -> [Token.{lexeme = ":"; ttype = Colon; r; c}]            @ lex_file tl r (c+1)
+    | ',' :: tl -> [Token.{lexeme = ","; ttype = Comma; r; c}]            @ lex_file tl r (c+1)
+    | '(' :: tl -> [Token.{lexeme = "("; ttype = LParen; r; c}]           @ lex_file tl r (c+1)
+    | ')' :: tl -> [Token.{lexeme = ")"; ttype = RParen; r; c}]           @ lex_file tl r (c+1)
+    | '{' :: tl -> [Token.{lexeme = "{"; ttype = LBrace; r; c}]           @ lex_file tl r (c+1)
+    | '}' :: tl -> [Token.{lexeme = "}"; ttype = RBrace; r; c}]           @ lex_file tl r (c+1)
+    | '[' :: tl -> [Token.{lexeme = "["; ttype = LBracket; r; c}]         @ lex_file tl r (c+1)
+    | ']' :: tl -> [Token.{lexeme = "]"; ttype = RBracket; r; c}]         @ lex_file tl r (c+1)
+    | ';' :: tl -> [Token.{lexeme = ";"; ttype = Semicolon; r; c}]        @ lex_file tl r (c+1)
+    | '+' :: tl -> [Token.{lexeme = "+"; ttype = Plus; r; c}]             @ lex_file tl r (c+1)
+    | '-' :: tl -> [Token.{lexeme = "-"; ttype = Minus; r; c}]            @ lex_file tl r (c+1)
+    | '*' :: tl -> [Token.{lexeme = "*"; ttype = Asterisk; r; c}]         @ lex_file tl r (c+1)
+    | '/' :: tl -> [Token.{lexeme = "/"; ttype = ForwardSlash; r; c}]     @ lex_file tl r (c+1)
+    | '%' :: tl -> [Token.{lexeme = "%"; ttype = Percent; r; c}]          @ lex_file tl r (c+1)
+    | '=' :: tl -> [Token.{lexeme = "="; ttype = TokenType.Equals; r; c}] @ lex_file tl r (c+1)
+    | '.' :: tl -> [Token.{lexeme = "."; ttype = TokenType.Period; r; c}] @ lex_file tl r (c+1)
+
     (* Integer literals *)
-    | '0'..'9' as hd :: tl -> let intlit, rest = consume_while (hd :: tl) (fun c -> isnum c) in
-                              [Token.{value = intlit; ttype = IntegerLiteral; r; c = c+(String.length intlit)}]
-                              @ lex_file rest r (c+String.length intlit)
+    | '0'..'9' as hd :: tl ->
+       let intlit, rest = consume_while (hd :: tl) (fun c -> isnum c) in
+       [Token.{lexeme = intlit;
+               ttype = IntegerLiteral;
+               r; c = c+(String.length intlit)}]
+       @ lex_file rest r (c+String.length intlit)
+
     (* Identifier or keyword *)
-    | hd :: tl -> let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
-                  let word = String.make 1 hd ^ word in
-                  (match is_keyword word with
-                   (* Keyword *)
-                   | Some k -> [Token.{value = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
-                   (* Identifier *)
-                   | None -> [Token.{value = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
+    | hd :: tl ->
+       let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+       let word = String.make 1 hd ^ word in
+       (match is_keyword word with
+
+        (* Keyword *)
+        | Some k ->
+           [Token.{lexeme = word; ttype = k; r; c}] @ lex_file rest r (c+String.length word)
+
+        (* Identifier *)
+        | None ->
+           [Token.{lexeme = word; ttype = Identifier; r; c}] @ lex_file rest r (c+String.length word))
 
   (* Debug function to print a list of tokens. *)
   let rec print_tokens (tokens : Token.t list) : unit =
