@@ -228,10 +228,17 @@ module Parser = struct
     | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
-       let rettype, tokens = expect tokens TokenType.Type in
+       let rettype, tokens = pop tokens in
+
+       (* allows rettype to be void *)
+       let rettype = match rettype with
+         | {ttype = TokenType.Void; _} -> TokenType.Void
+         | {ttype = TokenType.Type; _} -> rettype.ttype
+         | _ -> let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in exit 1 in
+
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
-       Ast.{id; params; block; rettype = rettype.ttype}, tokens
+       Ast.{id; params; block; rettype = rettype}, tokens
     | Some t ->
        let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
        exit 1

@@ -2,4 +2,4 @@
 
 set -xe
 
-rm -rf *.cmo *.cmi *.ssa out* main scr
+rm -rf *.cmo *.cmi *.ssa *.s out* main scr
