@@ -19,46 +19,52 @@
    * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
+
 module Gen = struct
   open Ast
   open Printf
   open Token
   open Err
 
-  (* Main program. A list of functions. *)
-  let func_section = ref ""
+  let scope : (((string, Token.t) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
 
-  (* Data section. A list of different globals. *)
-  let data_section = ref ""
+  let func_section   = ref ""
+  let data_section   = ref ""
 
-  (* Variable to use when a computation takes multiple steps. *)
-  let tmpreg = ref "%__SCORE_REG"
+  let tmpreg         = ref ""
+  let tmpreg_c       = ref 0
 
-  (* Variable to use to make `tmpreg` unqiue. *)
-  let tmpreg_c = ref 0
+  let if_lbl         = ref ""
+  let else_lbl       = ref ""
+  let if_done_lbl    = ref ""
+  let if_c           = ref 0
 
-  let if_lbl = ref "@if"
-  let else_lbl = ref "@else"
-  let done_lbl = ref "@done"
-  let if_c = ref 0
-  let loop_lbl = ref "@loop"
-  let loop_c = ref 0
-  let loop_start_lbl = ref "@loop_start"
-  let loop_end_lbl = ref "@loop_end"
+  let loop_lbl       = ref ""
+  let loop_start_lbl = ref ""
+  let loop_end_lbl   = ref ""
+  let loop_c         = ref 0
 
-  let didret = ref false (* TODO: Find a better solution *)
-  let didbreak = ref false
+  let didret         = ref false (* TODO: Find a better solution *)
+  let didbreak       = ref false (* TODO: Find a better solution *)
+
+  let push_scope () : unit = scope := Hashtbl.create 20 :: !scope
+
+  let pop_scope () : unit = scope := List.tl !scope
+
+  let id_in_scope (id : string) : bool = List.exists (fun s -> Hashtbl.mem s id) !scope
+
+  let add_id_to_scope (id : string) (token : Token.t) : unit =
+    let s = List.hd !scope in
+    Hashtbl.add s id token
 
   (* Construct a `if` label. *)
   let cons_if_lbl () : string * string * string =
     let tmp = string_of_int !if_c in
     if_c := !if_c + 1;
-
     if_lbl := "@if" ^ tmp;
     else_lbl := "@else" ^ tmp;
-    done_lbl := "@done" ^ tmp;
-
-    !if_lbl, !else_lbl, !done_lbl
+    if_done_lbl := "@done" ^ tmp;
+    !if_lbl, !else_lbl, !if_done_lbl
 
   (* Construct a `loop` label. *)
   let cons_loop_lbl () : string * string * string =
@@ -144,12 +150,20 @@ module Gen = struct
 
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
+    if id_in_scope stmt.id.lexeme then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclaration of `%s`" stmt.id.lexeme)
+                (Some stmt.id) in exit 1
+    else
+      add_id_to_scope stmt.id.lexeme stmt.id;
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
-    List.iter evaluate_stmt stmt.stmts
+    push_scope ();
+    List.iter evaluate_stmt stmt.stmts;
+    pop_scope ()
 
   (* Evaluate an `if` statement. *)
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
@@ -179,8 +193,13 @@ module Gen = struct
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
+    if not (id_in_scope stmt.id.lexeme) then
+      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "undeclared variable `%s`" stmt.id.lexeme)
+                (Some stmt.id) in exit 1;
+    else
+      let expr = evaluate_expr stmt.expr in
+      func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
@@ -209,7 +228,9 @@ module Gen = struct
     didbreak := false;
     match stmt with
     | Ast.Proc_def procdef -> assert false
-    | Ast.Block block -> assert false
+    | Ast.Block block ->
+      let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                ~msg:"nested block statements are unimplemented" None in exit 1
     | Ast.Let letstmt -> evaluate_let_stmt letstmt
     | Ast.Mut mutstmt -> evaluate_mut_stmt mutstmt
     | Ast.If ifstmt -> evaluate_if_stmt ifstmt
@@ -220,17 +241,37 @@ module Gen = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
+    if id_in_scope stmt.id.lexeme then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclaration of `%s`" stmt.id.lexeme)
+                (Some stmt.id) in exit 1
+    else
+      add_id_to_scope stmt.id.lexeme stmt.id;
+
+    push_scope ();
+
     let params : string =
       List.fold_left (fun acc p ->
           let id, type_ = (fst p).Token.lexeme, snd p in
+
+          if id_in_scope id then
+            let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                      ~msg:(Printf.sprintf "redeclaration of `%s`" id)
+                      (Some (fst p)) in exit 1
+          else
+            add_id_to_scope id (fst p);
+
           let qbe_type = scoretype_to_qbetype type_ in
           let id = (fst p).Token.lexeme in
           acc ^ qbe_type ^ " %" ^ id ^ ", "
         ) "" stmt.params in
+
     func_section :=
       sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.lexeme params;
+
     evaluate_block_stmt stmt.block;
-    func_section := sprintf "%s}\n" !func_section
+    func_section := sprintf "%s}\n" !func_section;
+    pop_scope ()
 
   (* Evaluate a top-level statement. *)
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =

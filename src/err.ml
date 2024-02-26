@@ -31,6 +31,8 @@ module Err = struct
     | Malformed_func_def
     | Unreachable
     | Unimplemented
+    | Redeclaration
+    | Undeclared
 
   let err_to_str (err_type : err_type) : string =
     match err_type with
@@ -41,6 +43,8 @@ module Err = struct
     | Malformed_func_def -> "Malformed_func_def"
     | Unreachable -> "Unreachable"
     | Unimplemented -> "Unimplemented"
+    | Redeclaration -> "Redeclaration"
+    | Undeclared -> "Undeclared"
 
   let err (err_type : err_type) (file : string) (func : string)
         ?(msg="") (token : Token.t option) : unit =
