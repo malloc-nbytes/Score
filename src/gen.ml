@@ -89,6 +89,8 @@ module Gen = struct
     | TokenType.ForwardSlash -> "div"
     | TokenType.DoubleEquals -> "ceqw"
     | TokenType.LessThan -> "csltw"
+    | TokenType.LessThanEqual -> "cslew"
+    | TokenType.GreaterThanEqual -> "csgew"
     | TokenType.GreaterThan -> "csgtw"
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
