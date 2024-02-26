@@ -107,6 +107,11 @@ module Lexer = struct
     | '<' :: '=' :: tl -> [Token.{lexeme = "<="; ttype = LessThanEqual; r; c}]    @ lex_file tl r (c+2)
     | '>' :: '=' :: tl -> [Token.{lexeme = ">="; ttype = GreaterThanEqual; r; c}] @ lex_file tl r (c+2)
     | '!' :: '=' :: tl -> [Token.{lexeme = "!="; ttype = NotEqual; r; c}]         @ lex_file tl r (c+2)
+    | '+' :: '=' :: tl -> [Token.{lexeme = "!="; ttype = PlusEquals; r; c}]       @ lex_file tl r (c+2)
+    | '-' :: '=' :: tl -> [Token.{lexeme = "-="; ttype = MinusEquals; r; c}]      @ lex_file tl r (c+2)
+    | '*' :: '=' :: tl -> [Token.{lexeme = "*="; ttype = AsteriskEquals; r; c}]   @ lex_file tl r (c+2)
+    | '/' :: '=' :: tl -> [Token.{lexeme = "/="; ttype = ForwardSlashEquals; r; c}] @ lex_file tl r (c+2)
+    | '%' :: '=' :: tl -> [Token.{lexeme = "%="; ttype = PercentEquals; r; c}]   @ lex_file tl r (c+2)
 
     (* String literals *)
     | '"' :: tl ->

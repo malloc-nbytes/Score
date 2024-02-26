@@ -63,6 +63,11 @@ module TokenType = struct
     | DoublePipe
     | Break
     | For
+    | PlusEquals
+    | MinusEquals
+    | AsteriskEquals
+    | ForwardSlashEquals
+    | PercentEquals
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -107,6 +112,12 @@ module TokenType = struct
     | DoublePipe -> "DoublePipe"
     | Break -> "Break"
     | For -> "For"
+    | PlusEquals -> "PlusEquals"
+    | MinusEquals -> "MinusEquals"
+    | AsteriskEquals -> "AsteriskEquals"
+    | ForwardSlashEquals -> "ForwardSlashEquals"
+    | PercentEquals -> "PercentEquals"
+
 end
 
 module Token = struct

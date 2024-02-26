@@ -252,10 +252,46 @@ module Parser = struct
    * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
-    let _, tokens = expect tokens TokenType.Equals in
+    let sym, tokens = pop tokens in
+
+    match sym with
+      | {ttype = TokenType.Equals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | {ttype = TokenType.PlusEquals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | {ttype = TokenType.MinusEquals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | {ttype = TokenType.AsteriskEquals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | {ttype = TokenType.ForwardSlashEquals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | {ttype = TokenType.PercentEquals; _} ->
+         let expr, tokens = parse_expr tokens in
+         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         let _, tokens = expect tokens TokenType.Semicolon in
+         Ast.{id; expr}, tokens
+      | _ ->
+         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+                   ~msg:(Printf.sprintf "unsupported token `%s`" sym.lexeme) (Some sym) in
+         exit 1
+(*
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; expr}, tokens
+    Ast.{id; expr}, tokens *)
 
   (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)

@@ -7,8 +7,8 @@ proc factorial(n: i32): i32 {
     let res: i32 = 1;
 
     -- Syntax for a `for let` loop.
-    for let i: i32 = 2; i <= n; i = i+1; {
-        res = res*i;
+    for let i: i32 = 2; i <= n; i += 1; {
+        res *= i;
     }
 
     return res;
@@ -19,8 +19,8 @@ proc is_prime(n: i32): i32 {
     let flag: i32 = 1;
 
     -- `for let` loops can also have parenthesis.
-    for (let i: i32 = 2; i <= n/2; i = i+1;) {
-        if n%i == 0 {
+    for (let i: i32 = 2; i <= n/2; i += 1;) {
+        if n % i == 0 {
             flag = 0;
             break; -- Break statements are currently unstable.
         }
@@ -42,7 +42,7 @@ proc fizzbuzz(void): i32 {
 
     -- `while` loop syntax and if-else-if.
     while i < 101 {
-        if i%5 == 0 && i%3 == 0 {
+        if i % 5 == 0 && i % 3 == 0 {
             printf("FizzBuzz\n");
         } else if i%5 == 0 {
             printf("Fizz\n");
@@ -51,7 +51,7 @@ proc fizzbuzz(void): i32 {
         } else {
             printf("%d\n", i);
         }
-        i = i+1;
+        i += 1;
     }
 
     return 0;
@@ -71,7 +71,7 @@ proc fibonacci(n: i32): i32 {
 proc print_range(start: i32, end: i32): i32 {
     while start < end {
         printf("%d ", start);
-        start = start+1;
+        start += 1;
     }
     return 0;
 }

@@ -67,6 +67,17 @@ module Il = struct
     let s = List.hd !scope in
     Hashtbl.add s id token
 
+  let get_token_from_scope (id : string) : Token.t =
+    let rec get_token_from_scope' (scope : ((string, Token.t) Hashtbl.t) list) : Token.t =
+      match scope with
+      | [] -> failwith "unreachable"
+      | s :: ss ->
+         if Hashtbl.mem s id then
+           Hashtbl.find s id
+         else
+           get_token_from_scope' ss in
+    get_token_from_scope' !scope
+
   (* Construct a `if` label. *)
   let cons_if_lbl () : string * string * string =
     let tmp = string_of_int !if_c in
@@ -118,6 +129,11 @@ module Il = struct
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
     | TokenType.DoublePipe -> "or"
+    | TokenType.PlusEquals -> "add"
+    | TokenType.MinusEquals -> "sub"
+    | TokenType.AsteriskEquals -> "mul"
+    | TokenType.ForwardSlashEquals -> "div"
+    | TokenType.PercentEquals -> "rem"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
                  ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme)
@@ -221,7 +237,7 @@ module Il = struct
       func_section := sprintf "%s    jmp %s\n" !func_section looplbl;
 
     func_section := sprintf "%s%s\n" !func_section loopendlbl
-  
+
   and evaluate_for_stmt (stmt : Ast.for_stmt) : unit =
     push_scope ();
     let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in

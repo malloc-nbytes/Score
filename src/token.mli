@@ -41,6 +41,11 @@ module TokenType : sig
     | DoublePipe
     | Break
     | For
+    | PlusEquals
+    | MinusEquals
+    | AsteriskEquals
+    | ForwardSlashEquals
+    | PercentEquals
 
   val to_string : t -> string
 end
