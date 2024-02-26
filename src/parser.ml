@@ -162,7 +162,8 @@ module Parser = struct
   and parse_logical_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
       match tokens with
-      | {ttype = TokenType.DoubleAmpersand; _} as op :: tl ->
+      | {ttype = TokenType.DoubleAmpersand; _}
+      | {ttype = TokenType.DoublePipe; _} as op :: tl ->
          let (rhs : Ast.expr), tokens = parse_eq_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens

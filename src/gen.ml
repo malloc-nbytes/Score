@@ -96,6 +96,7 @@ module Gen = struct
     | TokenType.NotEqual -> "cnew"
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
+    | TokenType.DoublePipe -> "or"
     | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value
 
   (* Evaluate an expression. *)

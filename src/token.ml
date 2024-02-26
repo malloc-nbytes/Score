@@ -60,6 +60,7 @@ module TokenType = struct
     | LessThanEqual
     | GreaterThanEqual
     | NotEqual
+    | DoublePipe
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -101,7 +102,7 @@ module TokenType = struct
     | LessThanEqual -> "LessThanEqual"
     | GreaterThanEqual -> "GreaterThanEqual"
     | NotEqual -> "NotEqual"
-
+    | DoublePipe -> "DoublePipe"
 end
 
 module Token = struct

@@ -107,6 +107,7 @@ module Lexer = struct
     | '-' :: '>' :: tl -> [Token.{value = "->"; ttype = RightArrow; r; c}] @ lex_file tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{value = "=="; ttype = DoubleEquals; r; c}] @ lex_file tl r (c+2)
     | '&' :: '&' :: tl -> [Token.{value = "&&"; ttype = DoubleAmpersand; r; c}] @ lex_file tl r (c+2)
+    | '|' :: '|' :: tl -> [Token.{value = "||"; ttype = DoublePipe; r; c}] @ lex_file tl r (c+2)
     | '<' :: '=' :: tl -> [Token.{value = "<="; ttype = LessThanEqual; r; c}] @ lex_file tl r (c+2)
     | '>' :: '=' :: tl -> [Token.{value = ">="; ttype = GreaterThanEqual; r; c}] @ lex_file tl r (c+2)
     | '!' :: '=' :: tl -> [Token.{value = "!="; ttype = NotEqual; r; c}] @ lex_file tl r (c+2)

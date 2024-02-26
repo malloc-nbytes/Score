@@ -2,6 +2,8 @@
 -- is currently able to compile. Comments start
 -- with `--` and read until EOL.
 
+-- The equalty operators `>` `<` `>=` `<=` `==` `!=` are supported.
+
 -- The classic "FizzBuzz" problem.
 proc fizzbuzz(void): i32 {
      let i: i32 = 1;

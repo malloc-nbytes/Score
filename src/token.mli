@@ -38,6 +38,7 @@ module TokenType : sig
     | LessThanEqual
     | GreaterThanEqual
     | NotEqual
+    | DoublePipe
 
   val to_string : t -> string
 end
