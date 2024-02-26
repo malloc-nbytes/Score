@@ -123,21 +123,6 @@ module Parser = struct
     let lhs, tokens = parse_primary_expr tokens in
     aux tokens lhs
 
-   (* The fourth level of expression parsing. Deals with equality
-   * operators `==`, `<`, `>=` etc. *)
-   and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-      let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
-         match tokens with
-         | {ttype = TokenType.DoubleEquals; _}
-            | {ttype = TokenType.GreaterThan; _}
-            | {ttype = TokenType.LessThan; _} as op :: tl ->
-            let (rhs : Ast.expr), tokens = parse_logical_expr tl in
-            aux tokens (Binary {lhs; rhs; op})
-         | _ -> lhs, tokens
-      in
-      let lhs, tokens = parse_logical_expr tokens in
-      aux tokens lhs
-
   (* The third level of expression parsing. Deals with multiplicative
    * operators `*`, `/` etc. *)
   and parse_mult_expr (tokens : Token.t list) : Ast.expr * Token.t list =
@@ -146,11 +131,11 @@ module Parser = struct
       | {ttype = TokenType.Asterisk; _}
         | {ttype = TokenType.ForwardSlash; _}
           | {ttype = TokenType.Percent; _} as op :: tl ->
-         let (rhs : Ast.expr), tokens = parse_eq_expr tl in
+         let (rhs : Ast.expr), tokens = parse_logical_expr tl in
          aux tokens (Binary {lhs; rhs; op})
       | _ -> lhs, tokens
     in
-    let lhs, tokens = parse_eq_expr tokens in
+    let lhs, tokens = parse_logical_expr tokens in
     aux tokens lhs
 
   (* The second level of expression parsing. Deals with additive
@@ -167,10 +152,25 @@ module Parser = struct
     let lhs, tokens = parse_mult_expr tokens in
     aux tokens lhs
 
+  (* The fourth level of expression parsing. Deals with equality
+   * operators `==`, `<`, `>=` etc. *)
+   and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
+      let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
+         match tokens with
+         | {ttype = TokenType.DoubleEquals; _}
+            | {ttype = TokenType.GreaterThan; _}
+            | {ttype = TokenType.LessThan; _} as op :: tl ->
+            let (rhs : Ast.expr), tokens = parse_add_expr tl in
+            aux tokens (Binary {lhs; rhs; op})
+         | _ -> lhs, tokens
+      in
+      let lhs, tokens = parse_add_expr tokens in
+      aux tokens lhs
+
   (* The first level of expression parsing. All expressions
    * that need parsing will call this function. *)
   and parse_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-    let expr, tokens = parse_add_expr tokens in
+    let expr, tokens = parse_eq_expr tokens in
     expr, tokens
 
   (* Parses the block statement aka `{...}`. Does not consume

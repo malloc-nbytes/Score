@@ -61,7 +61,7 @@ let () =
 
   (* Generate intermediate code for QBE *)
   let code : string = Gen.generate_inter_lang program in
-  let _ = print_endline code in (* debug *)
+  (* let _ = print_endline code in (\* debug *\) *)
 
   (* Run QBE on the intermediate code *)
   let outfp = "./out.ssa" in
