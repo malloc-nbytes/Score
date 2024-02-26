@@ -37,6 +37,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "else" @@ TokenType.Else in
     let _ = Hashtbl.add keywords "void" TokenType.Void in
     let _ = Hashtbl.add keywords "while" TokenType.While in
+    let _ = Hashtbl.add keywords "break" TokenType.Break in
     ()
   ;;
 

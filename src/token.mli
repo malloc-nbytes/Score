@@ -39,6 +39,7 @@ module TokenType : sig
     | GreaterThanEqual
     | NotEqual
     | DoublePipe
+    | Break
 
   val to_string : t -> string
 end

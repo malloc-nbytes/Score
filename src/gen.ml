@@ -46,6 +46,7 @@ module Gen = struct
   let loop_end_lbl = ref "@loop_end"
 
   let didret = ref false (* TODO: Find a better solution *)
+  let didbreak = ref false
 
   (* Construct a `if` label. *)
   let cons_if_lbl () : string * string * string =
@@ -153,7 +154,7 @@ module Gen = struct
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
-    if not !didret then (* TODO: find a better solution *)
+    if not !didret && not !didbreak then (* TODO: find a better solution *)
       func_section := sprintf "%s    jmp %s\n" !func_section donelbl;
 
     (match stmt.else_ with
@@ -184,14 +185,20 @@ module Gen = struct
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
-    if not !didret then (* TODO: find a better solution *)
+    if not !didret && not !didbreak then (* TODO: find a better solution *)
       func_section := sprintf "%s    jmp %s\n" !func_section looplbl;
 
     func_section := sprintf "%s%s\n" !func_section loopendlbl
 
+  (* Evaluate a `break` statement. *)
+  and evaluate_break_stmt (stmt : Token.t) : unit =
+    didbreak := true;
+    func_section := sprintf "%s    jmp %s # BREAK\n" !func_section !loop_end_lbl
+
   (* Evaluate a statement and call the appropriate function. *)
   and evaluate_stmt (stmt : Ast.stmt) : unit =
     didret := false;
+    didbreak := false;
     match stmt with
     | Ast.Proc_def procdef -> assert false
     | Ast.Block block -> assert false
@@ -201,6 +208,7 @@ module Gen = struct
     | Ast.While whilestmt -> evaluate_while_stmt whilestmt
     | Ast.Stmt_expr se -> evaluate_expr_stmt se
     | Ast.Ret ret -> evaluate_ret_stmt ret
+    | Ast.Break b -> evaluate_break_stmt b
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
