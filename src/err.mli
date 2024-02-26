@@ -8,6 +8,7 @@ module Err : sig
     | Unknown_token
     | Malformed_func_def
     | Unreachable
+    | Unimplemented
 
   val err : err_type -> string -> string -> ?msg:string -> Token.t option -> unit
 end

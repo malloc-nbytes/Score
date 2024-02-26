@@ -23,6 +23,7 @@ module Gen = struct
   open Ast
   open Printf
   open Token
+  open Err
 
   (* Main program. A list of functions. *)
   let func_section = ref ""
@@ -80,7 +81,10 @@ module Gen = struct
     match token.Token.lexeme with
     | "i32" -> "w"
     | "str" -> "l"
-    | _ -> failwith @@ sprintf "gen.ml: invalid type `%s`" token.Token.lexeme
+    | _ ->
+       let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                 ~msg:(Printf.sprintf "unsupported type `%s`" token.lexeme)
+                 None in exit 1
 
   (* Get the QBE instruction for a binary operation. *)
   let evaluate_binop (op : Token.t) : string =
@@ -98,7 +102,10 @@ module Gen = struct
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
     | TokenType.DoublePipe -> "or"
-    | _ -> failwith @@ sprintf "Invalid binary operator %s" op.lexeme
+    | _ ->
+       let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                 ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme)
+                 None in exit 1
 
   (* Evaluate an expression. *)
   let rec evaluate_expr (expr : Ast.expr) : string =
@@ -116,9 +123,9 @@ module Gen = struct
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
     | Ast.Proc_call pc ->
-       let args = (List.fold_left (fun acc e ->
-                       acc ^ "w " ^ evaluate_expr e ^ ", "
-                     ) "" pc.args) in
+       let args = List.fold_left (fun acc e ->
+                      acc ^ "w " ^ evaluate_expr e ^ ", "
+                    ) "" pc.args in
        if pc.id.lexeme = "printf"
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
@@ -148,7 +155,8 @@ module Gen = struct
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
     let iflbl, elselbl, donelbl = cons_if_lbl () in
-    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl (if stmt.else_ = None then donelbl else elselbl);
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl
+                      (if stmt.else_ = None then donelbl else elselbl);
     func_section := sprintf "%s%s\n" !func_section iflbl;
     evaluate_block_stmt stmt.block;
 
