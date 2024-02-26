@@ -64,6 +64,7 @@ module Gen = struct
     loop_lbl := "@loop" ^ tmp;
     loop_start_lbl := "@loop_start" ^ tmp;
     loop_end_lbl := "@loop_end" ^ tmp;
+    loop_c := !loop_c + 1;
     !loop_lbl, !loop_start_lbl, !loop_end_lbl
 
   (* Construct a `__SCORE_REG` label. *)
