@@ -266,11 +266,11 @@ module Parser = struct
     let type_ = match type_, colon with
       | _, colon when colon.ttype <> TokenType.Colon ->
          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-         ~msg:(Printf.sprintf "`let` binding for variable %s is missing a colon" id.lexeme) None in exit 1
+         ~msg:(Printf.sprintf "`let` binding for variable `%s` is missing a colon" id.lexeme) (Some colon) in exit 1
       | {ttype = TokenType.Type; _}, {ttype = TokenType.Colon; _} -> type_
       | _ ->
          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-         ~msg:(Printf.sprintf "`let` binding for variable %s is missing it's type" id.lexeme)
+         ~msg:(Printf.sprintf "`let` binding for variable `%s` is missing it's type" id.lexeme)
          (Some type_) in exit 1 in
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
