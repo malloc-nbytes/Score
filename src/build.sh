@@ -12,7 +12,7 @@ ocamlc -c ast.mli
 ocamlc -c ast.ml
 ocamlc -c parser.mli
 ocamlc -c parser.ml
-ocamlc -c gen.mli
-ocamlc -c gen.ml
+ocamlc -c il.mli
+ocamlc -c il.ml
 ocamlc -c main.ml
-ocamlc -o main token.cmo err.cmo ast.cmo gen.cmo lexer.cmo parser.cmo main.cmo
+ocamlc -o scr token.cmo err.cmo ast.cmo il.cmo lexer.cmo parser.cmo main.cmo

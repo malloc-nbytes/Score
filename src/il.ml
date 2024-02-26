@@ -20,7 +20,7 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-module Gen = struct
+module Il = struct
   open Ast
   open Printf
   open Token
@@ -223,6 +223,7 @@ module Gen = struct
 
   (* Evaluate a `break` statement. *)
   and evaluate_break_stmt (stmt : Token.t) : unit =
+    printf "[WARNING]: `break` statements are not fully functional\n";
     didbreak := true;
     func_section := sprintf "%s    jmp %s # BREAK\n" !func_section !loop_end_lbl
 
