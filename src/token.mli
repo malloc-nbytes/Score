@@ -37,6 +37,7 @@ module TokenType : sig
     | DoubleAmpersand
     | LessThanEqual
     | GreaterThanEqual
+    | NotEqual
 
   val to_string : t -> string
 end

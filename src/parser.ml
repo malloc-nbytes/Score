@@ -148,6 +148,7 @@ module Parser = struct
             | {ttype = TokenType.GreaterThan; _}
             | {ttype = TokenType.GreaterThanEqual; _}
             | {ttype = TokenType.LessThanEqual; _}
+            | {ttype = TokenType.NotEqual; _}
             | {ttype = TokenType.LessThan; _} as op :: tl ->
             let (rhs : Ast.expr), tokens = parse_add_expr tl in
             aux tokens (Binary {lhs; rhs; op})

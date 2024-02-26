@@ -59,6 +59,7 @@ module TokenType = struct
     | DoubleAmpersand
     | LessThanEqual
     | GreaterThanEqual
+    | NotEqual
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -99,6 +100,7 @@ module TokenType = struct
     | DoubleAmpersand -> "DoubleAmpersand"
     | LessThanEqual -> "LessThanEqual"
     | GreaterThanEqual -> "GreaterThanEqual"
+    | NotEqual -> "NotEqual"
 
 end
 

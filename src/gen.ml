@@ -92,6 +92,7 @@ module Gen = struct
     | TokenType.LessThanEqual -> "cslew"
     | TokenType.GreaterThanEqual -> "csgew"
     | TokenType.GreaterThan -> "csgtw"
+    | TokenType.NotEqual -> "cnew"
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
     | _ -> failwith @@ sprintf "Invalid binary operator %s" op.value

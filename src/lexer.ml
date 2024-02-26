@@ -109,6 +109,7 @@ module Lexer = struct
     | '&' :: '&' :: tl -> [Token.{value = "&&"; ttype = DoubleAmpersand; r; c}] @ lex_file tl r (c+2)
     | '<' :: '=' :: tl -> [Token.{value = "<="; ttype = LessThanEqual; r; c}] @ lex_file tl r (c+2)
     | '>' :: '=' :: tl -> [Token.{value = ">="; ttype = GreaterThanEqual; r; c}] @ lex_file tl r (c+2)
+    | '!' :: '=' :: tl -> [Token.{value = "!="; ttype = NotEqual; r; c}] @ lex_file tl r (c+2)
     (* String literals *)
     | '"' :: tl -> let strlit, rest = consume_while tl (fun c -> c <> '"') in
                    let rest = List.tl rest in (* consume_while does not consume closing quote. *)
