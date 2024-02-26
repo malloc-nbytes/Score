@@ -222,6 +222,32 @@ module Il = struct
 
     func_section := sprintf "%s%s\n" !func_section loopendlbl
 
+    (* and for_stmt =
+      { init : stmt
+      ; cond : expr
+      ; after : stmt
+      ; block : block_stmt
+      } *)
+  
+  and evaluate_for_stmt (stmt : Ast.for_stmt) : unit =
+    push_scope ();
+    let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in
+    evaluate_stmt stmt.init;
+    func_section := sprintf "%s%s\n" !func_section looplbl;
+    let expr = evaluate_expr stmt.cond in
+    func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
+    func_section := sprintf "%s%s\n" !func_section loopstartlbl;
+    evaluate_block_stmt stmt.block;
+    evaluate_stmt stmt.after;
+
+    (* Currently, if you have instructions after `ret` in QBE, it
+     * fails. This is a QAD solution to this issue. *)
+    if not !didret && not !didbreak then (* TODO: find a better solution *)
+      func_section := sprintf "%s    jmp %s\n" !func_section looplbl;
+
+    func_section := sprintf "%s%s\n" !func_section loopendlbl;
+    pop_scope ()
+
   (* Evaluate a `break` statement. *)
   and evaluate_break_stmt (stmt : Token.t) : unit =
     printf "[WARNING]: `break` statements are not fully functional\n";
@@ -244,6 +270,7 @@ module Il = struct
     | Ast.Stmt_expr se -> evaluate_expr_stmt se
     | Ast.Ret ret -> evaluate_ret_stmt ret
     | Ast.Break b -> evaluate_break_stmt b
+    | Ast.For f -> evaluate_for_stmt f
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =

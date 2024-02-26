@@ -39,6 +39,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "void" TokenType.Void in
     let _ = Hashtbl.add keywords "while" TokenType.While in
     let _ = Hashtbl.add keywords "break" TokenType.Break in
+    let _ = Hashtbl.add keywords "for" TokenType.For in
     ()
 
   (* Determines if the given string `s` is a

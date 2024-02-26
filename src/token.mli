@@ -40,6 +40,7 @@ module TokenType : sig
     | NotEqual
     | DoublePipe
     | Break
+    | For
 
   val to_string : t -> string
 end

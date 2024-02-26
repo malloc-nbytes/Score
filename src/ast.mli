@@ -17,6 +17,7 @@ module Ast : sig
     | Stmt_expr of stmt_expr
     | Ret of ret_stmt
     | Break of Token.t
+    | For of for_stmt
 
   and block_stmt = { stmts : stmt list }
 
@@ -24,6 +25,13 @@ module Ast : sig
 
   and while_stmt =
     { expr : expr
+    ; block : block_stmt
+    }
+
+  and for_stmt =
+    { init : stmt
+    ; cond : expr
+    ; after : stmt
     ; block : block_stmt
     }
 

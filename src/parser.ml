@@ -329,6 +329,29 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     b, tokens
 
+  and parse_for_stmt (tokens : Token.t list) : Ast.for_stmt * Token.t list =
+   let rec parse_for_stmt' (tokens : Token.t list) : Ast.stmt * Ast.expr * Ast.stmt * Token.t list =
+      let init, tokens = parse_stmt tokens in
+      let cond, tokens = parse_expr tokens in
+      let _, tokens = expect tokens TokenType.Semicolon in
+      let after, tokens = parse_stmt tokens in
+      init, cond, after, tokens in
+
+   match peek tokens 0 with
+   | Some {ttype = TokenType.LParen; _} ->
+      let _, tokens = expect tokens TokenType.LParen in
+      let init, cond, after, tokens = parse_for_stmt' tokens in
+      let _, tokens = expect tokens TokenType.RParen in
+      let _, tokens = expect tokens TokenType.LBrace in
+      let block, tokens = parse_block_stmt tokens in
+      Ast.{init; cond; after; block}, tokens
+   | _ ->
+      let init, cond, after, tokens = parse_for_stmt' tokens in
+      let _, tokens = expect tokens TokenType.LBrace in
+      let block, tokens = parse_block_stmt tokens in
+      Ast.{init; cond; after; block}, tokens
+         
+
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
   and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
@@ -357,6 +380,9 @@ module Parser = struct
     | {ttype = TokenType.While; _} :: tl ->
        let stmt, tokens = parse_while_stmt tl in
        Ast.While stmt, tokens
+    | {ttype = TokenType.For; _} :: tl ->
+       let stmt, tokens = parse_for_stmt tl in
+       Ast.For stmt, tokens
     | {ttype = TokenType.Return; _} :: tl ->
        let stmt, tokens = parse_ret_stmt tl in
        Ast.Ret stmt, tokens

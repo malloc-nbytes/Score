@@ -5,11 +5,10 @@
 -- Find the factorial of a number.
 proc factorial(n: i32): i32 {
      let res: i32 = 1;
-     let i: i32 = 2;
 
-     while i <= n {
+     -- Syntax for a `for let` loop.
+     for let i: i32 = 2; i <= n; i = i+1; {
          res = res*i;
-         i = i+1;
      }
 
      return res;
@@ -18,14 +17,13 @@ proc factorial(n: i32): i32 {
 -- Check if a given number is prime.
 proc is_prime(n: i32): i32 {
     let flag: i32 = 1;
-    let i: i32 = 2;
 
-    while i <= n/2 {
+    -- `for let` loops can also have parenthesis.
+    for (let i: i32 = 2; i <= n/2; i = i+1;) {
         if n%i == 0 {
             flag = 0;
-            break;
+            break; -- Break statements are currently unstable.
         }
-        i = i+1;
     }
 
     if flag {
@@ -42,6 +40,7 @@ proc is_prime(n: i32): i32 {
 proc fizzbuzz(void): i32 {
      let i: i32 = 1;
 
+     -- `while` loop syntax.
      while i < 101 {
          if i%5 == 0 && i%3 == 0 {
             printf("FizzBuzz\n");
@@ -63,6 +62,8 @@ proc fizzbuzz(void): i32 {
 proc fibonacci(n: i32): i32 {
      if n == 0 { return 0; }
      if n == 1 { return 1; }
+
+     -- You can use recursion.
      return fibonacci(n-1) + fibonacci(n-2);
 }
 

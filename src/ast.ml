@@ -39,6 +39,7 @@ module Ast = struct
     | Stmt_expr of stmt_expr
     | Ret of ret_stmt
     | Break of Token.t
+    | For of for_stmt
 
   and block_stmt = { stmts : stmt list }
 
@@ -46,6 +47,13 @@ module Ast = struct
 
   and while_stmt =
     { expr : expr
+    ; block : block_stmt
+    }
+
+  and for_stmt =
+    { init : stmt
+    ; cond : expr
+    ; after : stmt
     ; block : block_stmt
     }
 
@@ -179,6 +187,7 @@ module Ast = struct
       | Stmt_expr se -> stmt_expr_dump se (depth + 1)
       | Ret r -> ret_stmt_dump r (depth + 1)
       | Break b -> failwith "dumping break stmt unimplemented"
+      | For f -> failwith "dumping for stmt unimplemented"
 
     and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
       List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
