@@ -36,5 +36,6 @@ touch input.txt
 Currently, this program will read `./src/input.txt` for the source code
 and will create an executable `./src/out`.
 
-
+# Current Bugs
+- Having a `break` statement inside of multiple `while` loops does not function correctly.
 
