@@ -234,7 +234,9 @@ module Parser = struct
        let rettype = match rettype with
          | {ttype = TokenType.Void; _} -> TokenType.Void
          | {ttype = TokenType.Type; _} -> rettype.ttype
-         | _ -> let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in exit 1 in
+         | _ -> let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__
+                  ~msg:(Printf.sprintf "Missing return type for procedure %s" id.lexeme)
+                  (Some rettype) in exit 1 in
 
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
@@ -259,8 +261,17 @@ module Parser = struct
    * has already been consumed by higher order function `parse_stmt`. *)
   and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
-    let _, tokens = expect tokens TokenType.Colon in
-    let type_, tokens = expect tokens TokenType.Type in
+    let colon, tokens = pop tokens in
+    let type_, tokens = pop tokens in
+    let type_ = match type_, colon with
+      | _, colon when colon.ttype <> TokenType.Colon ->
+         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+         ~msg:(Printf.sprintf "`let` binding for variable %s is missing a colon" id.lexeme) None in exit 1
+      | {ttype = TokenType.Type; _}, {ttype = TokenType.Colon; _} -> type_
+      | _ ->
+         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+         ~msg:(Printf.sprintf "`let` binding for variable %s is missing it's type" id.lexeme)
+         (Some type_) in exit 1 in
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
