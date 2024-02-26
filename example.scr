@@ -44,9 +44,9 @@ proc fizzbuzz(void): i32 {
     while i < 101 {
         if i % 5 == 0 && i % 3 == 0 {
             printf("FizzBuzz\n");
-        } else if i%5 == 0 {
+        } else if i % 5 == 0 {
             printf("Fizz\n");
-        } else if i%3 == 0 {
+        } else if i % 3 == 0 {
             printf("Buzz\n");
         } else {
             printf("%d\n", i);
@@ -79,6 +79,17 @@ proc print_range(start: i32, end: i32): i32 {
 -- Given a first and last name, print the names.
 proc print_name(fname: str, lname: str): i32 {
     printf("Your name is: %s %s\n", fname, lname);
+    return 0;
+}
+
+-- Nested statements
+proc print_matrix(void): i32 {
+    for let row: i32 = 1; row <= 10; row += 1; {
+        for let col: i32 = 1; col <= 10; col += 1; {
+            printf("%d ", row*col);
+        }
+        printf("\n");
+    }
     return 0;
 }
 
