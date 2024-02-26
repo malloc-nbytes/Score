@@ -221,13 +221,6 @@ module Il = struct
       func_section := sprintf "%s    jmp %s\n" !func_section looplbl;
 
     func_section := sprintf "%s%s\n" !func_section loopendlbl
-
-    (* and for_stmt =
-      { init : stmt
-      ; cond : expr
-      ; after : stmt
-      ; block : block_stmt
-      } *)
   
   and evaluate_for_stmt (stmt : Ast.for_stmt) : unit =
     push_scope ();

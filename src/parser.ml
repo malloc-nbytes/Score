@@ -284,10 +284,9 @@ module Parser = struct
     let block, tokens = parse_block_stmt tokens in
     (match tokens with
      | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _}) :: tl2 ->
-        failwith "if else if unimplemented"
-     (* let tokens = tl1 :: tl2 in
-        let else_, tokens = parse_block_stmt tokens in
-        Ast.{expr; block; else_ = Some else_}, tokens *)
+        let if_, tokens = parse_if_stmt tl2 in
+        let else_ = Ast.{stmts = [Ast.If if_]} in
+        Ast.{expr; block; else_ = Some else_}, tokens
      | {ttype = TokenType.Else; _} :: tl ->
         let _, tokens = expect tl TokenType.LBrace in
         let else_, tokens = parse_block_stmt tokens in
@@ -350,7 +349,6 @@ module Parser = struct
       let _, tokens = expect tokens TokenType.LBrace in
       let block, tokens = parse_block_stmt tokens in
       Ast.{init; cond; after; block}, tokens
-         
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)
