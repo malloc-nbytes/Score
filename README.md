@@ -28,10 +28,10 @@ Currently, this program will read `./src/input.txt` for the source code
 and will create an executable `./src/out`.
 
 # TODO
-- Printing [X]
 - Integer Types [X]
 - String Types [X]
 - Functions [X]
+- Printing [X]
 - FizzBuzz [X]
 - Fix the syntax for `if-else-if` statements [ ]
 - `for` loops [ ]
