@@ -150,6 +150,7 @@ module Il = struct
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
+         let _ = assert_id_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
