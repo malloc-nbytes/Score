@@ -24,7 +24,7 @@ open Token
 open Lexer
 open Parser
 open Ast
-open Il
+open Ir
 
 let file_to_str filepath =
   let ch = open_in_bin filepath in
@@ -99,7 +99,7 @@ let () =
   (* Ast.ast_dump program; (\* debug *\) *)
 
   (* Generate intermediate code for QBE *)
-  let code = Il.generate_inter_lang program in
+  let code = Ir.generate_inter_lang program in
   (* print_endline code; (\* debug *\) *)
 
   (* Run QBE on the intermediate code *)
