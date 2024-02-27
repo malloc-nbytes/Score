@@ -156,6 +156,9 @@ module Ir = struct
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
+    | Ast.Term Ast.IntCompoundLit cl ->
+        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                  ~msg:"int compound literals are unimplemented" None in exit 1
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       acc ^ "w " ^ evaluate_expr e ^ ", "
@@ -182,7 +185,8 @@ module Ir = struct
     assert_id_not_in_scope stmt.id;
     add_id_to_scope stmt.id.lexeme stmt.id;
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
+    func_section := sprintf "%s    %%%s =%s copy %s\n"
+                      !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
 
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =

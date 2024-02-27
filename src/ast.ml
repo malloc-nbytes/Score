@@ -99,6 +99,7 @@ module Ast = struct
     | Ident of Token.t
     | Intlit of Token.t
     | Strlit of Token.t
+    | IntCompoundLit of expr list
 
   and proc_call_expr =
     { id : Token.t
@@ -123,6 +124,10 @@ module Ast = struct
       | Term Ident i -> printf "%s%s\n" spaces i.lexeme
       | Term Intlit t -> printf "%s%s\n" spaces t.lexeme
       | Term Strlit s -> printf "%s\"%s\"\n" spaces s.lexeme
+      | Term IntCompoundLit l ->
+         let _ = printf "%s[\n" spaces in
+         let _ = List.iter (fun e -> expr_dump e (depth + 1)) l in
+         printf "%s]\n" spaces
       | Proc_call pc -> failwith "Proc_call dump unimplemented" in
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
