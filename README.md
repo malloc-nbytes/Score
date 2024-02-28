@@ -44,6 +44,5 @@ See `./scr --help` for more options
 
 # Current Bugs
 - Having a `break` statement inside of multiple `while` loops does not function correctly.
-- Having a `return` statement not being the last statement in a function does not work.
-- Returning a string from a function results in a segmentation fault.
+- Having a `return` statement in the middle of a procedure does not work.
 
