@@ -1,0 +1,39 @@
+proc ret_str_in_ret_stmt(void): str {
+     return "foo";
+}
+
+proc ret_str_from_var(void): str {
+     let s: str = "foo";
+     return s;
+}
+
+proc str_rets_wrong_str(void): str {
+     return "bar";
+}
+
+proc test_str_eq(s: str): i32 {
+     let ans: str = "foo";
+     return strcmp(s, ans);
+}
+
+proc main(void): i32 {
+     if strcmp(ret_str_in_ret_stmt(), "foo") != 0 {
+         exit(1);
+     }
+
+     if strcmp(ret_str_from_var(), "foo") != 0 {
+         exit(1);
+     }
+
+     if strcmp(str_rets_wrong_str(), "foo") == 0 {
+         exit(1);
+     }
+
+     if test_str_eq("foo") != 0 {
+         exit(1);
+     }
+
+
+
+     return 0;
+}

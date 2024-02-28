@@ -1,0 +1,111 @@
+proc while1(void): i32 {
+     printf("while1\n");
+     let i: i32 = 0;
+     while i < 10 { i += 1; }
+     return i;
+}
+
+proc while2(n: i32): i32 {
+     printf("while2\n");
+     let i: i32 = 0;
+     while i < n { i += 1; }
+     return i;
+}
+
+proc while_big(n: i32): i32 {
+     printf("while_big\n");
+     let i: i32 = 0;
+     while i < n { i += 1; }
+     return i;
+}
+
+proc while_down(n: i32): i32 {
+     printf("while_down\n");
+     let i: i32 = n;
+     while i > 0 {
+           i -= 1;
+     }
+     return i;
+}
+
+proc for1(void): i32 {
+     printf("for1\n");
+     let k: i32 = 0;
+     for let i: i32 = 0; i < 10; i += 1; {
+         k = i;
+     }
+     return k;
+}
+
+proc for2(n: i32): i32 {
+     printf("for2\n");
+     let k: i32 = 0;
+     for let i: i32 = 0; i < n; i += 1; {
+         k += 1;
+     }
+     return k;
+}
+
+proc double_for(void): i32 {
+     printf("double_for\n");
+     let x: i32 = 0;
+     for let i: i32 = 0; i < 100000; i += 1; {
+         for let j: i32 = 0; j < 100000; j += 1; {
+             x += 1;
+         }
+     }
+     return x;
+}
+
+proc triple_for(void): i32 {
+     printf("triple_for\n");
+     let x: i32 = 0;
+     for let i: i32 = 0; i < 1000; i += 1; {
+         for let j: i32 = 0; j < 1000; j += 1; {
+             for let k: i32 = 0; k < 1000; k += 1; {
+                 x += 1;
+             }
+         }
+     }
+     return x;
+}
+
+proc main(void): i32 {
+     if while1() != 10 {
+         exit(1);
+     }
+
+     let n: i32 = 30;
+     if while2(n) != n {
+         exit(1);
+     }
+
+     n = 1000000000;
+     if while_big(n) != n {
+         exit(1);
+     }
+
+     n = 1000000000;
+     if while_down(n) != 0 {
+         exit(1);
+     }
+
+     if for1() != 9 {
+         exit(1);
+     }
+
+     n = 1000000000;
+     if for2(n) != n {
+         exit(1);
+     }
+
+     if double_for() != 1410065408 {
+         exit(1);
+     }
+
+     if triple_for() != 1000000000 {
+         exit(1);
+     }
+
+     return 0;
+}

@@ -12,8 +12,8 @@ main
 input.txt
 input.bak
 *.sse
-*.scr
 *.out
+input.scr
 
 # ocamlbuild working directory
 _build/
