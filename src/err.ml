@@ -51,6 +51,7 @@ module Err = struct
     let s = err_to_str err_type in
     match token with
     | Some token' ->
+       let _ = Printf.eprintf "%s:%d:%d:\n" token'.fp token'.r token'.c in
        let msg = (if msg = "" then msg else "[ERR] " ^ msg ^ "\n") in
        Printf.eprintf
          "[ERR] %s [%s:%s]:\n%s[ERR] conflicting token: %s\n"

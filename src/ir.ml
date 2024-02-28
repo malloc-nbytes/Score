@@ -171,6 +171,12 @@ module Ir = struct
          let cons_args = "call $printf(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
+       else if pc.id.lexeme = "exit" (* INTRINSIC *)
+       then
+         let _ = assert (List.length pc.args = 1) in
+         let cons_args = "call $exit(" ^ args ^ ")" in
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg
        else
          let _ = assert_id_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
@@ -246,9 +252,9 @@ module Ir = struct
 
   (* Evaluate a statement expression ie `printf()`. *)
   and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
-    let expr = evaluate_expr stmt in
-    printf "HERE: %s\n" !cur_proc_id;
-    func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr
+    let _ = evaluate_expr stmt in ()
+    (* let expr = evaluate_expr stmt in () *)
+    (* func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr *)
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =

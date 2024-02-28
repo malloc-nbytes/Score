@@ -91,7 +91,7 @@ let () =
 
   (* Begin lexing *)
   Lexer.populate_keywords ();
-  let tokens = Lexer.lex_file (String.to_seq data |> List.of_seq) 1 1 in
+  let tokens = Lexer.lex_file !infp (String.to_seq data |> List.of_seq) 1 1 in
   (* Lexer.print_tokens tokens; (\* debug *\) *)
 
   (* Product an AST *)

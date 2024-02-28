@@ -145,10 +145,11 @@ module Token = struct
     ; ttype : TokenType.t
     ; r : int
     ; c : int
+    ; fp : string
     }
 
   (* Convert a Token to a string *)
   let to_string token =
-    Printf.sprintf "(line %d, char %d, %s `%s`)"
-      token.r token.c (TokenType.to_string token.ttype) token.lexeme
+    Printf.sprintf "(file: %s, line %d, char %d, %s `%s`)"
+      token.fp token.r token.c (TokenType.to_string token.ttype) token.lexeme
 end

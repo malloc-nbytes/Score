@@ -64,6 +64,7 @@ module Token : sig
     ; ttype : TokenType.t
     ; r : int
     ; c : int
+    ; fp : string
     }
 
   val to_string : t -> string
