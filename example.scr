@@ -88,6 +88,10 @@ proc print_matrix(void): void {
     }
 }
 
+proc compare_strs(s1: str, s2: str): i32 {
+     return strcmp(s1, s2) == 0;
+}
+
 -- Entrypoint
 proc main(void): i32 {
     let n: i32 = 10;
@@ -103,6 +107,14 @@ proc main(void): i32 {
     is_prime(13);
 
     printf("Factorial of 5: %d\n", factorial(5));
+
+    let strs_eq: i32 = compare_strs("hello", "hello");
+    if strs_eq {
+        printf("the strings are equal\n");
+    }
+    else {
+        printf("the strings are not equal\n");
+    }
 
     return 0;
 }
