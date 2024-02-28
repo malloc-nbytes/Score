@@ -49,7 +49,7 @@ subprocess.run("./clean.sh")
 subprocess.run("./build.sh")
 directory_path = './tests/'
 
-show = True if len(sys.argv) != 1 and sys.argv[1] == 'show' else False
+show = True if len(sys.argv) != 1 and sys.argv[1] == '-s' else False
 
 file_paths = list_files(directory_path)
 process_files(file_paths, directory_path, show)
