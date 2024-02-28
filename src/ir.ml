@@ -47,6 +47,8 @@ module Ir = struct
   let didret         = ref false (* TODO: Find a better solution *)
   let didbreak       = ref false (* TODO: Find a better solution *)
 
+  let cur_proc_id     = ref ""
+
   let push_scope () : unit = scope := Hashtbl.create 20 :: !scope
 
   let pop_scope () : unit = scope := List.tl !scope
@@ -178,14 +180,23 @@ module Ir = struct
            | None -> failwith "TODO ERR: NO TYPE"
            | Some t -> scoretype_to_qbetype t in
 
-         func_section := sprintf "%s    %s =%s %s\n"
-                           !func_section (cons_tmpreg false) qbe_type cons_args;
+         (* Don't create a new REG if the proc call is void. *)
+         (if qbe_type <> "" then
+            func_section := sprintf "%s    %s =%s %s\n"
+                              !func_section (cons_tmpreg false) qbe_type cons_args
+          else
+            func_section := sprintf "%s    %s\n"
+                              !func_section cons_args);
          !tmpreg
 
   (* Evaluate the `return` statement. *)
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    ret %s\n" !func_section expr;
+    let type_tok = snd (get_token_from_scope !cur_proc_id) in
+    let qbe_type = match type_tok with
+      | None -> failwith "TODO ERR: NO TYPE"
+      | Some t -> scoretype_to_qbetype t in
+    func_section := sprintf "%s    ret %s\n" !func_section @@ if qbe_type = "" then "" else expr;
     didret := true
 
   (* Evaluate the `let` statement. *)
@@ -197,10 +208,20 @@ module Ir = struct
                       !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
 
   (* Evaluate a block statement. *)
-  and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
+  and evaluate_block_stmt (stmt : Ast.block_stmt) : bool =
     push_scope ();
-    List.iter evaluate_stmt stmt.stmts;
-    pop_scope ()
+
+    let user_did_ret = ref false in
+    (List.iter (fun s ->
+         (match s with
+          | Ast.Ret _ -> user_did_ret := true
+          | _ -> user_did_ret := false);
+         evaluate_stmt s
+       ) stmt.stmts);
+
+    (* List.iter evaluate_stmt stmt.stmts; *)
+    pop_scope ();
+    !user_did_ret
 
   (* Evaluate an `if` statement. *)
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
@@ -209,7 +230,7 @@ module Ir = struct
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl
                       (if stmt.else_ = None then donelbl else elselbl);
     func_section := sprintf "%s%s\n" !func_section iflbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
@@ -219,13 +240,14 @@ module Ir = struct
     (match stmt.else_ with
      | Some block ->
         func_section := sprintf "%s%s\n" !func_section elselbl;
-        evaluate_block_stmt block
+        let _ = evaluate_block_stmt block in ()
      | None -> ());
     func_section := sprintf "%s%s\n" !func_section donelbl
 
   (* Evaluate a statement expression ie `printf()`. *)
   and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
     let expr = evaluate_expr stmt in
+    printf "HERE: %s\n" !cur_proc_id;
     func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
@@ -241,7 +263,7 @@ module Ir = struct
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
@@ -258,7 +280,7 @@ module Ir = struct
     let expr = evaluate_expr stmt.cond in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
     evaluate_stmt stmt.after;
 
     (* Currently, if you have instructions after `ret` in QBE, it
@@ -271,7 +293,7 @@ module Ir = struct
 
   (* Evaluate a `break` statement. *)
   and evaluate_break_stmt (stmt : Token.t) : unit =
-    printf "[WARNING]: `break` statements are not fully functional\n";
+    printf "[WARN]: `break` statements are not fully functional\n";
     didbreak := true;
     func_section := sprintf "%s    jmp %s # BREAK\n" !func_section !loop_end_lbl
 
@@ -295,6 +317,7 @@ module Ir = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
+    cur_proc_id := stmt.id.lexeme;
     assert_id_not_in_scope stmt.id;
     add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.rettype;
 
@@ -319,7 +342,11 @@ module Ir = struct
     func_section :=
       sprintf "%sexport function %s $%s(%s) {\n@start\n" !func_section qbe_type stmt.id.lexeme params;
 
-    evaluate_block_stmt stmt.block;
+    let user_did_ret = evaluate_block_stmt stmt.block in
+
+    (if qbe_type = "" && not user_did_ret then
+      func_section := sprintf "%s    ret\n" !func_section);
+
     func_section := sprintf "%s}\n" !func_section;
     pop_scope ()
 
