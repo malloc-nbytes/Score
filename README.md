@@ -19,13 +19,13 @@ cd ./Score/src/
 
 ## Running
 ```
-cd ./Score/src/
-touch input.txt
-./main
-./out
+./scr <input filepath>
 ```
-Currently, this program will read `./src/input.txt` for the source code
-and will create an executable `./src/out`.
+or
+```
+./scr -o <output filepath> <input filepath>
+```
+See `./scr --help` for more options
 
 # TODO
 - Integer Types [X]
