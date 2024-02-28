@@ -37,7 +37,7 @@ proc is_prime(n: i32): i32 {
 }
 
 -- The classic "FizzBuzz" problem.
-proc fizzbuzz(void): i32 {
+proc fizzbuzz(void): void {
     let i: i32 = 1;
 
     -- `while` loop syntax and if-else-if.
@@ -53,8 +53,6 @@ proc fizzbuzz(void): i32 {
         }
         i += 1;
     }
-
-    return 0;
 }
 
 -- Calculate the fibonacci sequence of
@@ -68,29 +66,26 @@ proc fibonacci(n: i32): i32 {
 }
 
 -- Print the range of numbers from start..end.
-proc print_range(start: i32, end: i32): i32 {
+proc print_range(start: i32, end: i32): void {
     while start < end {
         printf("%d ", start);
         start += 1;
     }
-    return 0;
 }
 
 -- Given a first and last name, print the names.
-proc print_name(fname: str, lname: str): i32 {
+proc print_name(fname: str, lname: str): void {
     printf("Your name is: %s %s\n", fname, lname);
-    return 0;
 }
 
 -- Nested statements
-proc print_matrix(void): i32 {
+proc print_matrix(void): void {
     for let row: i32 = 1; row <= 10; row += 1; {
         for let col: i32 = 1; col <= 10; col += 1; {
             printf("%d ", row*col);
         }
         printf("\n");
     }
-    return 0;
 }
 
 -- Entrypoint

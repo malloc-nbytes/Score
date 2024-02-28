@@ -1,6 +1,7 @@
 #!/bin/python3
 
 import os
+import sys
 import subprocess
 
 def list_files(directory):
@@ -15,7 +16,7 @@ def list_files(directory):
 
     return file_paths
 
-def process_files(file_paths, directory_path):
+def process_files(file_paths, directory_path, show):
     for file_path in file_paths:
         exe = f'{file_path}.out'
         compile_ = f"./scr -o {exe} {file_path}"
@@ -29,9 +30,11 @@ def process_files(file_paths, directory_path):
             elif result.returncode == 1:
                 print(f'\n=== COMPILATION FAILED ===\n(return code: {result.returncode})')
                 exit(1)
-            print(f'Running {exe} ...', end='')
-            # result = subprocess.run(run, shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            result = subprocess.run(run, shell=True, check=False)
+            print(f'Running {exe} ...', flush=True, end='')
+            if show:
+                result = subprocess.run(run, shell=True, check=False)
+            else:
+                result = subprocess.run(run, shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if result.returncode == 0:
                 print(' ok')
             elif result.returncode == 1:
@@ -46,5 +49,7 @@ subprocess.run("./clean.sh")
 subprocess.run("./build.sh")
 directory_path = './tests/'
 
+show = True if len(sys.argv) != 1 and sys.argv[1] == 'show' else False
+
 file_paths = list_files(directory_path)
-process_files(file_paths, directory_path)
+process_files(file_paths, directory_path, show)
