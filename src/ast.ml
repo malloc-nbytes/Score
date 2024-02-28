@@ -65,15 +65,14 @@ module Ast = struct
 
   and proc_def_stmt =
     { id : Token.t
-    (* param * type *)
-    ; params : (Token.t * Token.t) list
+    ; params : (Token.t * TokenType.id_type) list
     ; block : block_stmt
-    ; rettype : TokenType.t
+    ; rettype : TokenType.id_type
     }
 
   and let_stmt =
     { id : Token.t
-    ; type_ : Token.t
+    ; type_ : TokenType.id_type
     ; expr : expr
     }
 
@@ -99,6 +98,7 @@ module Ast = struct
     | Ident of Token.t
     | Intlit of Token.t
     | Strlit of Token.t
+    | IntCompoundLit of expr list
 
   and proc_call_expr =
     { id : Token.t
@@ -123,6 +123,10 @@ module Ast = struct
       | Term Ident i -> printf "%s%s\n" spaces i.lexeme
       | Term Intlit t -> printf "%s%s\n" spaces t.lexeme
       | Term Strlit s -> printf "%s\"%s\"\n" spaces s.lexeme
+      | Term IntCompoundLit l ->
+         let _ = printf "%s[\n" spaces in
+         let _ = List.iter (fun e -> expr_dump e (depth + 1)) l in
+         printf "%s]\n" spaces
       | Proc_call pc -> failwith "Proc_call dump unimplemented" in
 
     let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
@@ -140,9 +144,9 @@ module Ast = struct
       let _ = printf "%sPROC %s(" spaces stmt.id.lexeme in
       let _ = List.iter(fun param ->
                   let pval = (fst param).Token.lexeme
-                  and ptype = (snd param).Token.ttype |> TokenType.to_string in
+                  and ptype = (snd param) |> TokenType.id_type_to_string in
                   printf "%s %s," pval ptype) stmt.params in
-      let _ = printf "): %s {\n" @@ TokenType.to_string stmt.rettype in
+      let _ = printf "): %s {\n" @@ TokenType.id_type_to_string stmt.rettype in
       let _ = block_stmt_dump stmt.block (depth + 1) in
       printf "}\n"
 

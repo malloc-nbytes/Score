@@ -1,4 +1,11 @@
 module TokenType : sig
+  type id_type =
+    | I32
+    | Str
+    | Void
+    | Array of id_type
+    | Custom of string
+
   type t =
     | Eof
     | Identifier
@@ -15,7 +22,7 @@ module TokenType : sig
     | Colon
     | RightArrow
     | Comment
-    | Type
+    | Type of id_type
     | GreaterThan
     | LessThan
     | LBracket
@@ -32,7 +39,6 @@ module TokenType : sig
     | Let
     | If
     | Else
-    | Void
     | While
     | DoubleAmpersand
     | LessThanEqual
@@ -48,6 +54,8 @@ module TokenType : sig
     | PercentEquals
 
   val to_string : t -> string
+  val id_type_to_string : id_type -> string
+  val id_types : t list
 end
 
 module Token : sig
@@ -56,6 +64,7 @@ module Token : sig
     ; ttype : TokenType.t
     ; r : int
     ; c : int
+    ; fp : string
     }
 
   val to_string : t -> string

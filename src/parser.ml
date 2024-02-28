@@ -40,6 +40,16 @@ module Parser = struct
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"unwrapped None value" None in
        exit 1
 
+  (* Takes a list and splits the head from the tail
+   * and returns both. Should be used when wanting to
+   * consume the head, but still use it. *)
+  let pop (lst : Token.t list) : Token.t * Token.t list =
+    match lst with
+    | [] ->
+       let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
+       exit 1
+    | hd :: tl -> hd, tl
+
   (* Takes a list of tokens and an expected token type.
    * If the type of the head of the list does not match `exp`,
    * it will fail. It will also fail if `lst` is empty. Will
@@ -59,6 +69,16 @@ module Parser = struct
                  ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
     | hd :: tl -> hd, tl
 
+  let expect_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+    match tokens with
+    | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
+    | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
+    | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
+    | _ ->
+       let t = List.hd tokens in
+       let _ = Err.err Err.Expect __FILE__ __FUNCTION__
+                 ~msg:(Printf.sprintf "expected got %s" @@ Token.to_string t) @@ Some t in exit 1
+
   (* Takes a list and discards the head of it
    * but returns the tail of it. Should be used
    * when wanting to discard the head. *)
@@ -66,16 +86,6 @@ module Parser = struct
     match lst with
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | _ :: tl -> tl
-
-  (* Takes a list and splits the head from the tail
-   * and returns both. Should be used when wanting to
-   * consume the head, but still use it. *)
-  let pop (lst : Token.t list) : Token.t * Token.t list =
-    match lst with
-    | [] ->
-       let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
-       exit 1
-    | hd :: tl -> hd, tl
 
   (* Takes a token list and will peek the top
    * token. If something exists, return Some (`hd`).
@@ -197,13 +207,13 @@ module Parser = struct
    * Does not need to consume `proc` keyword as the caller
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
-    let rec gather_params (tokens : Token.t list) (acc : (Token.t * Token.t) list)
-            : (Token.t * Token.t) list * Token.t list =
+    let rec gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.id_type) list)
+            : (Token.t * TokenType.id_type) list * Token.t list =
       match tokens with
       | {ttype = TokenType.RParen; _} :: tl -> acc, tl
       | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
-         let type_, tokens = expect tokens TokenType.Type in
+         let type_, tokens = expect_type tokens in
          let next, tokens = pop tokens in
          let acc = acc @ [id, type_] in
          (match next with
@@ -212,7 +222,7 @@ module Parser = struct
           | _ ->
              let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
              exit 1)
-      | {ttype = TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
+      | {ttype = TokenType.Type TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
       | hd :: _ ->
          let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ @@ Some hd in
          exit 1
@@ -225,19 +235,10 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.LParen in
 
     match peek tokens 0 with
-    | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Void; _} ->
+    | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Type TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
-       let rettype, tokens = pop tokens in
-
-       (* allows rettype to be void *)
-       let rettype = match rettype with
-         | {ttype = TokenType.Void; _} -> TokenType.Void
-         | {ttype = TokenType.Type; _} -> rettype.ttype
-         | _ -> let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__
-                  ~msg:(Printf.sprintf "Missing return type for procedure %s" id.lexeme)
-                  (Some rettype) in exit 1 in
-
+       let rettype, tokens = expect_type tokens in
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
        Ast.{id; params; block; rettype = rettype}, tokens
@@ -288,30 +289,26 @@ module Parser = struct
          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                    ~msg:(Printf.sprintf "unsupported token `%s`" sym.lexeme) (Some sym) in
          exit 1
-(*
-    let expr, tokens = parse_expr tokens in
-    let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; expr}, tokens *)
 
   (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)
   and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
-    let colon, tokens = pop tokens in
+    let _, tokens = expect tokens TokenType.Colon in
     let type_, tokens = pop tokens in
-    let type_ = match type_, colon with
-      | _, colon when colon.ttype <> TokenType.Colon ->
-         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-         ~msg:(Printf.sprintf "`let` binding for variable `%s` is missing a colon" id.lexeme) (Some colon) in exit 1
-      | {ttype = TokenType.Type; _}, {ttype = TokenType.Colon; _} -> type_
-      | _ ->
-         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-         ~msg:(Printf.sprintf "`let` binding for variable `%s` is missing it's type" id.lexeme)
-         (Some type_) in exit 1 in
+
+    let type_ = match type_ with
+      | {ttype = TokenType.Type TokenType.I32; _} -> TokenType.I32
+      | {ttype = TokenType.Type TokenType.Str; _} -> TokenType.Str
+      | {ttype = TokenType.Type TokenType.Void; _} -> TokenType.Void
+      | _ -> let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+               ~msg:(Printf.sprintf "unsupported type `%s`" type_.lexeme) (Some type_) in
+             exit 1 in
+
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; type_; expr}, tokens
+    Ast.{id; type_ = type_; expr}, tokens
 
   (* Parses the if statement. *)
   and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =

@@ -26,7 +26,7 @@ module Ir = struct
   open Token
   open Err
 
-  let scope : (((string, Token.t) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
+  let scope : (((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
 
   let func_section   = ref ""
   let data_section   = ref ""
@@ -47,6 +47,8 @@ module Ir = struct
   let didret         = ref false (* TODO: Find a better solution *)
   let didbreak       = ref false (* TODO: Find a better solution *)
 
+  let cur_proc_id     = ref ""
+
   let push_scope () : unit = scope := Hashtbl.create 20 :: !scope
 
   let pop_scope () : unit = scope := List.tl !scope
@@ -63,12 +65,12 @@ module Ir = struct
                 ~msg:(Printf.sprintf "undeclared identifier `%s`" token.lexeme)
                 (Some token) in exit 1
 
-  let add_id_to_scope (id : string) (token : Token.t) : unit =
+  let add_id_to_scope (id : string) (token : Token.t) (type_ : TokenType.id_type option) : unit =
     let s = List.hd !scope in
-    Hashtbl.add s id token
+    Hashtbl.add s id (token, type_)
 
-  let get_token_from_scope (id : string) : Token.t =
-    let rec get_token_from_scope' (scope : ((string, Token.t) Hashtbl.t) list) : Token.t =
+  let get_token_from_scope (id : string) : Token.t * (TokenType.id_type option) =
+    let rec get_token_from_scope' (scope : ((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) : Token.t * (TokenType.id_type option) =
       match scope with
       | [] -> failwith "unreachable"
       | s :: ss ->
@@ -104,13 +106,14 @@ module Ir = struct
     !tmpreg
 
   (* Convert the Score datatype to a QBE type. *)
-  let scoretype_to_qbetype (token : Token.t) : string =
-    match token.Token.lexeme with
-    | "i32" -> "w"
-    | "str" -> "l"
+  let scoretype_to_qbetype (type_ : TokenType.id_type) : string =
+    match type_ with
+    | TokenType.Void -> ""
+    | TokenType.I32 -> "w"
+    | TokenType.Str -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                 ~msg:(Printf.sprintf "unsupported type `%s`" token.lexeme)
+                 ~msg:(Printf.sprintf "unsupported type `%s`" @@ TokenType.id_type_to_string type_)
                  None in exit 1
 
   (* Get the QBE instruction for a binary operation. *)
@@ -156,39 +159,75 @@ module Ir = struct
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
+    | Ast.Term Ast.IntCompoundLit cl ->
+        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                  ~msg:"int compound literals are unimplemented" None in exit 1
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       acc ^ "w " ^ evaluate_expr e ^ ", "
                     ) "" pc.args in
-       if pc.id.lexeme = "printf"
+       if pc.id.lexeme = "printf" (* INTRINSIC *)
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg
+       else if pc.id.lexeme = "exit" (* INTRINSIC *)
+       then
+         let _ = assert (List.length pc.args = 1) in
+         let cons_args = "call $exit(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
          let _ = assert_id_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+
+         let type_tok = snd (get_token_from_scope pc.id.lexeme) in
+         let qbe_type = match type_tok with
+           | None -> failwith "TODO ERR: NO TYPE"
+           | Some t -> scoretype_to_qbetype t in
+
+         (* Don't create a new REG if the proc call is void. *)
+         (if qbe_type <> "" then
+            func_section := sprintf "%s    %s =%s %s\n"
+                              !func_section (cons_tmpreg false) qbe_type cons_args
+          else
+            func_section := sprintf "%s    %s\n"
+                              !func_section cons_args);
          !tmpreg
 
   (* Evaluate the `return` statement. *)
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    ret %s\n" !func_section expr;
+    let type_tok = snd (get_token_from_scope !cur_proc_id) in
+    let qbe_type = match type_tok with
+      | None -> failwith "TODO ERR: NO TYPE"
+      | Some t -> scoretype_to_qbetype t in
+    func_section := sprintf "%s    ret %s\n" !func_section @@ if qbe_type = "" then "" else expr;
     didret := true
 
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert_id_not_in_scope stmt.id;
-    add_id_to_scope stmt.id.lexeme stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
     let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
+    func_section := sprintf "%s    %%%s =%s copy %s\n"
+                      !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
 
   (* Evaluate a block statement. *)
-  and evaluate_block_stmt (stmt : Ast.block_stmt) : unit =
+  and evaluate_block_stmt (stmt : Ast.block_stmt) : bool =
     push_scope ();
-    List.iter evaluate_stmt stmt.stmts;
-    pop_scope ()
+
+    let user_did_ret = ref false in
+    (List.iter (fun s ->
+         (match s with
+          | Ast.Ret _ -> user_did_ret := true
+          | _ -> user_did_ret := false);
+         evaluate_stmt s
+       ) stmt.stmts);
+
+    (* List.iter evaluate_stmt stmt.stmts; *)
+    pop_scope ();
+    !user_did_ret
 
   (* Evaluate an `if` statement. *)
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
@@ -197,7 +236,7 @@ module Ir = struct
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl
                       (if stmt.else_ = None then donelbl else elselbl);
     func_section := sprintf "%s%s\n" !func_section iflbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
@@ -207,14 +246,15 @@ module Ir = struct
     (match stmt.else_ with
      | Some block ->
         func_section := sprintf "%s%s\n" !func_section elselbl;
-        evaluate_block_stmt block
+        let _ = evaluate_block_stmt block in ()
      | None -> ());
     func_section := sprintf "%s%s\n" !func_section donelbl
 
   (* Evaluate a statement expression ie `printf()`. *)
   and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
-    let expr = evaluate_expr stmt in
-    func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr
+    let _ = evaluate_expr stmt in ()
+    (* let expr = evaluate_expr stmt in () *)
+    (* func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr *)
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
@@ -229,7 +269,7 @@ module Ir = struct
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
 
     (* Currently, if you have instructions after `ret` in QBE, it
      * fails. This is a QAD solution to this issue. *)
@@ -246,7 +286,7 @@ module Ir = struct
     let expr = evaluate_expr stmt.cond in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
-    evaluate_block_stmt stmt.block;
+    let _ = evaluate_block_stmt stmt.block in
     evaluate_stmt stmt.after;
 
     (* Currently, if you have instructions after `ret` in QBE, it
@@ -259,7 +299,7 @@ module Ir = struct
 
   (* Evaluate a `break` statement. *)
   and evaluate_break_stmt (stmt : Token.t) : unit =
-    printf "[WARNING]: `break` statements are not fully functional\n";
+    printf "[WARN]: `break` statements are not fully functional\n";
     didbreak := true;
     func_section := sprintf "%s    jmp %s # BREAK\n" !func_section !loop_end_lbl
 
@@ -283,11 +323,9 @@ module Ir = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
-    if stmt.rettype = TokenType.Void then
-      printf "[WARNING]: `void` return types are not fully functional. The function still must return a value\n";
-
+    cur_proc_id := stmt.id.lexeme;
     assert_id_not_in_scope stmt.id;
-    add_id_to_scope stmt.id.lexeme stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.rettype;
 
     push_scope ();
 
@@ -296,17 +334,25 @@ module Ir = struct
           let id, type_ = (fst p).Token.lexeme, snd p in
 
           assert_id_not_in_scope (fst p);
-          add_id_to_scope id (fst p);
+          add_id_to_scope id (fst p) @@ Some type_;
 
           let qbe_type = scoretype_to_qbetype type_ in
-          let id = (fst p).Token.lexeme in
           acc ^ qbe_type ^ " %" ^ id ^ ", "
         ) "" stmt.params in
 
-    func_section :=
-      sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.lexeme params;
+    let type_tok = snd (get_token_from_scope stmt.id.lexeme) in
+    let qbe_type = match type_tok with
+      | None -> failwith "TODO ERR: NO TYPE"
+      | Some t -> scoretype_to_qbetype t in
 
-    evaluate_block_stmt stmt.block;
+    func_section :=
+      sprintf "%sexport function %s $%s(%s) {\n@start\n" !func_section qbe_type stmt.id.lexeme params;
+
+    let user_did_ret = evaluate_block_stmt stmt.block in
+
+    (if qbe_type = "" && not user_did_ret then
+      func_section := sprintf "%s    ret\n" !func_section);
+
     func_section := sprintf "%s}\n" !func_section;
     pop_scope ()
 

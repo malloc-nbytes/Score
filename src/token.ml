@@ -21,6 +21,13 @@
    * SOFTWARE. *)
 
 module TokenType = struct
+  type id_type =
+    | I32
+    | Str
+    | Void
+    | Array of id_type
+    | Custom of string
+
   type t =
     | Eof
     | Identifier
@@ -37,7 +44,7 @@ module TokenType = struct
     | Colon
     | RightArrow
     | Comment
-    | Type
+    | Type of id_type
     | GreaterThan
     | LessThan
     | LBracket
@@ -54,7 +61,6 @@ module TokenType = struct
     | Let
     | If
     | Else
-    | Void
     | While
     | DoubleAmpersand
     | LessThanEqual
@@ -86,7 +92,12 @@ module TokenType = struct
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
-    | Type -> "Type"
+    (* | Type t -> "Type " ^ t *)
+    | Type I32 -> "Type I32"
+    | Type Str -> "Type Str"
+    | Type Void -> "Type Void"
+    | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
+    | Type (Custom s) -> "Type Custom " ^ s
     | GreaterThan -> "GreaterThan"
     | LessThan -> "LessThan"
     | LBracket -> "LBracket"
@@ -103,7 +114,6 @@ module TokenType = struct
     | Let -> "Let"
     | If -> "If"
     | Else -> "Else"
-    | Void -> "Void"
     | While -> "While"
     | DoubleAmpersand -> "DoubleAmpersand"
     | LessThanEqual -> "LessThanEqual"
@@ -118,6 +128,15 @@ module TokenType = struct
     | ForwardSlashEquals -> "ForwardSlashEquals"
     | PercentEquals -> "PercentEquals"
 
+    let id_type_to_string = function
+      | I32 -> "I32"
+      | Str -> "Str"
+      | Void -> "Void"
+      | Array _ -> "Array PRINTING UNIMPLEMENTED"
+      | Custom s -> "Custom " ^ s
+
+    let id_types = [Type I32;
+                    Type I32;]
 end
 
 module Token = struct
@@ -126,10 +145,11 @@ module Token = struct
     ; ttype : TokenType.t
     ; r : int
     ; c : int
+    ; fp : string
     }
 
   (* Convert a Token to a string *)
   let to_string token =
-    Printf.sprintf "(line %d, char %d, %s `%s`)"
-      token.r token.c (TokenType.to_string token.ttype) token.lexeme
+    Printf.sprintf "(file: %s, line %d, char %d, %s `%s`)"
+      token.fp token.r token.c (TokenType.to_string token.ttype) token.lexeme
 end
