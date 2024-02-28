@@ -61,7 +61,6 @@ module TokenType = struct
     | Let
     | If
     | Else
-    | Void
     | While
     | DoubleAmpersand
     | LessThanEqual
@@ -75,7 +74,6 @@ module TokenType = struct
     | AsteriskEquals
     | ForwardSlashEquals
     | PercentEquals
-    | IntArray
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -116,7 +114,6 @@ module TokenType = struct
     | Let -> "Let"
     | If -> "If"
     | Else -> "Else"
-    | Void -> "Void"
     | While -> "While"
     | DoubleAmpersand -> "DoubleAmpersand"
     | LessThanEqual -> "LessThanEqual"
@@ -130,7 +127,6 @@ module TokenType = struct
     | AsteriskEquals -> "AsteriskEquals"
     | ForwardSlashEquals -> "ForwardSlashEquals"
     | PercentEquals -> "PercentEquals"
-    | IntArray -> "IntArray"
 
     let id_type_to_string = function
       | I32 -> "I32"

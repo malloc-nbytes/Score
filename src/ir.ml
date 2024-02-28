@@ -26,7 +26,7 @@ module Ir = struct
   open Token
   open Err
 
-  let scope : (((string, Token.t) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
+  let scope : (((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
 
   let func_section   = ref ""
   let data_section   = ref ""
@@ -63,12 +63,12 @@ module Ir = struct
                 ~msg:(Printf.sprintf "undeclared identifier `%s`" token.lexeme)
                 (Some token) in exit 1
 
-  let add_id_to_scope (id : string) (token : Token.t) : unit =
+  let add_id_to_scope (id : string) (token : Token.t) (type_ : TokenType.id_type option) : unit =
     let s = List.hd !scope in
-    Hashtbl.add s id token
+    Hashtbl.add s id (token, type_)
 
-  let get_token_from_scope (id : string) : Token.t =
-    let rec get_token_from_scope' (scope : ((string, Token.t) Hashtbl.t) list) : Token.t =
+  let get_token_from_scope (id : string) : Token.t * (TokenType.id_type option) =
+    let rec get_token_from_scope' (scope : ((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) : Token.t * (TokenType.id_type option) =
       match scope with
       | [] -> failwith "unreachable"
       | s :: ss ->
@@ -104,13 +104,14 @@ module Ir = struct
     !tmpreg
 
   (* Convert the Score datatype to a QBE type. *)
-  let scoretype_to_qbetype (token : Token.t) : string =
-    match token.Token.lexeme with
-    | "i32" -> "w"
-    | "str" -> "l"
+  let scoretype_to_qbetype (type_ : TokenType.id_type) : string =
+    match type_ with
+    | TokenType.Void -> ""
+    | TokenType.I32 -> "w"
+    | TokenType.Str -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                 ~msg:(Printf.sprintf "unsupported type `%s`" token.lexeme)
+                 ~msg:(Printf.sprintf "unsupported type `%s`" @@ TokenType.id_type_to_string type_)
                  None in exit 1
 
   (* Get the QBE instruction for a binary operation. *)
@@ -163,7 +164,7 @@ module Ir = struct
        let args = List.fold_left (fun acc e ->
                       acc ^ "w " ^ evaluate_expr e ^ ", "
                     ) "" pc.args in
-       if pc.id.lexeme = "printf"
+       if pc.id.lexeme = "printf" (* INTRINSIC *)
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
@@ -171,7 +172,14 @@ module Ir = struct
        else
          let _ = assert_id_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+
+         let type_tok = snd (get_token_from_scope pc.id.lexeme) in
+         let qbe_type = match type_tok with
+           | None -> failwith "TODO ERR: NO TYPE"
+           | Some t -> scoretype_to_qbetype t in
+
+         func_section := sprintf "%s    %s =%s %s\n"
+                           !func_section (cons_tmpreg false) qbe_type cons_args;
          !tmpreg
 
   (* Evaluate the `return` statement. *)
@@ -183,7 +191,7 @@ module Ir = struct
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert_id_not_in_scope stmt.id;
-    add_id_to_scope stmt.id.lexeme stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
     let expr = evaluate_expr stmt.expr in
     func_section := sprintf "%s    %%%s =%s copy %s\n"
                       !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
@@ -287,11 +295,8 @@ module Ir = struct
 
   (* Evaluate a procedure definition statement. *)
   and evaluate_proc_def_stmt (stmt : Ast.proc_def_stmt) : unit =
-    if stmt.rettype = TokenType.Void then
-      printf "[WARNING]: `void` return types are not fully functional. The function still must return a value\n";
-
     assert_id_not_in_scope stmt.id;
-    add_id_to_scope stmt.id.lexeme stmt.id;
+    add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.rettype;
 
     push_scope ();
 
@@ -300,15 +305,19 @@ module Ir = struct
           let id, type_ = (fst p).Token.lexeme, snd p in
 
           assert_id_not_in_scope (fst p);
-          add_id_to_scope id (fst p);
+          add_id_to_scope id (fst p) @@ Some type_;
 
           let qbe_type = scoretype_to_qbetype type_ in
-          let id = (fst p).Token.lexeme in
           acc ^ qbe_type ^ " %" ^ id ^ ", "
         ) "" stmt.params in
 
+    let type_tok = snd (get_token_from_scope stmt.id.lexeme) in
+    let qbe_type = match type_tok with
+      | None -> failwith "TODO ERR: NO TYPE"
+      | Some t -> scoretype_to_qbetype t in
+
     func_section :=
-      sprintf "%sexport function w $%s(%s) {\n@start\n" !func_section stmt.id.lexeme params;
+      sprintf "%sexport function %s $%s(%s) {\n@start\n" !func_section qbe_type stmt.id.lexeme params;
 
     evaluate_block_stmt stmt.block;
     func_section := sprintf "%s}\n" !func_section;

@@ -39,7 +39,6 @@ module TokenType : sig
     | Let
     | If
     | Else
-    | Void
     | While
     | DoubleAmpersand
     | LessThanEqual
@@ -53,7 +52,6 @@ module TokenType : sig
     | AsteriskEquals
     | ForwardSlashEquals
     | PercentEquals
-    | IntArray
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

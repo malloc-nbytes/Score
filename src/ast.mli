@@ -43,15 +43,14 @@ module Ast : sig
 
   and proc_def_stmt =
     { id : Token.t
-    (* param * type *)
-    ; params : (Token.t * Token.t) list
+    ; params : (Token.t * TokenType.id_type) list
     ; block : block_stmt
-    ; rettype : TokenType.t
+    ; rettype : TokenType.id_type
     }
 
   and let_stmt =
     { id : Token.t
-    ; type_ : Token.t
+    ; type_ : TokenType.id_type
     ; expr : expr
     }
 

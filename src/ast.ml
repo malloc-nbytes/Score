@@ -65,15 +65,14 @@ module Ast = struct
 
   and proc_def_stmt =
     { id : Token.t
-    (* param * type *)
-    ; params : (Token.t * Token.t) list
+    ; params : (Token.t * TokenType.id_type) list
     ; block : block_stmt
-    ; rettype : TokenType.t
+    ; rettype : TokenType.id_type
     }
 
   and let_stmt =
     { id : Token.t
-    ; type_ : Token.t
+    ; type_ : TokenType.id_type
     ; expr : expr
     }
 
@@ -145,9 +144,9 @@ module Ast = struct
       let _ = printf "%sPROC %s(" spaces stmt.id.lexeme in
       let _ = List.iter(fun param ->
                   let pval = (fst param).Token.lexeme
-                  and ptype = (snd param).Token.ttype |> TokenType.to_string in
+                  and ptype = (snd param) |> TokenType.id_type_to_string in
                   printf "%s %s," pval ptype) stmt.params in
-      let _ = printf "): %s {\n" @@ TokenType.to_string stmt.rettype in
+      let _ = printf "): %s {\n" @@ TokenType.id_type_to_string stmt.rettype in
       let _ = block_stmt_dump stmt.block (depth + 1) in
       printf "}\n"
 
