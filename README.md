@@ -2,7 +2,7 @@
 
 Score is a compiled language written in OCaml QBE.
 
-See `example.scr` for what is currently possible.
+See `example.scr` or `./src/tests/` for what is currently possible.
 
 # Requirements
 - OCaml https://ocaml.org/
