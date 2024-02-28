@@ -36,6 +36,7 @@ See `./scr --help` for more options
 - Scope [X]
 - Fix the syntax for `if-else-if` statements [X]
 - `for` loops [X]
+- unary operators [ ]
 - Arrays [ ]
 - Semantic analysis [ ]
 - ADTs [ ]

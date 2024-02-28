@@ -7,7 +7,7 @@ proc factorial(n: i32): i32 {
     let res: i32 = 1;
 
     -- Syntax for a `for let` loop.
-    for let i: i32 = 2; i <= n; i += 1; {
+    for let i: i32 = 2; i <= n; i += 1; { -- `;` is required for the stmt `i += 1;`.
         res *= i;
     }
 
@@ -44,11 +44,14 @@ proc fizzbuzz(void): void {
     while i < 101 {
         if i % 5 == 0 && i % 3 == 0 {
             printf("FizzBuzz\n");
-        } else if i % 5 == 0 {
+        }
+        else if i % 5 == 0 {
             printf("Fizz\n");
-        } else if i % 3 == 0 {
+        }
+        else if i % 3 == 0 {
             printf("Buzz\n");
-        } else {
+        }
+        else {
             printf("%d\n", i);
         }
         i += 1;
@@ -89,12 +92,15 @@ proc print_matrix(void): void {
 }
 
 proc compare_strs(s1: str, s2: str): i32 {
+     -- Call to C function strcmp().
      return strcmp(s1, s2) == 0;
 }
 
 -- Entrypoint
 proc main(void): i32 {
     let n: i32 = 10;
+
+    -- Call to C function printf().
     printf("fib of %d is %d\n", n, fibonacci(n));
 
     fizzbuzz();
