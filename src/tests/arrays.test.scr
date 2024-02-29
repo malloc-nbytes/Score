@@ -1,5 +1,5 @@
 proc main(i: i32): i32 {
-     -- let arr: i32[5] = {1,2,3,4,5};
+     let arr: i32[5] = {1,2,3,4,5};
 
      return 0;
 }

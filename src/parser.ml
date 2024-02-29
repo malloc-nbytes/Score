@@ -20,11 +20,6 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-(* TODO:
- *   Factor out the repeating code
- *   of the `aux` inner functions inside
- *   of all the expression parsing functions. *)
-
 module Parser = struct
   open Token
   open Ast
@@ -291,25 +286,26 @@ module Parser = struct
                    ~msg:(Printf.sprintf "unsupported token `%s`" sym.lexeme) (Some sym) in
          exit 1
 
+  and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+    let type_, tokens = expect_type tokens in
+    match peek tokens 0 with
+    | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
+       let _, tokens = expect tokens TokenType.LBracket in
+       let len, tokens = expect tokens TokenType.IntegerLiteral in
+       let _, tokens = expect tokens TokenType.RBracket in
+       TokenType.Array (type_, (int_of_string len.lexeme)), tokens
+    | _ -> type_, tokens (* Not array *)
+
   (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)
   and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.Colon in
-    let type_, tokens = pop tokens in
-
-    let type_ = match type_ with
-      | {ttype = TokenType.Type TokenType.I32; _} -> TokenType.I32
-      | {ttype = TokenType.Type TokenType.Str; _} -> TokenType.Str
-      | {ttype = TokenType.Type TokenType.Void; _} -> TokenType.Void
-      | _ -> let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-               ~msg:(Printf.sprintf "unsupported type `%s`" type_.lexeme) (Some type_) in
-             exit 1 in
-
+    let type_, tokens = parse_type tokens in
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; type_ = type_; expr}, tokens
+    Ast.{id; type_; expr}, tokens
 
   (* Parses the if statement. *)
   and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =

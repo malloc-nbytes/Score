@@ -3,7 +3,7 @@ module TokenType : sig
     | I32
     | Str
     | Void
-    | Array of id_type
+    | Array of id_type * int
     | Custom of string
 
   type t =

@@ -64,6 +64,6 @@ module Err = struct
       | Some token ->
          (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
       | None -> "None", "None" in
-    Printf.eprintf "Failure: %s\nReason: %s\nAt: %s\n%s\n" failure reason at where
+    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\n%s\n" failure reason at where
 
 end
