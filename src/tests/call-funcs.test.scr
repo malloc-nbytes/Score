@@ -1,0 +1,49 @@
+proc __test1(void): i32 {
+     return 1;
+}
+
+proc test1(void): i32 {
+     printf("test1\n");
+     return __test1() + 10;
+}
+
+proc __test2(n: i32): i32 {
+     let i: i32 = 3;
+     return i+n;
+}
+
+proc test2(void): i32 {
+     printf("test2\n");
+     let x: i32 = __test2(10) + 3;
+     return x;
+}
+
+proc __test3'(n: i32): i32 {
+     return n*2;
+}
+
+proc __test3(n: i32): i32 {
+     return __test3'(n+__test3'(2)) + __test3'(2);
+}
+
+proc test3(void): i32 {
+     printf("test2\n");
+     -- 12 :: 13
+     return __test3(1) + __test3(2); -- 25
+}
+
+proc main(void): i32 {
+     if test1() != 11 {
+         exit(1);
+     }
+
+     if test2() != 16 {
+         exit(1);
+     }
+
+     if test3() != 30 {
+         exit(1);
+     }
+
+     return 0;
+}

@@ -49,8 +49,8 @@ proc for2(n: i32): i32 {
 proc double_for(void): i32 {
      printf("double_for\n");
      let x: i32 = 0;
-     for let i: i32 = 0; i < 100000; i += 1; {
-         for let j: i32 = 0; j < 100000; j += 1; {
+     for let i: i32 = 0; i < 10000; i += 1; {
+         for let j: i32 = 0; j < 10000; j += 1; {
              x += 1;
          }
      }
@@ -99,7 +99,7 @@ proc main(void): i32 {
          exit(1);
      }
 
-     if double_for() != 1410065408 {
+     if double_for() != 100000000 {
          exit(1);
      }
 

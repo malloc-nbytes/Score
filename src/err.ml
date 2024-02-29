@@ -28,11 +28,14 @@ module Err = struct
     | Expect
     | Exhausted_tokens
     | Unknown_token
-    | Malformed_func_def
+    | Malformed_proc_def
     | Unreachable
     | Unimplemented
     | Redeclaration
     | Undeclared
+    | Syntax
+    | Missing_binding
+    | Missing_type
 
   let err_to_str (err_type : err_type) : string =
     match err_type with
@@ -40,23 +43,24 @@ module Err = struct
     | Expect -> "Expect"
     | Exhausted_tokens -> "Exhausted_tokens"
     | Unknown_token -> "Unknown_token"
-    | Malformed_func_def -> "Malformed_func_def"
+    | Malformed_proc_def -> "Malformed_proc_def"
     | Unreachable -> "Unreachable"
     | Unimplemented -> "Unimplemented"
-    | Redeclaration -> "Redeclaration"
-    | Undeclared -> "Undeclared"
+    | Redeclaration -> "Redeclared Identifier"
+    | Undeclared -> "Undeclared Identifier"
+    | Syntax -> "Syntax Error"
+    | Missing_binding -> "Missing_binding"
+    | Missing_type -> "Missing_type"
 
   let err (err_type : err_type) (file : string) (func : string)
         ?(msg="") (token : Token.t option) : unit =
-    let s = err_to_str err_type in
-    match token with
-    | Some token' ->
-       let _ = Printf.eprintf "%s:%d:%d:\n" token'.fp token'.r token'.c in
-       let msg = (if msg = "" then msg else "[ERR] " ^ msg ^ "\n") in
-       Printf.eprintf
-         "[ERR] %s [%s:%s]:\n%s[ERR] conflicting token: %s\n"
-         s file func msg (Token.to_string token')
-    | None -> Printf.eprintf "[ERR] %s [%s:%s]:\n[ERR] %s\n" s file func msg
-  ;;
+    let open Printf in
+    let e = err_to_str err_type in
+    let failure = e ^ " in " ^ file ^ " " ^ func ^ " ()" in
+    let reason = if msg = "" then "None" else msg in
+    let at, where = match token with
+      | Some token -> (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
+      | None -> "None", "None" in
+    Printf.eprintf "Failure: %s\nReason: %s\nAt: %s\n%s\n" failure reason at where
 
 end

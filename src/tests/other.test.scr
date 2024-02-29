@@ -10,7 +10,6 @@ proc factorial(n: i32): i32 {
     return res;
 }
 
-
 proc is_prime(n: i32): i32 {
     printf("is_prime\n");
     let flag: i32 = 1;

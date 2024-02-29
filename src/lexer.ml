@@ -42,6 +42,11 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "for" TokenType.For in
     ()
 
+  let rec repl_quote (lst : char list) : string =
+    match lst with
+    | [] -> ""
+    | hd :: tl -> (if hd = '\'' then "_QUOTE_" else String.make 1 hd) ^ repl_quote tl
+
   (* Determines if the given string `s` is a
    * keyword or not. If it is, it returns the
    * appropriate token type. *)
@@ -157,8 +162,9 @@ module Lexer = struct
 
     (* Identifier or keyword *)
     | hd :: tl ->
-       let word, rest = consume_while tl (fun c -> c = '_' || isalnum c) in
+       let word, rest = consume_while tl (fun c -> c = '_' || c = '\''|| isalnum c) in
        let word = String.make 1 hd ^ word in
+       let word_wo_quotes = repl_quote (word |> String.to_seq |> List.of_seq) in
        (match is_keyword word with
 
         (* Keyword *)
@@ -167,7 +173,7 @@ module Lexer = struct
 
         (* Identifier *)
         | None ->
-           [Token.{lexeme = word; ttype = Identifier; r; c; fp}] @ lex_file fp rest r (c+String.length word))
+           [Token.{lexeme = word_wo_quotes; ttype = Identifier; r; c; fp}] @ lex_file fp rest r (c+String.length word))
 
   (* Debug function to print a list of tokens. *)
   let rec print_tokens (tokens : Token.t list) : unit =

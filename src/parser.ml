@@ -65,7 +65,7 @@ module Parser = struct
     | hd :: _ when hd.ttype <> exp ->
        let actual = TokenType.to_string hd.ttype
        and expected = TokenType.to_string exp in
-       let _ = Err.err Err.Expect __FILE__ __FUNCTION__
+       let _ = Err.err Err.Syntax __FILE__ __FUNCTION__
                  ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
     | hd :: tl -> hd, tl
 
@@ -76,8 +76,8 @@ module Parser = struct
     | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
     | _ ->
        let t = List.hd tokens in
-       let _ = Err.err Err.Expect __FILE__ __FUNCTION__
-                 ~msg:(Printf.sprintf "expected got %s" @@ Token.to_string t) @@ Some t in exit 1
+       let _ = Err.err Err.Missing_type __FILE__ __FUNCTION__
+                 ~msg:(Printf.sprintf "expected Type but got %s" @@ TokenType.to_string t.ttype) @@ Some t in exit 1
 
   (* Takes a list and discards the head of it
    * but returns the tail of it. Should be used
@@ -220,14 +220,14 @@ module Parser = struct
           | {ttype = TokenType.RParen; _} -> acc, tokens
           | {ttype = TokenType.Comma; _} -> gather_params tokens acc
           | _ ->
-             let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
+             let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ None in
              exit 1)
       | {ttype = TokenType.Type TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
       | hd :: _ ->
-         let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ @@ Some hd in
+         let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ @@ Some hd in
          exit 1
       | [] ->
-         let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__
+         let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
                    ~msg:"unterminated function definition" None in
          exit 1 in
 
@@ -243,7 +243,8 @@ module Parser = struct
        let block, tokens = parse_block_stmt tokens in
        Ast.{id; params; block; rettype = rettype}, tokens
     | Some t ->
-       let _ = Err.err Err.Malformed_func_def __FILE__ __FUNCTION__ None in
+       let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
+                 ~msg:"procedure definitions must either have parameters or `void`" (Some t) in
        exit 1
     | None ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in

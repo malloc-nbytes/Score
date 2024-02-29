@@ -28,7 +28,7 @@ def process_files(file_paths, directory_path, show):
             if result.returncode == 0:
                 print(' ok')
             elif result.returncode == 1:
-                print(f'\n=== COMPILATION FAILED ===\n(return code: {result.returncode})')
+                print(f'\n=== COMPILATION FAILED {file_path} ===\n(return code: {result.returncode})')
                 exit(1)
             print(f'Running {exe} ...', flush=True, end='')
             if show:
