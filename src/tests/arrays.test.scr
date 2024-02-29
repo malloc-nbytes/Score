@@ -1,5 +1,13 @@
-proc main(i: i32): i32 {
+proc arr_test1(void): i32 {
+     printf("arr_test1\n");
      let arr: i32[5] = {1,2,3,4,5};
+     return 0;
+}
+
+proc main(i: i32): i32 {
+     if arr_test1() != 0 {
+         exit(1);
+     }
 
      return 0;
 }

@@ -110,6 +110,9 @@ module Parser = struct
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
+    | {ttype = TokenType.LBrace; _} :: tl ->
+       exit 1;
+       (* let _, tokens = expect tokens TokenType.RBrace in *)
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | hd :: _ ->
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
