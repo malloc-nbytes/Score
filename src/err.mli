@@ -14,6 +14,7 @@ module Err : sig
     | Syntax
     | Missing_binding
     | Missing_type
+    | No_return
 
   val err : err_type -> string -> string -> ?msg:string -> Token.t option -> unit
 end

@@ -347,14 +347,19 @@ module Ir = struct
         ) "" stmt.params in
 
     let type_tok = snd (get_token_from_scope stmt.id.lexeme) in
-    let qbe_type = match type_tok with
+    let qbe_type, type_tok = match type_tok with
       | None -> failwith "TODO ERR: NO TYPE"
-      | Some t -> scoretype_to_qbetype t in
+      | Some t -> scoretype_to_qbetype t, t in
 
     func_section :=
       sprintf "%sexport function %s $%s(%s) {\n@start\n" !func_section qbe_type stmt.id.lexeme params;
 
     let user_did_ret = evaluate_block_stmt stmt.block in
+
+    (if not user_did_ret && type_tok <> TokenType.Void then
+       let _ = Err.err Err.No_return __FILE__ __FUNCTION__
+                 ~msg:(sprintf "missing return statement for procedure `%s`" stmt.id.lexeme)
+                 None in exit 1);
 
     (if qbe_type = "" && not user_did_ret then
       func_section := sprintf "%s    ret\n" !func_section);

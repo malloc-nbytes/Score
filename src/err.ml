@@ -36,6 +36,7 @@ module Err = struct
     | Syntax
     | Missing_binding
     | Missing_type
+    | No_return
 
   let err_to_str (err_type : err_type) : string =
     match err_type with
@@ -51,6 +52,7 @@ module Err = struct
     | Syntax -> "Syntax Error"
     | Missing_binding -> "Missing_binding"
     | Missing_type -> "Missing_type"
+    | No_return -> "No_return"
 
   let err (err_type : err_type) (file : string) (func : string)
         ?(msg="") (token : Token.t option) : unit =
@@ -59,7 +61,8 @@ module Err = struct
     let failure = e ^ " in " ^ file ^ " " ^ func ^ " ()" in
     let reason = if msg = "" then "None" else msg in
     let at, where = match token with
-      | Some token -> (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
+      | Some token ->
+         (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
       | None -> "None", "None" in
     Printf.eprintf "Failure: %s\nReason: %s\nAt: %s\n%s\n" failure reason at where
 
