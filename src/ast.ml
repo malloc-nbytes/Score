@@ -78,7 +78,7 @@ module Ast = struct
 
   and mut_stmt =
     { id : Token.t
-    ; expr : expr
+    ; rhs : expr
     }
 
   and expr =
@@ -104,103 +104,5 @@ module Ast = struct
     { id : Token.t
     ; args : expr list
     }
-
-  let ast_dump (program : program) : unit =
-    let open Printf in
-
-    let indent (d : int) : string =
-      let s = ref "" in
-      let _ = for i = 1 to d do s := !s ^ "  "
-              done in !s in
-
-    let rec expr_dump (expr : expr) (depth : int) : unit =
-      let spaces = indent depth in
-      match expr with
-      | Binary b ->
-         let _ = expr_dump b.lhs (depth + 1) in
-         let _ = printf "%s%s\n" spaces b.op.lexeme in
-         expr_dump b.rhs (depth + 1)
-      | Term Ident i -> printf "%s%s\n" spaces i.lexeme
-      | Term Intlit t -> printf "%s%s\n" spaces t.lexeme
-      | Term Strlit s -> printf "%s\"%s\"\n" spaces s.lexeme
-      | Term IntCompoundLit (l, s) ->
-         let _ = printf "%s[\n" spaces in
-         let _ = List.iter (fun e -> expr_dump e (depth + 1)) l in
-         printf "%s]\n" spaces
-      | Proc_call pc -> failwith "Proc_call dump unimplemented" in
-
-    let mut_stmt_dump (stmt : mut_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sMUT %s =\n" spaces stmt.id.lexeme in
-      expr_dump stmt.expr depth in
-
-    let let_stmt_dump (stmt : let_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sLET %s =\n" spaces stmt.id.lexeme in
-      expr_dump stmt.expr depth in
-
-    let rec proc_def_stmt_dump (stmt : proc_def_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sPROC %s(" spaces stmt.id.lexeme in
-      let _ = List.iter(fun param ->
-                  let pval = (fst param).Token.lexeme
-                  and ptype = (snd param) |> TokenType.id_type_to_string in
-                  printf "%s %s," pval ptype) stmt.params in
-      let _ = printf "): %s {\n" @@ TokenType.id_type_to_string stmt.rettype in
-      let _ = block_stmt_dump stmt.block (depth + 1) in
-      printf "}\n"
-
-    and if_stmt_dump (stmt : if_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sIF\n" spaces in
-      let _ = expr_dump stmt.expr depth in
-      let _ = printf "%s{\n" spaces in
-      let _ = block_stmt_dump stmt.block (depth + 1) in
-      printf "%s}\n" spaces
-
-    and while_stmt_dump (stmt : while_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sWHILE\n" spaces in
-      let _ = expr_dump stmt.expr depth in
-      let _ = printf "%s{\n" spaces in
-      let _ = block_stmt_dump stmt.block (depth + 1) in
-      printf "%s}\n" spaces
-
-    and stmt_expr_dump (stmt : stmt_expr) (depth : int) : unit =
-      let spaces = indent depth in
-      match stmt with
-      | Proc_call pc ->
-         let _ = printf "%sPROC_CALL %s(\n" spaces pc.id.lexeme in
-         let _ = List.iter (fun e -> expr_dump e (depth + 1)) pc.args in
-         printf "%s)\n" spaces
-      | _ -> assert false
-
-    and ret_stmt_dump (stmt : ret_stmt) (depth : int) : unit =
-      let spaces = indent depth in
-      let _ = printf "%sRETURN\n" spaces in
-      expr_dump stmt.expr (depth + 1)
-
-    and stmt_dump (stmt : stmt) (depth : int) : unit =
-      match stmt with
-      | Proc_def pd -> proc_def_stmt_dump pd (depth + 1)
-      | Block b -> block_stmt_dump b (depth + 1)
-      | Let l -> let_stmt_dump l (depth + 1)
-      | Mut m -> mut_stmt_dump m (depth + 1)
-      | If i -> if_stmt_dump i (depth + 1)
-      | While w -> while_stmt_dump w (depth + 1)
-      | Stmt_expr se -> stmt_expr_dump se (depth + 1)
-      | Ret r -> ret_stmt_dump r (depth + 1)
-      | Break b -> failwith "dumping break stmt unimplemented"
-      | For f -> failwith "dumping for stmt unimplemented"
-
-    and block_stmt_dump (stmt : block_stmt) (depth : int) : unit =
-      List.iter (fun s -> stmt_dump s (depth + 1)) stmt.stmts in
-
-    let toplvl_stmt_dump (stmt : toplvl_stmt) : unit =
-      match stmt with
-      | Proc_def s -> proc_def_stmt_dump s 0
-      | Let s -> let_stmt_dump s 0 in
-
-    List.iter toplvl_stmt_dump program
 
 end

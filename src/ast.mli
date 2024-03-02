@@ -56,7 +56,7 @@ module Ast : sig
 
   and mut_stmt =
     { id : Token.t
-    ; expr : expr
+    ; rhs : expr
     }
 
   and expr =
@@ -82,7 +82,5 @@ module Ast : sig
     { id : Token.t
     ; args : expr list
     }
-
-  val ast_dump : program -> unit
 
 end

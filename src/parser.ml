@@ -262,41 +262,25 @@ module Parser = struct
    * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
     let id, tokens = expect tokens TokenType.Identifier in
-    let sym, tokens = pop tokens in
+    let op, tokens = pop tokens in
 
-    match sym with
+    match op with
       | {ttype = TokenType.Equals; _} ->
-         let expr, tokens = parse_expr tokens in
+         let rhs, tokens = parse_expr tokens in
          let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
-      | {ttype = TokenType.PlusEquals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
+         Ast.{id; rhs}, tokens
+      | {ttype = TokenType.PlusEquals; _}
+        | {ttype = TokenType.MinusEquals; _}
+        | {ttype = TokenType.AsteriskEquals; _}
+        | {ttype = TokenType.ForwardSlashEquals; _}
+        | {ttype = TokenType.PercentEquals; _} ->
+         let rhs, tokens = parse_expr tokens in
+         let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs; op} in
          let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
-      | {ttype = TokenType.MinusEquals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
-      | {ttype = TokenType.AsteriskEquals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
-      | {ttype = TokenType.ForwardSlashEquals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
-      | {ttype = TokenType.PercentEquals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let expr = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op = sym} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; expr}, tokens
+         Ast.{id; rhs}, tokens
       | _ ->
          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                   ~msg:(Printf.sprintf "unsupported token `%s`" sym.lexeme) (Some sym) in
+                   ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme) (Some op) in
          exit 1
 
   and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =

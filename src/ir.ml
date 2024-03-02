@@ -284,7 +284,7 @@ module Ir = struct
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     assert_id_in_scope stmt.id;
-    let expr = evaluate_expr stmt.expr in
+    let expr = evaluate_expr stmt.rhs in
     func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
 
   (* Evaluate a `while` statement. *)
