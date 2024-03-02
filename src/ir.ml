@@ -70,11 +70,17 @@ module Ir = struct
                 ~msg:(Printf.sprintf "redeclared identifier `%s`" token.lexeme)
                 (Some token) in exit 1
 
-  let assert_id_in_scope (token : Token.t) : unit =
+  let assert_token_in_scope (token : Token.t) : unit =
     if not (List.exists (fun s -> Hashtbl.mem s token.lexeme) !scope) then
       let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
                 ~msg:(Printf.sprintf "undeclared identifier `%s`" token.lexeme)
                 (Some token) in exit 1
+
+  let assert_id_in_scope (id : string) : unit =
+    if not (List.exists (fun s -> Hashtbl.mem s id) !scope) then
+      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "undeclared identifier `%s`" id)
+                None in exit 1
 
   let add_id_to_scope (id : string) (token : Token.t) (type_ : TokenType.id_type option) : unit =
     let s = List.hd !scope in
@@ -164,7 +170,7 @@ module Ir = struct
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
     | Ast.Term Ast.Ident ident ->
-      assert_id_in_scope ident;
+      assert_token_in_scope ident;
       "%" ^ ident.lexeme
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme
     | Ast.Term Ast.Strlit strlit ->
@@ -203,7 +209,7 @@ module Ir = struct
          func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
-         let _ = assert_id_in_scope pc.id in (* Temporary *)
+         let _ = assert_token_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
 
          let type_tok = snd (get_token_from_scope pc.id.lexeme) in
@@ -283,9 +289,11 @@ module Ir = struct
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    assert_id_in_scope stmt.id;
-    let expr = evaluate_expr stmt.rhs in
-    func_section := sprintf "%s    %%%s =w copy %s\n" !func_section stmt.id.lexeme expr
+    (* we need to eval the lhs to support array operations like arr[i] = ... *)
+    let lhs = evaluate_expr stmt.lhs in
+    assert_id_in_scope @@ String.sub lhs 1 (String.length lhs - 1); (* Chop off the leading `%` *)
+    let rhs = evaluate_expr stmt.rhs in
+    func_section := sprintf "%s    %s =w copy %s\n" !func_section lhs rhs
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =

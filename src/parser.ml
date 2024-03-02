@@ -261,23 +261,24 @@ module Parser = struct
   (* Used when parsing a statement of mutating a value
    * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
-    let id, tokens = expect tokens TokenType.Identifier in
+    (* let rhs, tokens = expect tokens TokenType.Identifier in *)
+    let lhs, tokens = parse_expr tokens in
     let op, tokens = pop tokens in
 
     match op with
       | {ttype = TokenType.Equals; _} ->
          let rhs, tokens = parse_expr tokens in
          let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; rhs}, tokens
+         Ast.{lhs; rhs}, tokens
       | {ttype = TokenType.PlusEquals; _}
         | {ttype = TokenType.MinusEquals; _}
         | {ttype = TokenType.AsteriskEquals; _}
         | {ttype = TokenType.ForwardSlashEquals; _}
         | {ttype = TokenType.PercentEquals; _} ->
          let rhs, tokens = parse_expr tokens in
-         let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs; op} in
+         let rhs = Ast.Binary {lhs; rhs; op} in
          let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{id; rhs}, tokens
+         Ast.{lhs; rhs}, tokens
       | _ ->
          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                    ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme) (Some op) in

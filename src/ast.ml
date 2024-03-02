@@ -77,7 +77,7 @@ module Ast = struct
     }
 
   and mut_stmt =
-    { id : Token.t
+    { lhs : expr
     ; rhs : expr
     }
 
