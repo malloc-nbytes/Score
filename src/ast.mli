@@ -76,7 +76,7 @@ module Ast : sig
     | Ident of Token.t
     | Intlit of Token.t
     | Strlit of Token.t
-    | IntCompoundLit of expr list
+    | IntCompoundLit of expr list * int
 
   and proc_call_expr =
     { id : Token.t

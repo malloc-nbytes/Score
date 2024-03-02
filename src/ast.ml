@@ -98,7 +98,7 @@ module Ast = struct
     | Ident of Token.t
     | Intlit of Token.t
     | Strlit of Token.t
-    | IntCompoundLit of expr list
+    | IntCompoundLit of expr list * int
 
   and proc_call_expr =
     { id : Token.t
@@ -123,7 +123,7 @@ module Ast = struct
       | Term Ident i -> printf "%s%s\n" spaces i.lexeme
       | Term Intlit t -> printf "%s%s\n" spaces t.lexeme
       | Term Strlit s -> printf "%s\"%s\"\n" spaces s.lexeme
-      | Term IntCompoundLit l ->
+      | Term IntCompoundLit (l, s) ->
          let _ = printf "%s[\n" spaces in
          let _ = List.iter (fun e -> expr_dump e (depth + 1)) l in
          printf "%s]\n" spaces

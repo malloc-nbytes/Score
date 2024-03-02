@@ -20,6 +20,17 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
+(* ARRAYS
+  %A0 =l alloc4 12      # stack allocate an array A of 3 words
+  %A1 =l add %A0, 4
+  %A2 =l add %A0, 8
+
+  storew 43,  %A0      # A[0] <- 43
+  storew 255, %A1      # A[1] <- 255
+  storew 99, %A2       # A[2] <- 99
+
+*)
+
 module Ir = struct
   open Ast
   open Printf
@@ -111,6 +122,7 @@ module Ir = struct
     | TokenType.Void -> ""
     | TokenType.I32 -> "w"
     | TokenType.Str -> "l"
+    | TokenType.Array _ -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
                  ~msg:(Printf.sprintf "unsupported type `%s`" @@ TokenType.id_type_to_string type_)
@@ -159,9 +171,16 @@ module Ir = struct
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
-    | Ast.Term Ast.IntCompoundLit cl ->
-        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                  ~msg:"int compound literals are unimplemented" None in exit 1
+    | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
+      let array_reg = cons_tmpreg false in
+      func_section := sprintf "%s    %s =l alloc4 %d\n" !func_section array_reg (len * 4);
+      for i = 0 to len - 1 do
+        let e = evaluate_expr (List.nth exprs i) in
+        let added_reg = (cons_tmpreg false) in
+        func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
+        func_section := sprintf "%s    storew %s, %s\n" !func_section e added_reg;
+      done;
+      array_reg
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       acc ^ "w " ^ evaluate_expr e ^ ", "

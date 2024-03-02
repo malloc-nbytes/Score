@@ -91,12 +91,21 @@ module Parser = struct
     | k, _ :: tl -> peek tl (k - 1)
     | _ -> None
 
+  let rec parse_comma_sep_exprs (tokens : Token.t list) (acc : Ast.expr list) : (Ast.expr list) * Token.t list =
+    let expr, tokens = parse_expr tokens in
+    match peek tokens 0 with
+    | Some {ttype = TokenType.Comma; _} ->
+       let _, tokens = pop tokens in
+       parse_comma_sep_exprs tokens @@ acc @ [expr]
+    | Some {ttype = TokenType.RBrace; _} -> acc @ [expr], tokens
+    | _ -> acc, tokens
+
   (* The last level of expression parsing. Checks for an
    * identifier, integer literal etc. If a left paren `(` is
    * encountered, it will recurse back to the first level of
    * expression parsing and work that sub-expression back up
    * to this level. *)
-  let rec parse_primary_expr (tokens : Token.t list) : Ast.expr * Token.t list =
+  and parse_primary_expr (tokens : Token.t list) : Ast.expr * Token.t list =
     match tokens with
     | {ttype = TokenType.Identifier; _} as id :: tl ->
        (match peek tl 0 with
@@ -111,8 +120,9 @@ module Parser = struct
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
     | {ttype = TokenType.LBrace; _} :: tl ->
-       exit 1;
-       (* let _, tokens = expect tokens TokenType.RBrace in *)
+       let exprs, tokens = parse_comma_sep_exprs tl [] in
+       let _, tokens = expect tokens TokenType.RBrace in
+       Ast.Term (Ast.IntCompoundLit (exprs, List.length exprs)), tokens
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | hd :: _ ->
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
