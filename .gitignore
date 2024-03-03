@@ -13,6 +13,7 @@ input.txt
 input.bak
 *.sse
 *.out
+*.dSYM
 input.scr
 
 # ocamlbuild working directory
