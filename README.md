@@ -1,6 +1,6 @@
 # Score
 
-Score is a compiled language written in OCaml QBE.
+Score is a compiled language written in OCaml with the QBE backend.
 
 See `example.scr` or `./src/tests/` for what is currently possible.
 
