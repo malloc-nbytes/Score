@@ -76,8 +76,6 @@ let () =
 
   let infp = ref "" in
   let outfp = ref "out" in
-  let intermediate_code_fp = ref "Score_QBE_code.ssa" in
-  let asm_fp = ref "Score_QBE_code.s" in
   let debug_syms = ref false in
   let should_del = ref true in
 
@@ -92,6 +90,9 @@ let () =
     | fp :: _ -> infp := fp in
 
   parse_args argv;
+
+  let intermediate_code_fp = !outfp ^ ".ssa" in
+  let asm_fp = !outfp ^ ".s" in
 
   let data = file_to_str !infp in
 
@@ -109,8 +110,8 @@ let () =
   (* print_endline code; (\* debug *\) *)
 
   (* Run QBE on the intermediate code *)
-  let _ = write_to_file !intermediate_code_fp code in
-  let _ = run_qbe !intermediate_code_fp !asm_fp !should_del in
+  let _ = write_to_file intermediate_code_fp code in
+  let _ = run_qbe intermediate_code_fp asm_fp !should_del in
 
   (* Create an executable *)
-  assemble !outfp !asm_fp !debug_syms !should_del
+  assemble !outfp asm_fp !debug_syms !should_del
