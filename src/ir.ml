@@ -190,7 +190,7 @@ module Ir = struct
        !tmpreg
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
       let array_reg = cons_tmpreg false in
-      func_section := sprintf "%s    %s =l alloc4 %d\n" !func_section array_reg (len * 4);
+      func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
       for i = 0 to len - 1 do
         let e = evaluate_expr (List.nth exprs i) in
         let added_reg = (cons_tmpreg false) in
@@ -205,19 +205,19 @@ module Ir = struct
        if pc.id.lexeme = "printf" (* INTRINSIC *)
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else if pc.id.lexeme = "exit" (* INTRINSIC *)
        then
          let _ = assert (List.length pc.args = 1) in
          let cons_args = "call $exit(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else if pc.id.lexeme = "strcmp" (* INTRINSIC *)
        then
          let _ = assert (List.length pc.args = 2) in
          let cons_args = "call $strcmp(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
          !tmpreg
        else
          let _ = assert_token_in_scope pc.id in (* Temporary *)
