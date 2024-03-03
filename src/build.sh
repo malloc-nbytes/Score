@@ -2,17 +2,17 @@
 
 set -xe
 
-ocamlc -c token.mli
-ocamlc -c token.ml
-ocamlc -c err.mli
-ocamlc -c err.ml
-ocamlc -c lexer.mli
-ocamlc -c lexer.ml
-ocamlc -c ast.mli
-ocamlc -c ast.ml
-ocamlc -c parser.mli
-ocamlc -c parser.ml
-ocamlc -c ir.mli
-ocamlc -c ir.ml
-ocamlc -c main.ml
+ocamlc -annot -c token.mli
+ocamlc -annot -c token.ml
+ocamlc -annot -c err.mli
+ocamlc -annot -c err.ml
+ocamlc -annot -c lexer.mli
+ocamlc -annot -c lexer.ml
+ocamlc -annot -c ast.mli
+ocamlc -annot -c ast.ml
+ocamlc -annot -c parser.mli
+ocamlc -annot -c parser.ml
+ocamlc -annot -c ir.mli
+ocamlc -annot -c ir.ml
+ocamlc -annot -c main.ml
 ocamlc -o scr token.cmo err.cmo ast.cmo ir.cmo lexer.cmo parser.cmo main.cmo

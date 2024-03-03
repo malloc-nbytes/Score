@@ -126,7 +126,7 @@ module Ir = struct
   let scoretype_to_qbetype (type_ : TokenType.id_type) : string =
     match type_ with
     | TokenType.Void -> ""
-    | TokenType.I32 -> "w"
+    | TokenType.I32 -> "l"
     | TokenType.Str -> "l"
     | TokenType.Array _ -> "l"
     | _ ->
@@ -166,9 +166,21 @@ module Ir = struct
     | Ast.Binary bin ->
        let lhs = evaluate_expr bin.lhs in
        let rhs = evaluate_expr bin.rhs in
-       func_section := sprintf "%s    %s =w %s %s, %s\n" !func_section (cons_tmpreg false)
+       func_section := sprintf "%s    %s =l %s %s, %s\n" !func_section (cons_tmpreg false)
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
+    | Ast.Array_retrieval ar ->
+  (* and array_retrieval_expr = *)
+  (*   { id : Token.t *)
+  (*   ; index : expr *)
+  (*   } *)
+        assert_token_in_scope ar.id;
+        let index = evaluate_expr ar.index in
+        let array_reg = "%" ^ ar.id.lexeme in
+        let added_reg = (cons_tmpreg false) in
+        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
+        func_section := sprintf "%s    %s =l loadl %s\n" !func_section (cons_tmpreg false) added_reg;
+        !tmpreg
     | Ast.Term Ast.Ident ident ->
       assert_token_in_scope ident;
       "%" ^ ident.lexeme
@@ -184,12 +196,12 @@ module Ir = struct
         let e = evaluate_expr (List.nth exprs i) in
         let added_reg = (cons_tmpreg false) in
         func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
-        func_section := sprintf "%s    storew %s, %s\n" !func_section e added_reg;
+        func_section := sprintf "%s    storel %s, %s\n" !func_section e added_reg;
       done;
       array_reg
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
-                      acc ^ "w " ^ evaluate_expr e ^ ", "
+                      acc ^ "l " ^ evaluate_expr e ^ ", "
                     ) "" pc.args in
        if pc.id.lexeme = "printf" (* INTRINSIC *)
        then
@@ -289,11 +301,19 @@ module Ir = struct
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    (* we need to eval the lhs to support array operations like arr[i] = ... *)
-    let lhs = evaluate_expr stmt.lhs in
-    assert_id_in_scope @@ String.sub lhs 1 (String.length lhs - 1); (* Chop off the leading `%` *)
-    let rhs = evaluate_expr stmt.rhs in
-    func_section := sprintf "%s    %s =w copy %s\n" !func_section lhs rhs
+    match stmt with
+    | Ast.Mut_var mutvar ->
+      assert_token_in_scope mutvar.id;
+      let expr = evaluate_expr mutvar.expr in
+      func_section := sprintf "%s    %%%s =l copy %s\n" !func_section mutvar.id.lexeme expr
+    | Ast.Mut_arr mutarr ->
+      assert_token_in_scope mutarr.id;
+      let index = evaluate_expr mutarr.index in
+      let expr = evaluate_expr mutarr.expr in
+      let array_reg = "%" ^ mutarr.id.lexeme in
+      let added_reg = (cons_tmpreg false) in
+      func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
+      func_section := sprintf "%s    storel %s, %s\n" !func_section expr added_reg
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
