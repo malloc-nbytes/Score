@@ -112,6 +112,11 @@ module Parser = struct
         | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
            let proc_call, tokens = parse_proc_call (id :: tl) in
            Ast.Proc_call proc_call, tokens
+        | Some {ttype = TokenType.LBracket; _} ->
+           let _, tokens = expect tl TokenType.LBracket in
+           let index, tokens = parse_expr tokens in
+           let _, tokens = expect tokens TokenType.RBracket in
+           Ast.Array_retrieval {id; index}, tokens
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
@@ -261,38 +266,61 @@ module Parser = struct
   (* Used when parsing a statement of mutating a value
    * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
-    (* let rhs, tokens = expect tokens TokenType.Identifier in *)
-    let lhs, tokens = parse_expr tokens in
-    let op, tokens = pop tokens in
-
-    match op with
-      | {ttype = TokenType.Equals; _} ->
-         let rhs, tokens = parse_expr tokens in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{lhs; rhs}, tokens
-      | {ttype = TokenType.PlusEquals; _}
-        | {ttype = TokenType.MinusEquals; _}
-        | {ttype = TokenType.AsteriskEquals; _}
-        | {ttype = TokenType.ForwardSlashEquals; _}
-        | {ttype = TokenType.PercentEquals; _} ->
-         let rhs, tokens = parse_expr tokens in
-         let rhs = Ast.Binary {lhs; rhs; op} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.{lhs; rhs}, tokens
-      | _ ->
-         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                   ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme) (Some op) in
-         exit 1
-
-  and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-    let type_, tokens = expect_type tokens in
+    let id, tokens = expect tokens TokenType.Identifier in
     match peek tokens 0 with
-    | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
+    | Some {ttype = TokenType.LBracket; _} -> (* Array mutation *)
        let _, tokens = expect tokens TokenType.LBracket in
-       let len, tokens = expect tokens TokenType.IntegerLiteral in
+       let index, tokens = parse_expr tokens in
        let _, tokens = expect tokens TokenType.RBracket in
-       TokenType.Array (type_, (int_of_string len.lexeme)), tokens
-    | _ -> type_, tokens (* Not array *)
+       let op, tokens = pop tokens in
+
+       (match op with
+        | {ttype = TokenType.Equals; _} ->
+           let expr, tokens = parse_expr tokens in
+           let _, tokens = expect tokens TokenType.Semicolon in
+           Ast.Mut_arr Ast.{id; index; expr}, tokens
+        | {ttype = TokenType.PlusEquals}
+          | {ttype = TokenType.MinusEquals}
+          | {ttype = TokenType.AsteriskEquals}
+          | {ttype = TokenType.ForwardSlashEquals}
+          | {ttype = TokenType.PercentEquals} as op ->
+           let expr, tokens = parse_expr tokens in
+           let rhs = Ast.Binary {lhs = Ast.Array_retrieval {id; index}; rhs = expr; op} in
+           let _, tokens = expect tokens TokenType.Semicolon in
+           Ast.Mut_arr Ast.{id; index; expr = rhs}, tokens
+        | _ ->
+           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+           exit 1)
+
+    | _ -> (* Variable mutation *)
+       let op, tokens = pop tokens in
+       match op with
+       | {ttype = TokenType.Equals; _} ->
+          let expr, tokens = parse_expr tokens in
+          let _, tokens = expect tokens TokenType.Semicolon in
+          Ast.Mut_var Ast.{id; expr}, tokens
+       | {ttype = TokenType.PlusEquals}
+         | {ttype = TokenType.MinusEquals}
+         | {ttype = TokenType.AsteriskEquals}
+         | {ttype = TokenType.ForwardSlashEquals}
+         | {ttype = TokenType.PercentEquals} as op ->
+          let expr, tokens = parse_expr tokens in
+          let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op} in
+          let _, tokens = expect tokens TokenType.Semicolon in
+          Ast.Mut_var Ast.{id; expr = rhs}, tokens
+       | _ ->
+          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+          exit 1
+
+    and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+      let type_, tokens = expect_type tokens in
+      match peek tokens 0 with
+      | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
+        let _, tokens = expect tokens TokenType.LBracket in
+        let len, tokens = expect tokens TokenType.IntegerLiteral in
+        let _, tokens = expect tokens TokenType.RBracket in
+        TokenType.Array (type_, (int_of_string len.lexeme)), tokens
+      | _ -> type_, tokens (* Not array *)
 
   (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)

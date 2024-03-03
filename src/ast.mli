@@ -55,14 +55,30 @@ module Ast : sig
     }
 
   and mut_stmt =
-    { lhs : expr
-    ; rhs : expr
+    | Mut_var of mut_var_stmt
+    | Mut_arr of mut_arr_stmt
+
+  and mut_var_stmt =
+    { id : Token.t
+    ; expr : expr
+    }
+
+  and mut_arr_stmt =
+    { id : Token.t
+    ; index : expr
+    ; expr : expr
     }
 
   and expr =
     | Binary of binary_expr
     | Term of term_expr
     | Proc_call of proc_call_expr
+    | Array_retrieval of array_retrieval_expr
+
+  and array_retrieval_expr =
+    { id : Token.t
+    ; index : expr
+    }
 
   and stmt_expr = expr
 
