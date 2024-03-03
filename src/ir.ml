@@ -170,34 +170,35 @@ module Ir = struct
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
     | Ast.Array_retrieval ar ->
-        assert_token_in_scope ar.id;
-        let index = Ast.Binary {lhs = ar.index;
-                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-        let index = evaluate_expr index in
-        let array_reg = "%" ^ ar.id.lexeme in
-        let added_reg = (cons_tmpreg false) in
-        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-        func_section := sprintf "%s    %s =l loadl %s\n" !func_section (cons_tmpreg false) added_reg;
-        !tmpreg
+       printf "[WARN]: `array retrieval` expressions are not fully functional\n";
+       assert_token_in_scope ar.id;
+       let index = Ast.Binary {lhs = ar.index;
+                               op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+       let index = evaluate_expr index in
+       let array_reg = "%" ^ ar.id.lexeme in
+       let added_reg = (cons_tmpreg false) in
+       func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
+       func_section := sprintf "%s    %s =l loadl %s\n" !func_section (cons_tmpreg false) added_reg;
+       !tmpreg
     | Ast.Term Ast.Ident ident ->
-      assert_token_in_scope ident;
-      "%" ^ ident.lexeme
+       assert_token_in_scope ident;
+       "%" ^ ident.lexeme
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
-      let array_reg = cons_tmpreg false in
-      func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
-      for i = 0 to len - 1 do
-        let e = evaluate_expr (List.nth exprs i) in
-        let added_reg = (cons_tmpreg false) in
-        func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
-        func_section := sprintf "%s    storel %s, %s\n" !func_section e added_reg;
-      done;
-      array_reg
+       let array_reg = cons_tmpreg false in
+       func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
+       for i = 0 to len - 1 do
+         let e = evaluate_expr (List.nth exprs i) in
+         let added_reg = (cons_tmpreg false) in
+         func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
+         func_section := sprintf "%s    storel %s, %s\n" !func_section e added_reg;
+       done;
+       array_reg
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       acc ^ "l " ^ evaluate_expr e ^ ", "
@@ -302,20 +303,21 @@ module Ir = struct
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     match stmt with
     | Ast.Mut_var mutvar ->
-      assert_token_in_scope mutvar.id;
-      let expr = evaluate_expr mutvar.expr in
-      func_section := sprintf "%s    %%%s =l copy %s\n" !func_section mutvar.id.lexeme expr
+       assert_token_in_scope mutvar.id;
+       let expr = evaluate_expr mutvar.expr in
+       func_section := sprintf "%s    %%%s =l copy %s\n" !func_section mutvar.id.lexeme expr
     | Ast.Mut_arr mutarr ->
-      assert_token_in_scope mutarr.id;
-      let index = Ast.Binary {lhs = mutarr.index;
-                              op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                              rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-      let index = evaluate_expr index in
-      let expr = evaluate_expr mutarr.expr in
-      let array_reg = "%" ^ mutarr.id.lexeme in
-      let added_reg = (cons_tmpreg false) in
-      func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-      func_section := sprintf "%s    storew %s, %s\n" !func_section expr added_reg
+       printf "[WARN]: `array mutations` fully functional\n";
+       assert_token_in_scope mutarr.id;
+       let index = Ast.Binary {lhs = mutarr.index;
+                               op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+       let index = evaluate_expr index in
+       let expr = evaluate_expr mutarr.expr in
+       let array_reg = "%" ^ mutarr.id.lexeme in
+       let added_reg = (cons_tmpreg false) in
+       func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
+       func_section := sprintf "%s    storew %s, %s\n" !func_section expr added_reg
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
