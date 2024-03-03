@@ -170,12 +170,11 @@ module Ir = struct
                          (evaluate_binop bin.op) lhs rhs;
        !tmpreg
     | Ast.Array_retrieval ar ->
-  (* and array_retrieval_expr = *)
-  (*   { id : Token.t *)
-  (*   ; index : expr *)
-  (*   } *)
         assert_token_in_scope ar.id;
-        let index = evaluate_expr ar.index in
+        let index = Ast.Binary {lhs = ar.index;
+                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+        let index = evaluate_expr index in
         let array_reg = "%" ^ ar.id.lexeme in
         let added_reg = (cons_tmpreg false) in
         func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
@@ -308,12 +307,15 @@ module Ir = struct
       func_section := sprintf "%s    %%%s =l copy %s\n" !func_section mutvar.id.lexeme expr
     | Ast.Mut_arr mutarr ->
       assert_token_in_scope mutarr.id;
-      let index = evaluate_expr mutarr.index in
+      let index = Ast.Binary {lhs = mutarr.index;
+                              op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                              rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+      let index = evaluate_expr index in
       let expr = evaluate_expr mutarr.expr in
       let array_reg = "%" ^ mutarr.id.lexeme in
       let added_reg = (cons_tmpreg false) in
       func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-      func_section := sprintf "%s    storel %s, %s\n" !func_section expr added_reg
+      func_section := sprintf "%s    storew %s, %s\n" !func_section expr added_reg
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
