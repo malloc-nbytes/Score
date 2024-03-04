@@ -30,6 +30,7 @@ module Lexer = struct
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
     let _ = Hashtbl.add keywords "i32"    @@ TokenType.Type TokenType.I32 in
+    let _ = Hashtbl.add keywords "usize"    @@ TokenType.Type TokenType.Usize in
     let _ = Hashtbl.add keywords "str"    @@ TokenType.Type TokenType.Str in
     let _ = Hashtbl.add keywords "void"   @@ TokenType.Type TokenType.Void in
     let _ = Hashtbl.add keywords "proc"   @@ TokenType.Proc in

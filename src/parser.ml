@@ -68,6 +68,7 @@ module Parser = struct
     match tokens with
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
+    | {ttype = TokenType.Type (TokenType.Usize as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
     | _ ->
        let t = List.hd tokens in

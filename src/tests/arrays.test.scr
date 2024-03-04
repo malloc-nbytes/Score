@@ -2,7 +2,7 @@ proc sum_arr(void): i32 {
     printf("sum_arr\n");
     let arr: i32[5] = {1,2,3,4,5};
     let s: i32 = 0;
-    for let i: i32 = 0; i < 5; i += 1; {
+    for let i: usize = 0; i < 5; i += 1; {
         s += arr[i];
     }
     return s;
@@ -12,7 +12,7 @@ proc find_biggest(void): i32 {
     printf("find_biggest\n");
     let arr: i32[5] = {3,1,5,2,4};
     let m: i32 = arr[0];
-    for let i: i32 = 0; i < 5; i += 1; {
+    for let i: usize = 0; i < 5; i += 1; {
         if arr[i] > m { m = arr[i]; }
     }
     return m;

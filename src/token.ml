@@ -24,6 +24,7 @@ module TokenType = struct
   type id_type =
     | I32
     | Str
+    | Usize
     | Void
     | Array of id_type * int
     | Custom of string
@@ -94,6 +95,7 @@ module TokenType = struct
     | Comment -> "Comment"
     (* | Type t -> "Type " ^ t *)
     | Type I32 -> "Type I32"
+    | Type Usize -> "Usize"
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
     | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
@@ -131,6 +133,7 @@ module TokenType = struct
     let id_type_to_string = function
       | I32 -> "I32"
       | Str -> "Str"
+      | Usize -> "Usize"
       | Void -> "Void"
       | Array _ -> "Array PRINTING UNIMPLEMENTED"
       | Custom s -> "Custom " ^ s

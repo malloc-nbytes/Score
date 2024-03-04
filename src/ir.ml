@@ -58,7 +58,9 @@ module Ir = struct
   let didret         = ref false (* TODO: Find a better solution *)
   let didbreak       = ref false (* TODO: Find a better solution *)
 
-  let cur_proc_id     = ref ""
+  let cur_proc_id    = ref ""
+
+  let need_long      = ref false
 
   let push_scope () : unit = scope := Hashtbl.create 20 :: !scope
 
@@ -126,8 +128,9 @@ module Ir = struct
   let scoretype_to_qbetype (type_ : TokenType.id_type) : string =
     match type_ with
     | TokenType.Void -> ""
-    | TokenType.I32 -> "l"
+    | TokenType.I32 -> "w"
     | TokenType.Str -> "l"
+    | TokenType.Usize -> "l"
     | TokenType.Array _ -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
@@ -160,66 +163,81 @@ module Ir = struct
                  ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme)
                  None in exit 1
 
+  let unrwap k = match k with
+    | Some v -> v
+    | None -> failwith "unrwapped with None value"
+
   (* Evaluate an expression. *)
-  let rec evaluate_expr (expr : Ast.expr) : string =
+  let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-       let lhs = evaluate_expr bin.lhs in
-       let rhs = evaluate_expr bin.rhs in
-       func_section := sprintf "%s    %s =l %s %s, %s\n" !func_section (cons_tmpreg false)
-                         (evaluate_binop bin.op) lhs rhs;
-       !tmpreg
+       (* let lhs = evaluate_expr bin.lhs in
+       let rhs = evaluate_expr bin.rhs in *)
+       (* func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false)
+                         (if !need_long then "l" else "w") (evaluate_binop bin.op) lhs rhs; *)
+       (* !tmpreg *)
+       (* get token from scope and use the appropriate qbe type *)
+       let lhs, lhs_type = evaluate_expr bin.lhs in
+       let rhs, rhs_type = evaluate_expr bin.rhs in
+       let qbe_type = scoretype_to_qbetype lhs_type in
+       let qbe_type = if qbe_type = "" then scoretype_to_qbetype rhs_type else qbe_type in
+       let qbe_type = if !need_long then "l" else qbe_type in
+       func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false) qbe_type (evaluate_binop bin.op) lhs rhs;
+       !tmpreg, lhs_type
     | Ast.Array_retrieval ar ->
-       printf "[WARN]: `array retrieval` expressions are not fully functional\n";
        assert_token_in_scope ar.id;
        let index = Ast.Binary {lhs = ar.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-       let index = evaluate_expr index in
+       need_long := true;
+       let index, _ = evaluate_expr index in
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-       func_section := sprintf "%s    %s =l loadl %s\n" !func_section (cons_tmpreg false) added_reg;
-       !tmpreg
+       func_section := sprintf "%s    %s =w loadw %s\n" !func_section (cons_tmpreg false) added_reg;
+       !tmpreg, TokenType.I32
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
-       "%" ^ ident.lexeme
-    | Ast.Term Ast.Intlit intlit -> intlit.lexeme
+       "%" ^ ident.lexeme, unrwap @@ snd (get_token_from_scope ident.lexeme)
+    | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
-       !tmpreg
+       !tmpreg, TokenType.Str
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
        let array_reg = cons_tmpreg false in
-       func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
+       func_section := sprintf "%s    %s =l alloc4 %d\n" !func_section array_reg (len * 4);
        for i = 0 to len - 1 do
-         let e = evaluate_expr (List.nth exprs i) in
+         (* let e = evaluate_expr (List.nth exprs i) in *)
+          let e, _ = evaluate_expr (List.nth exprs i) in
          let added_reg = (cons_tmpreg false) in
          func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
-         func_section := sprintf "%s    storel %s, %s\n" !func_section e added_reg;
+         func_section := sprintf "%s    storew %s, %s\n" !func_section e added_reg;
        done;
-       array_reg
+       array_reg, TokenType.Array (TokenType.I32, len)
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
-                      acc ^ "l " ^ evaluate_expr e ^ ", "
+                      let e, _ = evaluate_expr e in
+                      acc ^ "w " ^ e ^ ", "
                     ) "" pc.args in
+       need_long := false;
        if pc.id.lexeme = "printf" (* INTRINSIC *)
        then
          let cons_args = "call $printf(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg, TokenType.Void
        else if pc.id.lexeme = "exit" (* INTRINSIC *)
        then
          let _ = assert (List.length pc.args = 1) in
          let cons_args = "call $exit(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg, TokenType.Void
        else if pc.id.lexeme = "strcmp" (* INTRINSIC *)
        then
          let _ = assert (List.length pc.args = 2) in
          let cons_args = "call $strcmp(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =l %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg
+         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+         !tmpreg, TokenType.I32
        else
          let _ = assert_token_in_scope pc.id in (* Temporary *)
          let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
@@ -236,25 +254,34 @@ module Ir = struct
           else
             func_section := sprintf "%s    %s\n"
                               !func_section cons_args);
-         !tmpreg
+         !tmpreg, unrwap @@ snd (get_token_from_scope pc.id.lexeme)
 
   (* Evaluate the `return` statement. *)
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
-    let expr = evaluate_expr stmt.expr in
+    (* let expr = evaluate_expr stmt.expr in *)
+    let expr, _ = evaluate_expr stmt.expr in
     let type_tok = snd (get_token_from_scope !cur_proc_id) in
     let qbe_type = match type_tok with
       | None -> failwith "TODO ERR: NO TYPE"
       | Some t -> scoretype_to_qbetype t in
     func_section := sprintf "%s    ret %s\n" !func_section @@ if qbe_type = "" then "" else expr;
+    need_long := false;
     didret := true
 
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert_id_not_in_scope stmt.id;
     add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
-    let expr = evaluate_expr stmt.expr in
-    func_section := sprintf "%s    %%%s =%s copy %s\n"
-                      !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
+    (* let expr = evaluate_expr stmt.expr in *)
+    let expr, type_ = evaluate_expr stmt.expr in
+    need_long := false;
+    match stmt.type_ = type_ with
+    | true ->
+       func_section := sprintf "%s    %%%s =%s copy %s\n"
+                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
+    | false ->
+       func_section := sprintf "%s    %%%s =%s extsw %s\n"
+                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
 
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : bool =
@@ -274,7 +301,8 @@ module Ir = struct
 
   (* Evaluate an `if` statement. *)
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    let expr = evaluate_expr stmt.expr in
+    (* let expr = evaluate_expr stmt.expr in *)
+    let expr, _ = evaluate_expr stmt.expr in
     let iflbl, elselbl, donelbl = cons_if_lbl () in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr iflbl
                       (if stmt.else_ = None then donelbl else elselbl);
@@ -291,11 +319,13 @@ module Ir = struct
         func_section := sprintf "%s%s\n" !func_section elselbl;
         let _ = evaluate_block_stmt block in ()
      | None -> ());
+    need_long := false;
     func_section := sprintf "%s%s\n" !func_section donelbl
 
   (* Evaluate a statement expression ie `printf()`. *)
   and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
-    let _ = evaluate_expr stmt in ()
+    let _ = evaluate_expr stmt in
+    need_long := false
     (* let expr = evaluate_expr stmt in () *)
     (* func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr *)
 
@@ -304,16 +334,20 @@ module Ir = struct
     match stmt with
     | Ast.Mut_var mutvar ->
        assert_token_in_scope mutvar.id;
-       let expr = evaluate_expr mutvar.expr in
-       func_section := sprintf "%s    %%%s =l copy %s\n" !func_section mutvar.id.lexeme expr
+       (* let expr = evaluate_expr mutvar.expr in *)
+       let expr, _ = evaluate_expr mutvar.expr in
+       let qbe_type = scoretype_to_qbetype @@ unrwap @@ snd (get_token_from_scope mutvar.id.lexeme) in
+       func_section := sprintf "%s    %%%s =%s copy %s\n" !func_section mutvar.id.lexeme qbe_type expr
     | Ast.Mut_arr mutarr ->
-       printf "[WARN]: `array mutations` fully functional\n";
        assert_token_in_scope mutarr.id;
        let index = Ast.Binary {lhs = mutarr.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-       let index = evaluate_expr index in
-       let expr = evaluate_expr mutarr.expr in
+       need_long := true;
+       let index, _ = evaluate_expr index in
+       need_long := false;
+       (* let expr = evaluate_expr mutarr.expr in *)
+       let expr, _ = evaluate_expr mutarr.expr in
        let array_reg = "%" ^ mutarr.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
@@ -323,7 +357,8 @@ module Ir = struct
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
     let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in
     func_section := sprintf "%s%s\n" !func_section looplbl;
-    let expr = evaluate_expr stmt.expr in
+    (* let expr = evaluate_expr stmt.expr in *)
+    let expr, _ = evaluate_expr stmt.expr in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
     let _ = evaluate_block_stmt stmt.block in
@@ -340,7 +375,8 @@ module Ir = struct
     let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in
     evaluate_stmt stmt.init;
     func_section := sprintf "%s%s\n" !func_section looplbl;
-    let expr = evaluate_expr stmt.cond in
+    (* let expr = evaluate_expr stmt.cond in *)
+    let expr, _ = evaluate_expr stmt.cond in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
     let _ = evaluate_block_stmt stmt.block in

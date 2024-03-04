@@ -2,6 +2,7 @@ module TokenType : sig
   type id_type =
     | I32
     | Str
+    | Usize
     | Void
     | Array of id_type * int
     | Custom of string
