@@ -171,15 +171,15 @@ module Ir = struct
   let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-        let lhs, lhs_type = evaluate_expr bin.lhs in
-        let rhs, rhs_type = evaluate_expr bin.rhs in
-        let qbe_type = scoretype_to_qbetype lhs_type in
-        let qbe_type = if qbe_type = "" then scoretype_to_qbetype rhs_type else qbe_type in
-        let qbe_type = if !need_long then "l" else qbe_type in
-        let added_reg = (cons_tmpreg false) in
-        func_section := sprintf "%s    %s =l extsw %s\n" !func_section added_reg lhs;
-        func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false) qbe_type (evaluate_binop bin.op) added_reg rhs;
-        !tmpreg, lhs_type
+       let lhs, lhs_type = evaluate_expr bin.lhs in
+       let rhs, rhs_type = evaluate_expr bin.rhs in
+       let qbe_type = scoretype_to_qbetype lhs_type in
+       let qbe_type = if qbe_type = "" then scoretype_to_qbetype rhs_type else qbe_type in
+       let qbe_type = if !need_long then "l" else qbe_type in
+       let added_reg = (cons_tmpreg false) in
+       func_section := sprintf "%s    %s =l extsw %s\n" !func_section added_reg lhs;
+       func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false) qbe_type (evaluate_binop bin.op) added_reg rhs;
+       !tmpreg, lhs_type
     | Ast.Array_retrieval ar ->
        assert_token_in_scope ar.id;
        let index = Ast.Binary {lhs = ar.index;
@@ -198,8 +198,7 @@ module Ir = struct
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
        "%" ^ ident.lexeme, unrwap @@ snd (get_token_from_scope ident.lexeme)
-    | Ast.Term Ast.Intlit intlit -> 
-       intlit.lexeme, TokenType.I32
+    | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
@@ -221,44 +220,41 @@ module Ir = struct
                       acc ^ "w " ^ e ^ ", "
                     ) "" pc.args in
        need_long := false;
-       if pc.id.lexeme = "printf" (* INTRINSIC *)
-       then
-         let cons_args = "call $printf(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg, TokenType.Void
-       else if pc.id.lexeme = "exit" (* INTRINSIC *)
-       then
-         let _ = assert (List.length pc.args = 1) in
-         let cons_args = "call $exit(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg, TokenType.Void
-       else if pc.id.lexeme = "strcmp" (* INTRINSIC *)
-       then
-         let _ = assert (List.length pc.args = 2) in
-         let cons_args = "call $strcmp(" ^ args ^ ")" in
-         func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
-         !tmpreg, TokenType.I32
-       else
-         let _ = assert_token_in_scope pc.id in (* Temporary *)
-         let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
+       (match pc.id.lexeme with
+        | "printf" ->
+           let cons_args = "call $printf(" ^ args ^ ")" in
+           func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+           !tmpreg, TokenType.Void
+        | "exit" ->
+           let _ = assert (List.length pc.args = 1) in
+           let cons_args = "call $exit(" ^ args ^ ")" in
+           func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+           !tmpreg, TokenType.Void
+        | "strcmp" ->
+           let _ = assert (List.length pc.args = 2) in
+           let cons_args = "call $strcmp(" ^ args ^ ")" in
+           func_section := sprintf "%s    %s =w %s\n" !func_section (cons_tmpreg false) cons_args;
+           !tmpreg, TokenType.I32
+        | _ ->
+           let _ = assert_token_in_scope pc.id in (* Temporary *)
+           let cons_args = "call $" ^ pc.id.lexeme ^ "(" ^ args ^ ")" in
 
-         let type_tok = snd (get_token_from_scope pc.id.lexeme) in
-         let qbe_type = match type_tok with
-           | None -> failwith "TODO ERR: NO TYPE"
-           | Some t -> scoretype_to_qbetype t in
+           let type_tok = snd (get_token_from_scope pc.id.lexeme) in
+           let qbe_type = match type_tok with
+             | None -> failwith "TODO ERR: NO TYPE"
+             | Some t -> scoretype_to_qbetype t in
 
-         (* Don't create a new REG if the proc call is void. *)
-         (if qbe_type <> "" then
-            func_section := sprintf "%s    %s =%s %s\n"
-                              !func_section (cons_tmpreg false) qbe_type cons_args
-          else
-            func_section := sprintf "%s    %s\n"
-                              !func_section cons_args);
-         !tmpreg, unrwap @@ snd (get_token_from_scope pc.id.lexeme)
+           (* Don't create a new REG if the proc call is void. *)
+           (if qbe_type <> "" then
+              func_section := sprintf "%s    %s =%s %s\n"
+                                !func_section (cons_tmpreg false) qbe_type cons_args
+            else
+              func_section := sprintf "%s    %s\n"
+                                !func_section cons_args);
+           !tmpreg, unrwap @@ snd (get_token_from_scope pc.id.lexeme))
 
   (* Evaluate the `return` statement. *)
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
-    (* let expr = evaluate_expr stmt.expr in *)
     let expr, _ = evaluate_expr stmt.expr in
     let type_tok = snd (get_token_from_scope !cur_proc_id) in
     let qbe_type = match type_tok with
@@ -272,7 +268,6 @@ module Ir = struct
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert_id_not_in_scope stmt.id;
     add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
-    (* let expr = evaluate_expr stmt.expr in *)
     let expr, type_ = evaluate_expr stmt.expr in
     match stmt.type_ = type_ with
     | true ->
@@ -324,9 +319,7 @@ module Ir = struct
   (* Evaluate a statement expression ie `printf()`. *)
   and evaluate_expr_stmt (stmt : Ast.stmt_expr) : unit =
     let _ = evaluate_expr stmt in
-    need_long := false
-    (* let expr = evaluate_expr stmt in () *)
-    (* func_section := sprintf "%s    %s =w copy %s\n" !func_section (cons_tmpreg false) expr *)
+    need_long := false (* TODO: remove? *)
 
   (* Evalute a `mut` statement ie `x = x + 1`. *)
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
@@ -344,7 +337,7 @@ module Ir = struct
        need_long := true;
        let index, _ = evaluate_expr index in
        need_long := false;
-       (* let expr = evaluate_expr mutarr.expr in *)
+
        let expr, _ = evaluate_expr mutarr.expr in
        let array_reg = "%" ^ mutarr.id.lexeme in
        let added_reg = (cons_tmpreg false) in
@@ -355,7 +348,6 @@ module Ir = struct
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
     let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in
     func_section := sprintf "%s%s\n" !func_section looplbl;
-    (* let expr = evaluate_expr stmt.expr in *)
     let expr, _ = evaluate_expr stmt.expr in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
@@ -373,7 +365,6 @@ module Ir = struct
     let looplbl, loopstartlbl, loopendlbl = cons_loop_lbl () in
     evaluate_stmt stmt.init;
     func_section := sprintf "%s%s\n" !func_section looplbl;
-    (* let expr = evaluate_expr stmt.cond in *)
     let expr, _ = evaluate_expr stmt.cond in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
@@ -401,8 +392,8 @@ module Ir = struct
     match stmt with
     | Ast.Proc_def procdef -> assert false
     | Ast.Block block ->
-      let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                ~msg:"nested block statements are unimplemented" None in exit 1
+       let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                 ~msg:"nested block statements are unimplemented" None in exit 1
     | Ast.Let letstmt -> evaluate_let_stmt letstmt
     | Ast.Mut mutstmt -> evaluate_mut_stmt mutstmt
     | Ast.If ifstmt -> evaluate_if_stmt ifstmt
@@ -447,7 +438,7 @@ module Ir = struct
                  None in exit 1);
 
     (if qbe_type = "" && not user_did_ret then
-      func_section := sprintf "%s    ret\n" !func_section);
+       func_section := sprintf "%s    ret\n" !func_section);
 
     func_section := sprintf "%s}\n" !func_section;
     pop_scope ()
@@ -457,8 +448,8 @@ module Ir = struct
     match stmt with
     | Ast.Proc_def s -> evaluate_proc_def_stmt s
     | Ast.Let s ->
-      let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                ~msg:"global let statements are unimplemented" None in exit 1
+       let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                 ~msg:"global let statements are unimplemented" None in exit 1
 
   (* Entrypoint *)
   let generate_inter_lang (program : Ast.program) : string =

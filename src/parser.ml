@@ -64,6 +64,8 @@ module Parser = struct
                  ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
     | hd :: tl -> hd, tl
 
+  (* Helper function to expect a type and also retrive it as well
+   * as the rest of the tokens. *)
   let expect_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
     match tokens with
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
@@ -113,7 +115,7 @@ module Parser = struct
         | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
            let proc_call, tokens = parse_proc_call (id :: tl) in
            Ast.Proc_call proc_call, tokens
-        | Some {ttype = TokenType.LBracket; _} ->
+        | Some {ttype = TokenType.LBracket; _} -> (* Array indexing *)
            let _, tokens = expect tl TokenType.LBracket in
            let index, tokens = parse_expr tokens in
            let _, tokens = expect tokens TokenType.RBracket in
@@ -313,15 +315,16 @@ module Parser = struct
           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
           exit 1
 
-    and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-      let type_, tokens = expect_type tokens in
-      match peek tokens 0 with
-      | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
-        let _, tokens = expect tokens TokenType.LBracket in
-        let len, tokens = expect tokens TokenType.IntegerLiteral in
-        let _, tokens = expect tokens TokenType.RBracket in
-        TokenType.Array (type_, (int_of_string len.lexeme)), tokens
-      | _ -> type_, tokens (* Not array *)
+  (* Helper function to parse types *)
+  and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+    let type_, tokens = expect_type tokens in
+    match peek tokens 0 with
+    | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
+       let _, tokens = expect tokens TokenType.LBracket in
+       let len, tokens = expect tokens TokenType.IntegerLiteral in
+       let _, tokens = expect tokens TokenType.RBracket in
+       TokenType.Array (type_, (int_of_string len.lexeme)), tokens
+    | _ -> type_, tokens (* Not array *)
 
   (* Parses the statement of `let`. The `let` keyword
    * has already been consumed by higher order function `parse_stmt`. *)
@@ -331,8 +334,23 @@ module Parser = struct
     let type_, tokens = parse_type tokens in
     let _, tokens = expect tokens TokenType.Equals in
     let expr, tokens = parse_expr tokens in
-    let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; type_; expr}, tokens
+
+    match type_, expr with
+    | TokenType.Array (t, len), Ast.Term (Ast.IntCompoundLit (exprs, len')) when len <> len' ->
+       (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
+        | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
+           let exprs = exprs @ (List.init (len - len')
+                                  (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""}))) in
+           let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, len)) in
+           let _, tokens = expect tokens TokenType.Semicolon in
+           Ast.{id; type_; expr}, tokens
+        | _ -> (* The initialization is not 0 *)
+           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+                     ~msg:"array sizes do not match or it is not zero initialized" (Some (List.hd tokens)) in
+           exit 1)
+    | _ ->
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{id; type_; expr}, tokens
 
   (* Parses the if statement. *)
   and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =
@@ -375,37 +393,40 @@ module Parser = struct
     (* let _, tokens = expect tokens TokenType.Semicolon in *)
     Ast.{id; args}, tokens
 
+  (* Parses the `return` statement. *)
   and parse_ret_stmt (tokens : Token.t list) : Ast.ret_stmt * Token.t list =
     let expr, tokens = parse_expr tokens in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{expr}, tokens
 
+  (* Parses the `break` statement. *)
   and parse_break_stmt (tokens : Token.t list) : Token.t * Token.t list =
     let b, tokens = expect tokens TokenType.Break in
     let _, tokens = expect tokens TokenType.Semicolon in
     b, tokens
 
+  (* Parses the `for` statement. *)
   and parse_for_stmt (tokens : Token.t list) : Ast.for_stmt * Token.t list =
-   let rec parse_for_stmt' (tokens : Token.t list) : Ast.stmt * Ast.expr * Ast.stmt * Token.t list =
+    let rec parse_for_stmt' (tokens : Token.t list) : Ast.stmt * Ast.expr * Ast.stmt * Token.t list =
       let init, tokens = parse_stmt tokens in
       let cond, tokens = parse_expr tokens in
       let _, tokens = expect tokens TokenType.Semicolon in
       let after, tokens = parse_stmt tokens in
       init, cond, after, tokens in
 
-   match peek tokens 0 with
-   | Some {ttype = TokenType.LParen; _} ->
-      let _, tokens = expect tokens TokenType.LParen in
-      let init, cond, after, tokens = parse_for_stmt' tokens in
-      let _, tokens = expect tokens TokenType.RParen in
-      let _, tokens = expect tokens TokenType.LBrace in
-      let block, tokens = parse_block_stmt tokens in
-      Ast.{init; cond; after; block}, tokens
-   | _ ->
-      let init, cond, after, tokens = parse_for_stmt' tokens in
-      let _, tokens = expect tokens TokenType.LBrace in
-      let block, tokens = parse_block_stmt tokens in
-      Ast.{init; cond; after; block}, tokens
+    match peek tokens 0 with
+    | Some {ttype = TokenType.LParen; _} -> (* Allows for starting the loop with `(`. *)
+       let _, tokens = expect tokens TokenType.LParen in
+       let init, cond, after, tokens = parse_for_stmt' tokens in
+       let _, tokens = expect tokens TokenType.RParen in
+       let _, tokens = expect tokens TokenType.LBrace in
+       let block, tokens = parse_block_stmt tokens in
+       Ast.{init; cond; after; block}, tokens
+    | _ -> (* No parenthesis *)
+       let init, cond, after, tokens = parse_for_stmt' tokens in
+       let _, tokens = expect tokens TokenType.LBrace in
+       let block, tokens = parse_block_stmt tokens in
+       Ast.{init; cond; after; block}, tokens
 
   (* Given a list of tokens, will parse the "outer" statements
    * aka function defs, structs etc. *)

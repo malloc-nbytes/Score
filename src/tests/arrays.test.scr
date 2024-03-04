@@ -60,6 +60,17 @@ proc find_maj_elem(void): usize {
     return m;
 }
 
+proc test_zero_init(void): i32 {
+    printf("test_zero_init\n");
+
+    let arr: i32[5] = {0};
+    let m: i32 = 0;
+    for let i: i32 = 0; i < 5; i += 1; {
+        if arr[i] != 0 { m = 1; }
+    }
+    return m;
+}
+
 proc main(i: i32): i32 {
     if sum_arr() != 15 {
         printf("sum arr failed\n");
@@ -88,6 +99,11 @@ proc main(i: i32): i32 {
 
     if find_maj_elem() != 1 {
         printf("find_maj_elem failed\n");
+        exit(1);
+    }
+
+    if test_zero_init() != 0 {
+        printf("test_zero_init failed\n");
         exit(1);
     }
 
