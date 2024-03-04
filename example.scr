@@ -97,17 +97,15 @@ proc compare_strs(s1: str, s2: str): i32 {
 }
 
 -- Arrays example.
-proc find_majority_elem(void): usize {
-    let arr: i32[5] = {1,1,5,1,5};
-    let freqs: i32[6] = {0,0,0,0,0,0};
+proc find_majority_elem(arr: i32[], n: usize): i32 {
+    let freqs: i32[10] = {0};
 
-    -- It is encouraged to index arrays with `usize`.
-    for let i: usize = 0; i < 5; i += 1; {
+    for let i: i32 = 0; i < n; i += 1; {
         freqs[arr[i]] += 1;
     }
 
-    let m: usize = 0;
-    for let i: usize = 0; i < 6; i += 1; {
+    let m: i32 = 0;
+    for let i: i32 = 0; i < 10; i += 1; {
         if freqs[i] > freqs[m] {
             m = i;
         }
@@ -142,7 +140,11 @@ proc main(void): i32 {
         printf("the strings are not equal\n");
     }
 
-    printf("The majority element is: %d\n", find_majority_elem());
+    -- Intitialze arrays with len = `..` and
+    -- will be infered from the len of the rhs.
+    let arr: i32[..] = {1,1,1,5,5,1,5,5};
+    let arr_len: usize = 8;
+    printf("The majority element is: %d\n", find_majority_elem(arr, arr_len));
 
     return 0;
 }
