@@ -194,7 +194,7 @@ module Ir = struct
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-       func_section := sprintf "%s    %s =w loadw %s\n" !func_section (cons_tmpreg false) added_reg;
+       func_section := sprintf "%s    %s =l loadw %s\n" !func_section (cons_tmpreg false) added_reg;
        !tmpreg, TokenType.I32
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
@@ -206,10 +206,10 @@ module Ir = struct
        !tmpreg, TokenType.Str
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
        let array_reg = cons_tmpreg false in
-       func_section := sprintf "%s    %s =l alloc4 %d\n" !func_section array_reg (len * 4);
+       func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
        for i = 0 to len - 1 do
          (* let e = evaluate_expr (List.nth exprs i) in *)
-          let e, _ = evaluate_expr (List.nth exprs i) in
+         let e, _ = evaluate_expr (List.nth exprs i) in
          let added_reg = (cons_tmpreg false) in
          func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
          func_section := sprintf "%s    storew %s, %s\n" !func_section e added_reg;
