@@ -130,7 +130,7 @@ module Parser = struct
     | {ttype = TokenType.LBrace; _} :: tl ->
        let exprs, tokens = parse_comma_sep_exprs tl [] in
        let _, tokens = expect tokens TokenType.RBrace in
-       Ast.Term (Ast.IntCompoundLit (exprs, List.length exprs)), tokens
+       Ast.Term (Ast.IntCompoundLit (exprs, Some (List.length exprs))), tokens
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | hd :: _ ->
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
@@ -229,7 +229,7 @@ module Parser = struct
       | {ttype = TokenType.RParen; _} :: tl -> acc, tl
       | {ttype = TokenType.Identifier; _} as id :: tl ->
          let _, tokens = expect tl TokenType.Colon in
-         let type_, tokens = expect_type tokens in
+         let type_, tokens = parse_type tokens in
          let next, tokens = pop tokens in
          let acc = acc @ [id, type_] in
          (match next with
@@ -321,9 +321,14 @@ module Parser = struct
     match peek tokens 0 with
     | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
        let _, tokens = expect tokens TokenType.LBracket in
-       let len, tokens = expect tokens TokenType.IntegerLiteral in
+       (* let len, tokens = expect tokens TokenType.IntegerLiteral in *)
+       let len, tokens = match peek tokens 0 with
+         | Some {ttype = IntegerLiteral; _} ->
+            let len, tokens = expect tokens TokenType.IntegerLiteral in
+            Some len, tokens
+         | _ -> None, tokens in
        let _, tokens = expect tokens TokenType.RBracket in
-       TokenType.Array (type_, (int_of_string len.lexeme)), tokens
+       TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
     | _ -> type_, tokens (* Not array *)
 
   (* Parses the statement of `let`. The `let` keyword
@@ -336,12 +341,12 @@ module Parser = struct
     let expr, tokens = parse_expr tokens in
 
     match type_, expr with
-    | TokenType.Array (t, len), Ast.Term (Ast.IntCompoundLit (exprs, len')) when len <> len' ->
+    | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len <> len' ->
        (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
         | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
            let exprs = exprs @ (List.init (len - len')
                                   (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""}))) in
-           let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, len)) in
+           let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, (Some len))) in
            let _, tokens = expect tokens TokenType.Semicolon in
            Ast.{id; type_; expr}, tokens
         | _ -> (* The initialization is not 0 *)

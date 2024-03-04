@@ -26,7 +26,7 @@ module TokenType = struct
     | Str
     | Usize
     | Void
-    | Array of id_type * int
+    | Array of id_type * (int option)
     | Custom of string
 
   type t =

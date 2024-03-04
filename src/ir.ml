@@ -204,6 +204,7 @@ module Ir = struct
                          !data_section (cons_tmpreg true) strlit.lexeme;
        !tmpreg, TokenType.Str
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* stack-allocated arrays *)
+       let len = match len with | Some len -> len | _ -> failwith "empty array" in
        let array_reg = cons_tmpreg false in
        func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
        for i = 0 to len - 1 do
@@ -213,7 +214,7 @@ module Ir = struct
          func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);
          func_section := sprintf "%s    storew %s, %s\n" !func_section e added_reg;
        done;
-       array_reg, TokenType.Array (TokenType.I32, len)
+       array_reg, TokenType.Array (TokenType.I32, Some len)
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       let e, _ = evaluate_expr e in
@@ -267,8 +268,12 @@ module Ir = struct
   (* Evaluate the `let` statement. *)
   and evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     assert_id_not_in_scope stmt.id;
+    (if stmt.type_ = TokenType.Array (TokenType.I32, None) then
+      let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
+                ~msg:"declaring an array with len = 0 is not allowed" (Some stmt.id) in exit 1);
     add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
     let expr, type_ = evaluate_expr stmt.expr in
+
     match stmt.type_ = type_ with
     | true ->
        func_section := sprintf "%s    %%%s =%s copy %s\n"
