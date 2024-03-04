@@ -141,7 +141,8 @@ proc main(void): i32 {
     }
 
     -- Intitialze arrays with len = `..` and
-    -- will be infered from the len of the rhs.
+    -- will be infered from the len of the rhs
+    -- or just put the size explicitly.
     let arr: i32[..] = {1,1,1,5,5,1,5,5};
     let arr_len: usize = 8;
     printf("The majority element is: %d\n", find_majority_elem(arr, arr_len));
