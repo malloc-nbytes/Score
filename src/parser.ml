@@ -318,14 +318,17 @@ module Parser = struct
   (* Helper function to parse types *)
   and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
     let type_, tokens = expect_type tokens in
-    match peek tokens 0 with
+    match peek tokens 0 with (* Check for tokens after primitive type ie `[` *)
     | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
        let _, tokens = expect tokens TokenType.LBracket in
-       (* let len, tokens = expect tokens TokenType.IntegerLiteral in *)
-       let len, tokens = match peek tokens 0 with
-         | Some {ttype = IntegerLiteral; _} ->
+       let len, tokens = match peek tokens 0 with (* Allows for `[]` to be empty *)
+         | Some {ttype = TokenType.IntegerLiteral; _} ->
             let len, tokens = expect tokens TokenType.IntegerLiteral in
             Some len, tokens
+         | Some {ttype = TokenType.Period; _} ->
+            let _, tokens = expect tokens TokenType.Period in
+            let _, tokens = expect tokens TokenType.Period in
+            Some Token.{ttype = IntegerLiteral; lexeme = "-1"; r=0; c=0; fp=""}, tokens
          | _ -> None, tokens in
        let _, tokens = expect tokens TokenType.RBracket in
        TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
@@ -341,7 +344,8 @@ module Parser = struct
     let expr, tokens = parse_expr tokens in
 
     match type_, expr with
-    | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len <> len' ->
+    (* Array lens do not match *)
+    | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len <> len' && len <> -1 ->
        (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
         | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
            let exprs = exprs @ (List.init (len - len')
@@ -353,6 +357,12 @@ module Parser = struct
            let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                      ~msg:"array sizes do not match or it is not zero initialized" (Some (List.hd tokens)) in
            exit 1)
+    (* Cases where `..` is in array type *)
+    | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len = -1 ->
+       let _, tokens = expect tokens TokenType.Semicolon in
+       (* Array of id_type * (int option) *)
+       let type_ = TokenType.Array (t, Some (List.length exprs)) in
+       Ast.{id; type_; expr}, tokens
     | _ ->
        let _, tokens = expect tokens TokenType.Semicolon in
        Ast.{id; type_; expr}, tokens
