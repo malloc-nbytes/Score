@@ -24,6 +24,42 @@ proc small_arr(void): i32 {
     return arr[0] + arr[1];
 }
 
+proc index_wanother_arr(void): i32 {
+    printf("index_wanother_arr\n");
+    let arr: i32[5] = {1,2,3,4,5};
+    let index_arr: i32[2] = {0,4};
+    return arr[index_arr[0]] + arr[index_arr[1]];
+}
+
+proc index_arr_backwards(void): i32 {
+    printf("index_arr_backwards\n");
+    let arr: i32[3] = {1,2,3};
+    let s: i32 = 0;
+    for let i: usize = 2; i >= 0; i -= 1; {
+        s += arr[i];
+    }
+    return s;
+}
+
+proc find_maj_elem(void): usize {
+    printf("find_maj_elem\n");
+    let arr: i32[5] = {1,1,5,1,5};
+    let freqs: i32[6] = {0,0,0,0,0,0};
+
+    for let i: usize = 0; i < 5; i += 1; {
+        freqs[arr[i]] += 1;
+    }
+
+    let m: usize = 0;
+    for let i: usize = 0; i < 6; i += 1; {
+        if freqs[i] > freqs[m] {
+            m = i;
+        }
+    }
+
+    return m;
+}
+
 proc main(i: i32): i32 {
     if sum_arr() != 15 {
         printf("sum arr failed\n");
@@ -37,6 +73,21 @@ proc main(i: i32): i32 {
 
     if small_arr() != 3 {
         printf("small_arr failed\n");
+        exit(1);
+    }
+
+    if index_wanother_arr() != 6 {
+        printf("index_wanother_arr failed\n");
+        exit(1);
+    }
+
+    if index_arr_backwards() != 6 {
+        printf("index_arr_backwards() failed\n");
+        exit(1);
+    }
+
+    if find_maj_elem() != 1 {
+        printf("find_maj_elem failed\n");
         exit(1);
     }
 

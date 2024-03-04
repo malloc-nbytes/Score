@@ -186,9 +186,9 @@ module Ir = struct
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
        need_long := true;
-       let index, type_ = evaluate_expr index in
 
-       if type_ <> TokenType.Usize then printf "[WARN]: Indexing array not using `usize`\n";
+       let index, type_ = evaluate_expr index in
+       (* if type_ <> TokenType.Usize && not !evald_intlit then printf "[WARN]: Indexing array not using `usize`\n"; *)
 
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
@@ -198,7 +198,8 @@ module Ir = struct
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
        "%" ^ ident.lexeme, unrwap @@ snd (get_token_from_scope ident.lexeme)
-    | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
+    | Ast.Term Ast.Intlit intlit -> 
+       intlit.lexeme, TokenType.I32
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
