@@ -89,7 +89,8 @@ module Ir = struct
     Hashtbl.add s id (token, type_)
 
   let get_token_from_scope (id : string) : Token.t * (TokenType.id_type option) =
-    let rec get_token_from_scope' (scope : ((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) : Token.t * (TokenType.id_type option) =
+    let rec get_token_from_scope' (scope : ((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list)
+            : Token.t * (TokenType.id_type option) =
       match scope with
       | [] -> failwith "unreachable"
       | s :: ss ->
@@ -163,9 +164,9 @@ module Ir = struct
                  ~msg:(Printf.sprintf "unsupported binop `%s`" op.lexeme)
                  None in exit 1
 
-  let unrwap k = match k with
+  let unwrap k = match k with
     | Some v -> v
-    | None -> failwith "unrwapped with None value"
+    | None -> failwith "unwrapped with None value"
 
   (* Evaluate an expression. *)
   let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
@@ -182,9 +183,12 @@ module Ir = struct
        !tmpreg, lhs_type
     | Ast.Array_retrieval ar ->
        assert_token_in_scope ar.id;
+       let skip = match (unwrap (snd (get_token_from_scope ar.id.lexeme))) with
+         | TokenType.Str -> "1"
+         | _ -> "4" in
        let index = Ast.Binary {lhs = ar.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = skip; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
        need_long := true;
 
        let index, type_ = evaluate_expr index in
@@ -197,7 +201,7 @@ module Ir = struct
        !tmpreg, TokenType.I32
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
-       "%" ^ ident.lexeme, unrwap @@ snd (get_token_from_scope ident.lexeme)
+       "%" ^ ident.lexeme, unwrap @@ snd (get_token_from_scope ident.lexeme)
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
@@ -252,7 +256,7 @@ module Ir = struct
             else
               func_section := sprintf "%s    %s\n"
                                 !func_section cons_args);
-           !tmpreg, unrwap @@ snd (get_token_from_scope pc.id.lexeme))
+           !tmpreg, unwrap @@ snd (get_token_from_scope pc.id.lexeme))
 
   (* Evaluate the `return` statement. *)
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
@@ -332,7 +336,7 @@ module Ir = struct
     | Ast.Mut_var mutvar ->
        assert_token_in_scope mutvar.id;
        let expr, _ = evaluate_expr mutvar.expr in
-       let qbe_type = scoretype_to_qbetype @@ unrwap @@ snd (get_token_from_scope mutvar.id.lexeme) in
+       let qbe_type = scoretype_to_qbetype @@ unwrap @@ snd (get_token_from_scope mutvar.id.lexeme) in
        func_section := sprintf "%s    %%%s =%s copy %s\n" !func_section mutvar.id.lexeme qbe_type expr
     | Ast.Mut_arr mutarr ->
        assert_token_in_scope mutarr.id;
