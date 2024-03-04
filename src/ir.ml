@@ -171,26 +171,25 @@ module Ir = struct
   let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-       (* let lhs = evaluate_expr bin.lhs in
-       let rhs = evaluate_expr bin.rhs in *)
-       (* func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false)
-                         (if !need_long then "l" else "w") (evaluate_binop bin.op) lhs rhs; *)
-       (* !tmpreg *)
-       (* get token from scope and use the appropriate qbe type *)
-       let lhs, lhs_type = evaluate_expr bin.lhs in
-       let rhs, rhs_type = evaluate_expr bin.rhs in
-       let qbe_type = scoretype_to_qbetype lhs_type in
-       let qbe_type = if qbe_type = "" then scoretype_to_qbetype rhs_type else qbe_type in
-       let qbe_type = if !need_long then "l" else qbe_type in
-       func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false) qbe_type (evaluate_binop bin.op) lhs rhs;
-       !tmpreg, lhs_type
+        let lhs, lhs_type = evaluate_expr bin.lhs in
+        let rhs, rhs_type = evaluate_expr bin.rhs in
+        let qbe_type = scoretype_to_qbetype lhs_type in
+        let qbe_type = if qbe_type = "" then scoretype_to_qbetype rhs_type else qbe_type in
+        let qbe_type = if !need_long then "l" else qbe_type in
+        let added_reg = (cons_tmpreg false) in
+        func_section := sprintf "%s    %s =l extsw %s\n" !func_section added_reg lhs;
+        func_section := sprintf "%s    %s =%s %s %s, %s\n" !func_section (cons_tmpreg false) qbe_type (evaluate_binop bin.op) added_reg rhs;
+        !tmpreg, lhs_type
     | Ast.Array_retrieval ar ->
        assert_token_in_scope ar.id;
        let index = Ast.Binary {lhs = ar.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
        need_long := true;
-       let index, _ = evaluate_expr index in
+       let index, type_ = evaluate_expr index in
+
+       if type_ <> TokenType.Usize then printf "[WARN]: Indexing array not using `usize`\n";
+
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
@@ -274,14 +273,13 @@ module Ir = struct
     add_id_to_scope stmt.id.lexeme stmt.id @@ Some stmt.type_;
     (* let expr = evaluate_expr stmt.expr in *)
     let expr, type_ = evaluate_expr stmt.expr in
-    need_long := false;
     match stmt.type_ = type_ with
     | true ->
        func_section := sprintf "%s    %%%s =%s copy %s\n"
-                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
+                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr;
     | false ->
        func_section := sprintf "%s    %%%s =%s extsw %s\n"
-                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr
+                         !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr;
 
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : bool =
@@ -334,7 +332,6 @@ module Ir = struct
     match stmt with
     | Ast.Mut_var mutvar ->
        assert_token_in_scope mutvar.id;
-       (* let expr = evaluate_expr mutvar.expr in *)
        let expr, _ = evaluate_expr mutvar.expr in
        let qbe_type = scoretype_to_qbetype @@ unrwap @@ snd (get_token_from_scope mutvar.id.lexeme) in
        func_section := sprintf "%s    %%%s =%s copy %s\n" !func_section mutvar.id.lexeme qbe_type expr
