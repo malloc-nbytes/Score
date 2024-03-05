@@ -30,6 +30,7 @@ module Lexer = struct
    * and token type. Should be called before `lex_file ()` is called. *)
   let populate_keywords () : unit =
     let _ = Hashtbl.add keywords "i32"    @@ TokenType.Type TokenType.I32 in
+    let _ = Hashtbl.add keywords "u8"    @@ TokenType.Type TokenType.U8 in
     let _ = Hashtbl.add keywords "usize"    @@ TokenType.Type TokenType.Usize in
     let _ = Hashtbl.add keywords "str"    @@ TokenType.Type TokenType.Str in
     let _ = Hashtbl.add keywords "void"   @@ TokenType.Type TokenType.Void in
@@ -105,6 +106,7 @@ module Lexer = struct
        lex_file fp rest r (c+2+String.length comment)
 
     (* Multi-char symbols *)
+    | '\'' :: chara :: '\'' :: tl -> [Token.{lexeme = String.make 1 chara; ttype = Char; r; c; fp}] @ lex_file fp tl r (c+3)
     | ':' :: ':' :: tl -> [Token.{lexeme = "::"; ttype = DoubleColon; r; c; fp}]        @ lex_file fp tl r (c+2)
     | '-' :: '>' :: tl -> [Token.{lexeme = "->"; ttype = RightArrow; r; c; fp}]         @ lex_file fp tl r (c+2)
     | '=' :: '=' :: tl -> [Token.{lexeme = "=="; ttype = DoubleEquals; r; c; fp}]       @ lex_file fp tl r (c+2)

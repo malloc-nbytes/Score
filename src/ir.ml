@@ -132,6 +132,7 @@ module Ir = struct
     | TokenType.I32 -> "w"
     | TokenType.Str -> "l"
     | TokenType.Usize -> "l"
+    | TokenType.U8 -> "w"
     | TokenType.Array _ -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
@@ -185,6 +186,7 @@ module Ir = struct
        assert_token_in_scope ar.id;
        let skip = match (unwrap (snd (get_token_from_scope ar.id.lexeme))) with
          | TokenType.Str -> "1"
+         | TokenType.U8 -> "1"
          | _ -> "4" in
        let index = Ast.Binary {lhs = ar.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
@@ -203,6 +205,7 @@ module Ir = struct
        assert_token_in_scope ident;
        "%" ^ ident.lexeme, unwrap @@ snd (get_token_from_scope ident.lexeme)
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
+    | Ast.Term Ast.Char chara -> string_of_int (Char.code (chara.lexeme.[0])), TokenType.U8
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
@@ -212,7 +215,6 @@ module Ir = struct
        let array_reg = cons_tmpreg false in
        func_section := sprintf "%s    %s =l alloc8 %d\n" !func_section array_reg (len * 4);
        for i = 0 to len - 1 do
-         (* let e = evaluate_expr (List.nth exprs i) in *)
          let e, _ = evaluate_expr (List.nth exprs i) in
          let added_reg = (cons_tmpreg false) in
          func_section := sprintf "%s    %s =l add %s, %d\n" !func_section added_reg array_reg (i * 4);

@@ -3,6 +3,7 @@ module TokenType : sig
     | I32
     | Str
     | Usize
+    | U8
     | Void
     | Array of id_type * (int option)
     | Custom of string
@@ -13,6 +14,7 @@ module TokenType : sig
     | LParen
     | RParen
     | StringLiteral
+    | Char
     | IntegerLiteral
     | LBrace
     | RBrace

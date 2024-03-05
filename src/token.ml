@@ -25,6 +25,7 @@ module TokenType = struct
     | I32
     | Str
     | Usize
+    | U8
     | Void
     | Array of id_type * (int option)
     | Custom of string
@@ -35,6 +36,7 @@ module TokenType = struct
     | LParen
     | RParen
     | StringLiteral
+    | Char
     | IntegerLiteral
     | LBrace
     | RBrace
@@ -83,6 +85,7 @@ module TokenType = struct
     | LParen -> "LParen"
     | RParen -> "RParen"
     | StringLiteral -> "StringLiteral"
+    | Char -> "Char"
     | IntegerLiteral -> "IntegerLiteral"
     | LBrace -> "LBrace"
     | RBrace -> "RBrace"
@@ -96,6 +99,7 @@ module TokenType = struct
     (* | Type t -> "Type " ^ t *)
     | Type I32 -> "Type I32"
     | Type Usize -> "Usize"
+    | Type U8 -> "Type U8"
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
     | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
@@ -134,6 +138,7 @@ module TokenType = struct
       | I32 -> "I32"
       | Str -> "Str"
       | Usize -> "Usize"
+      | U8 -> "U8"
       | Void -> "Void"
       | Array _ -> "Array PRINTING UNIMPLEMENTED"
       | Custom s -> "Custom " ^ s

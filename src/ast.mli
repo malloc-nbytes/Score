@@ -92,6 +92,7 @@ module Ast : sig
     | Ident of Token.t
     | Intlit of Token.t
     | Strlit of Token.t
+    | Char of Token.t
     | IntCompoundLit of expr list * (int option)
 
   and proc_call_expr =

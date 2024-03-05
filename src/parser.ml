@@ -71,6 +71,7 @@ module Parser = struct
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Usize as hd)} :: tl -> hd, tl
+    | {ttype = TokenType.Type (TokenType.U8 as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
     | _ ->
        let t = List.hd tokens in
@@ -123,6 +124,7 @@ module Parser = struct
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
+    | {ttype = TokenType.Char; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in

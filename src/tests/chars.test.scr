@@ -1,0 +1,25 @@
+proc char_assign(void): u8 {
+    printf("char_assign\n");
+    let c: u8 = 'a';
+    return c;
+}
+
+proc subtract_char(void): i32 {
+    printf("subtract_char\n");
+    let c: u8 = 'a';
+    return c - '0';
+}
+
+proc main(void): i32 {
+    if char_assign() != 'a' {
+        printf("char_assign failed\n");
+        exit(1);
+    }
+
+    if subtract_char() != '1' {
+        printf("subtract_char failed\n");
+        exit(1);
+    }
+
+    return 0;
+}
