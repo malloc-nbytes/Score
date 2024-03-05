@@ -340,9 +340,12 @@ module Ir = struct
        func_section := sprintf "%s    %%%s =%s copy %s\n" !func_section mutvar.id.lexeme qbe_type expr
     | Ast.Mut_arr mutarr ->
        assert_token_in_scope mutarr.id;
+       let skip = match (unwrap (snd (get_token_from_scope mutarr.id.lexeme))) with
+         | TokenType.Str -> "1"
+         | _ -> "4" in
        let index = Ast.Binary {lhs = mutarr.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = "4"; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = skip; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
        need_long := true;
        let index, _ = evaluate_expr index in
        need_long := false;
