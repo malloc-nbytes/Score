@@ -195,11 +195,22 @@ module Ir = struct
        need_long := true;
        let index, type_ = evaluate_expr index in
 
+(*
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
        func_section := sprintf "%s    %s =l loadw %s\n" !func_section (cons_tmpreg false) added_reg;
        !tmpreg, TokenType.I32
+*)
+      (* if the arr_type is str, then mod the result by 256 *)
+      let array_reg = "%" ^ ar.id.lexeme in
+      let added_reg = (cons_tmpreg false) in
+      func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
+      (match arr_type with
+       | TokenType.Str -> func_section := sprintf "%s    %s =l loadsb %s\n" !func_section (cons_tmpreg false) added_reg
+       | TokenType.Char -> func_section := sprintf "%s    %s =l loadb %s\n" !func_section (cons_tmpreg false) added_reg
+       | _ -> func_section := sprintf "%s    %s =l loadw %s\n" !func_section (cons_tmpreg false) added_reg);
+      !tmpreg, arr_type
     | Ast.Term Ast.Ident ident ->
        assert_token_in_scope ident;
        "%" ^ ident.lexeme, unwrap @@ snd (get_token_from_scope ident.lexeme)
@@ -284,7 +295,7 @@ module Ir = struct
        func_section := sprintf "%s    %%%s =%s copy %s\n"
                          !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr;
     | false ->
-       func_section := sprintf "%s    %%%s =%s extsw %s\n"
+       func_section := sprintf "%s    %%%s =%s extsb %s\n" (* NOTE: this orginally was extsw *)
                          !func_section stmt.id.lexeme (scoretype_to_qbetype stmt.type_) expr;
 
   (* Evaluate a block statement. *)
