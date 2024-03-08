@@ -1,12 +1,12 @@
-proc char_assign(void): u8 {
+proc char_assign(void): char {
     printf("char_assign\n");
-    let c: u8 = 'a';
+    let c: char = 'a';
     return c;
 }
 
 proc subtract_char(void): i32 {
     printf("subtract_char\n");
-    let c: u8 = 'a';
+    let c: char = 'a';
     return c - '0';
 }
 

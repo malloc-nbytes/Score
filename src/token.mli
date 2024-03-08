@@ -3,7 +3,7 @@ module TokenType : sig
     | I32
     | Str
     | Usize
-    | U8
+    | Char
     | Void
     | Array of id_type * (int option)
     | Custom of string
@@ -14,7 +14,7 @@ module TokenType : sig
     | LParen
     | RParen
     | StringLiteral
-    | Char
+    | Character
     | IntegerLiteral
     | LBrace
     | RBrace
@@ -55,6 +55,7 @@ module TokenType : sig
     | AsteriskEquals
     | ForwardSlashEquals
     | PercentEquals
+    | Struct
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

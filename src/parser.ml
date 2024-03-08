@@ -71,7 +71,7 @@ module Parser = struct
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Usize as hd)} :: tl -> hd, tl
-    | {ttype = TokenType.Type (TokenType.U8 as hd)} :: tl -> hd, tl
+    | {ttype = TokenType.Type (TokenType.Char as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
     | _ ->
        let t = List.hd tokens in
@@ -124,7 +124,7 @@ module Parser = struct
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
-    | {ttype = TokenType.Char; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
+    | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
@@ -220,35 +220,37 @@ module Parser = struct
     let stmts, tokens = aux tokens [] in
     Ast.{stmts}, tokens
 
+  (* TokenType.RParen *)
+
+  and gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.id_type) list)
+          : (Token.t * TokenType.id_type) list * Token.t list =
+    match tokens with
+    | {ttype = TokenType.RParen; _} :: tl -> acc, tl
+    | {ttype = TokenType.Identifier; _} as id :: tl ->
+       let _, tokens = expect tl TokenType.Colon in
+       let type_, tokens = parse_type tokens in
+       let next, tokens = pop tokens in
+       let acc = acc @ [id, type_] in
+       (match next with
+        | {ttype = TokenType.RParen; _} -> acc, tokens
+        | {ttype = TokenType.Comma; _} -> gather_params tokens acc
+        | _ ->
+           let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ None in
+           exit 1)
+    | {ttype = TokenType.Type TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
+    | hd :: _ ->
+       let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ @@ Some hd in
+       exit 1
+    | [] ->
+       let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
+                 ~msg:"unterminated function definition" None in
+       exit 1
+
   (* Given a list of tokens, will parse a function definition
    * returning an Ast.node_stmt w/ constructor Ast.node_stmt_block.
    * Does not need to consume `proc` keyword as the caller
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
-    let rec gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.id_type) list)
-            : (Token.t * TokenType.id_type) list * Token.t list =
-      match tokens with
-      | {ttype = TokenType.RParen; _} :: tl -> acc, tl
-      | {ttype = TokenType.Identifier; _} as id :: tl ->
-         let _, tokens = expect tl TokenType.Colon in
-         let type_, tokens = parse_type tokens in
-         let next, tokens = pop tokens in
-         let acc = acc @ [id, type_] in
-         (match next with
-          | {ttype = TokenType.RParen; _} -> acc, tokens
-          | {ttype = TokenType.Comma; _} -> gather_params tokens acc
-          | _ ->
-             let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ None in
-             exit 1)
-      | {ttype = TokenType.Type TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
-      | hd :: _ ->
-         let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ @@ Some hd in
-         exit 1
-      | [] ->
-         let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
-                   ~msg:"unterminated function definition" None in
-         exit 1 in
-
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.LParen in
 
@@ -489,6 +491,18 @@ module Parser = struct
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                  ~msg:"unsupported token" @@ None in exit 1
 
+  let parse_struct_stmt (tokens : Token.t list) : Ast.struct_stmt * Token.t list =
+    let id, tokens = expect tokens TokenType.Identifier in
+    let _, tokens = expect tokens TokenType.Equals in
+    let _, tokens = expect tokens TokenType.LParen in
+    (* TODO: Currently, we want to gather the identifiers and
+     * their types. We have a function that already does this,
+     * however, it takes an expression enclosed in parenthesis.
+     * Eventually, we want to use braces instead. *)
+    let members, tokens = gather_params tokens [] in 
+    let _, tokens = expect tokens TokenType.Semicolon in
+    failwith "Todo"
+
   (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
@@ -496,8 +510,11 @@ module Parser = struct
        let stmt, tokens = parse_proc_def_stmt tl in
        Proc_def stmt, tokens
     | {ttype = TokenType.Let; _} :: tl ->
-       let stmt, toknes = parse_let_stmt tl in
+       let stmt, tokens = parse_let_stmt tl in
        Let stmt, tokens
+    | {ttype = TokenType.Struct; _} :: tl ->
+       let stmt, tokens = parse_struct_stmt tl in
+       Struct stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
        exit 1

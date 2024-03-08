@@ -132,7 +132,7 @@ module Ir = struct
     | TokenType.I32 -> "w"
     | TokenType.Str -> "l"
     | TokenType.Usize -> "l"
-    | TokenType.U8 -> "w"
+    | TokenType.Char -> "w"
     | TokenType.Array _ -> "l"
     | _ ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
@@ -184,17 +184,16 @@ module Ir = struct
        !tmpreg, lhs_type
     | Ast.Array_retrieval ar ->
        assert_token_in_scope ar.id;
-       let skip = match (unwrap (snd (get_token_from_scope ar.id.lexeme))) with
+       let arr_type = unwrap @@ snd (get_token_from_scope ar.id.lexeme) in
+       let skip = match arr_type with
          | TokenType.Str -> "1"
-         | TokenType.U8 -> "1"
+         | TokenType.Char -> "1"
          | _ -> "4" in
        let index = Ast.Binary {lhs = ar.index;
                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = skip; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
        need_long := true;
-
        let index, type_ = evaluate_expr index in
-       (* if type_ <> TokenType.Usize && not !evald_intlit then printf "[WARN]: Indexing array not using `usize`\n"; *)
 
        let array_reg = "%" ^ ar.id.lexeme in
        let added_reg = (cons_tmpreg false) in
@@ -205,7 +204,7 @@ module Ir = struct
        assert_token_in_scope ident;
        "%" ^ ident.lexeme, unwrap @@ snd (get_token_from_scope ident.lexeme)
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
-    | Ast.Term Ast.Char chara -> string_of_int (Char.code (chara.lexeme.[0])), TokenType.U8
+    | Ast.Term Ast.Char chara -> string_of_int (Char.code (chara.lexeme.[0])), TokenType.Char
     | Ast.Term Ast.Strlit strlit ->
        data_section := sprintf "%sdata %s = { b \"%s\", b 0 }\n"
                          !data_section (cons_tmpreg true) strlit.lexeme;
@@ -342,7 +341,8 @@ module Ir = struct
        func_section := sprintf "%s    %%%s =%s copy %s\n" !func_section mutvar.id.lexeme qbe_type expr
     | Ast.Mut_arr mutarr ->
        assert_token_in_scope mutarr.id;
-       let skip = match (unwrap (snd (get_token_from_scope mutarr.id.lexeme))) with
+       let arr_type = unwrap @@ snd (get_token_from_scope mutarr.id.lexeme) in
+       let skip = match arr_type with
          | TokenType.Str -> "1"
          | _ -> "4" in
        let index = Ast.Binary {lhs = mutarr.index;
@@ -356,7 +356,9 @@ module Ir = struct
        let array_reg = "%" ^ mutarr.id.lexeme in
        let added_reg = (cons_tmpreg false) in
        func_section := sprintf "%s    %s =l add %s, %s\n" !func_section added_reg array_reg index;
-       func_section := sprintf "%s    storew %s, %s\n" !func_section expr added_reg
+       (match arr_type with
+       | TokenType.Str -> func_section := sprintf "%s    storeb %s, %s\n" !func_section expr added_reg
+       | _ -> func_section := sprintf "%s    storew %s, %s\n" !func_section expr added_reg)
 
   (* Evaluate a `while` statement. *)
   and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
@@ -461,6 +463,7 @@ module Ir = struct
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def s -> evaluate_proc_def_stmt s
+    | Ast.Struct s -> failwith "ir.ml: struct todo"
     | Ast.Let s ->
        let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
                  ~msg:"global let statements are unimplemented" None in exit 1

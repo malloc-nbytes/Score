@@ -6,6 +6,7 @@ module Ast : sig
   and toplvl_stmt =
     | Proc_def of proc_def_stmt
     | Let of let_stmt
+    | Struct of struct_stmt
 
   and stmt =
     | Proc_def of proc_def_stmt
@@ -18,6 +19,11 @@ module Ast : sig
     | Ret of ret_stmt
     | Break of Token.t
     | For of for_stmt
+
+  and struct_stmt =
+    { id : Token.t
+    ; members : (Token.t * TokenType.id_type) list
+    }
 
   and block_stmt = { stmts : stmt list }
 
