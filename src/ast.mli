@@ -22,7 +22,7 @@ module Ast : sig
 
   and struct_stmt =
     { id : Token.t
-    ; members : (Token.t * TokenType.id_type) list
+    ; fields : (Token.t * TokenType.id_type) list
     }
 
   and block_stmt = { stmts : stmt list }

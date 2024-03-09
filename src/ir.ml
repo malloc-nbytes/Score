@@ -28,17 +28,6 @@ module Ir = struct
 
   let scope : (((string, (Token.t * (TokenType.id_type option))) Hashtbl.t) list) ref = ref @@ Hashtbl.create 20 :: []
 
-  (* struct_tbl is a hash table of hash tables. The outer hash table
-   * is a hash table of struct names to inner hash tables. The inner
-   * hash tables are hash tables of field names to how much to add to the pointer. ie
-   *   struct_tbl = {
-   *     "struct_name" = {
-   *       "field_name" = 0,
-   *       "field_name2" = 4
-   *     }
-   *   } *)
-  let struct_tbl : (string, ((string, int) Hashtbl.t ref)) Hashtbl.t ref = ref @@ Hashtbl.create 20
-
   let func_section   = ref ""
   let data_section   = ref ""
   let type_section   = ref ""
@@ -100,29 +89,6 @@ module Ir = struct
          else
            get_token_from_scope' ss in
     get_token_from_scope' !scope
-
-  let rec get_struct_field_offset (struct_name : string) (field_name : string) : int =
-    let struct_fields : (string, int) Hashtbl.t ref = Hashtbl.find !struct_tbl struct_name in
-    if Hashtbl.mem !struct_fields field_name then
-      Hashtbl.find !struct_fields field_name
-    else
-      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
-                ~msg:(Printf.sprintf "undeclared field `%s` in struct `%s`" field_name struct_name)
-                None in exit 1
-
-  let add_struct_to_struct_tbl (struct_name : string) (fields : (Token.t * TokenType.id_type) list) : unit =
-    (* Each member will have an increasing offset of +4 (+8 if it is a string) and starts at 0 *)
-    let struct_fields : (string, int) Hashtbl.t ref = ref @@ Hashtbl.create 20 in
-    let _ = List.fold_left (fun acc f ->
-              let id, type_ = (fst f).Token.lexeme, snd f in
-              Hashtbl.add !struct_fields id acc;
-              acc + (match type_ with
-                      | TokenType.I32 -> 4
-                      | TokenType.Str -> 8
-                      | TokenType.Char -> 4
-                      | _ -> failwith "unreachable")
-            ) 0 fields in
-    Hashtbl.add !struct_tbl struct_name struct_fields
 
   (* Construct a `if` label. *)
   let cons_if_lbl () : string * string * string =
@@ -324,7 +290,6 @@ module Ir = struct
   (* Evaluate a block statement. *)
   and evaluate_block_stmt (stmt : Ast.block_stmt) : bool =
     push_scope ();
-
     let user_did_ret = ref false in
     (List.iter (fun s ->
          (match s with
@@ -332,8 +297,6 @@ module Ir = struct
           | _ -> user_did_ret := false);
          evaluate_stmt s
        ) stmt.stmts);
-
-    (* List.iter evaluate_stmt stmt.stmts; *)
     pop_scope ();
     !user_did_ret
 
@@ -418,7 +381,7 @@ module Ir = struct
     let expr, _ = evaluate_expr stmt.cond in
     func_section := sprintf "%s    jnz %s, %s, %s\n" !func_section expr loopstartlbl loopendlbl;
     func_section := sprintf "%s%s\n" !func_section loopstartlbl;
-    let _ = evaluate_block_stmt stmt.block in
+    ignore(evaluate_block_stmt stmt.block);
     evaluate_stmt stmt.after;
 
     (* Currently, if you have instructions after `ret` in QBE, it
@@ -493,29 +456,12 @@ module Ir = struct
     func_section := sprintf "%s}\n" !func_section;
     pop_scope ()
 
-  (* type :fourfloats = { s, s, d, d } *)
-  (* type :abyteandmanywords = { b, w 100 } *)
-  let evaluate_struct_stmt (stmt : Ast.struct_stmt) : unit =
-    add_struct_to_struct_tbl stmt.id.lexeme stmt.members;
-    type_section := sprintf "%stype :%s = { " !type_section stmt.id.lexeme;
-    List.iter (fun f ->
-      let id, type_ = (fst f).Token.lexeme, snd f in
-      type_section := sprintf "%s%s, " !type_section (match type_ with
-                                                      | TokenType.I32 -> "w"
-                                                      | TokenType.Str -> "l"
-                                                      | TokenType.Char -> "w"
-                                                      | _ -> failwith "unreachable")
-      ) stmt.members;
-    type_section := sprintf "%s}\n" !type_section
-
   (* Evaluate a top-level statement. *)
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
-    | Ast.Proc_def s -> evaluate_proc_def_stmt s
-    | Ast.Struct s -> evaluate_struct_stmt s
-    | Ast.Let s ->
-       let _ = Err.err Err.Unimplemented __FILE__ __FUNCTION__
-                 ~msg:"global let statements are unimplemented" None in exit 1
+    | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
+    | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
+    | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
 
   (* Entrypoint *)
   let generate_inter_lang (program : Ast.program) : string =

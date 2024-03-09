@@ -499,9 +499,9 @@ module Parser = struct
      * their types. We have a function that already does this,
      * however, it takes an expression enclosed in parenthesis.
      * Eventually, we want to use braces instead. *)
-    let members, tokens = gather_params tokens [] in 
+    let fields, tokens = gather_params tokens [] in 
     let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{id; members}, tokens
+    Ast.{id; fields}, tokens
 
   (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
