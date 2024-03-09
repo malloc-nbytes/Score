@@ -20,22 +20,12 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
+open Utils
 open Token
 open Lexer
 open Parser
 open Ast
-open Ir
-
-let file_to_str filepath =
-  let ch = open_in_bin filepath in
-  let s = really_input_string ch (in_channel_length ch) in
-  close_in ch;
-  s
-
-let write_to_file filepath content =
-  let oc = open_out filepath in
-  let _ = Printf.fprintf oc "%s" content in
-  close_out oc
+open Ir2
 
 let run_qbe inter_code_fp output_fp should_del =
   let cmd = Printf.sprintf "qbe -o %s %s" output_fp inter_code_fp in
@@ -94,7 +84,7 @@ let () =
   let intermediate_code_fp = !outfp ^ ".ssa" in
   let asm_fp = !outfp ^ ".s" in
 
-  let data = file_to_str !infp in
+  let data = Utils.file_to_str !infp in
 
   (* Begin lexing *)
   Lexer.populate_keywords ();
@@ -106,11 +96,11 @@ let () =
   (* Ast.ast_dump program; (\* debug *\) *)
 
   (* Generate intermediate code for QBE *)
-  let code = Ir.generate_inter_lang program in
+  let code = Ir2.generate_inter_lang program in
   (* print_endline code; (\* debug *\) *)
 
   (* Run QBE on the intermediate code *)
-  let _ = write_to_file intermediate_code_fp code in
+  let _ = Utils.write_to_file intermediate_code_fp code in
   let _ = run_qbe intermediate_code_fp asm_fp !should_del in
 
   (* Create an executable *)
