@@ -1,37 +1,58 @@
 proc ret_str_in_ret_stmt(void): str {
-     return "foo";
+    printf("ret_str_in_ret_stmt\n");
+    return "foo";
 }
 
 proc ret_str_from_var(void): str {
-     let s: str = "foo";
-     return s;
+    printf("ret_str_from_var\n");
+    let s: str = "foo";
+    return s;
 }
 
 proc str_rets_wrong_str(void): str {
-     return "bar";
+    printf("str_rets_wrong_str\n");
+    return "bar";
 }
 
 proc test_str_eq(s: str): i32 {
-     let ans: str = "foo";
-     return strcmp(s, ans);
+    printf("test_str_eq\n");
+    let ans: str = "foo";
+    return strcmp(s, ans);
+}
+
+proc count_letter(c: char): i32 {
+    printf("count_letter\n");
+    let count: i32 = 0;
+    let s: str = "hello world";
+    for let i: usize = 0; s[i]; i += 1; {
+        if s[i] == c {
+            count += 1;
+        }
+    }
+    return count;
 }
 
 proc main(void): i32 {
-     if strcmp(ret_str_in_ret_stmt(), "foo") != 0 {
-         exit(1);
-     }
+    if strcmp(ret_str_in_ret_stmt(), "foo") != 0 {
+        exit(1);
+    }
 
-     if strcmp(ret_str_from_var(), "foo") != 0 {
-         exit(1);
-     }
+    if strcmp(ret_str_from_var(), "foo") != 0 {
+        exit(1);
+    }
 
-     if strcmp(str_rets_wrong_str(), "foo") == 0 {
-         exit(1);
-     }
+    if strcmp(str_rets_wrong_str(), "foo") == 0 {
+        exit(1);
+    }
 
-     if test_str_eq("foo") != 0 {
-         exit(1);
-     }
+    if test_str_eq("foo") != 0 {
+        exit(1);
+    }
+
+    if count_letter('l') != 3 {
+        printf("count_letter failed\n");
+        exit(1);
+    }
 
      return 0;
 }
