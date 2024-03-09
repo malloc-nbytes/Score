@@ -501,7 +501,7 @@ module Parser = struct
      * Eventually, we want to use braces instead. *)
     let members, tokens = gather_params tokens [] in 
     let _, tokens = expect tokens TokenType.Semicolon in
-    failwith "Todo"
+    Ast.{id; members}, tokens
 
   (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
