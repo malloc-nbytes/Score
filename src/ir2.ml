@@ -7,6 +7,7 @@ module Ir2 = struct
 
   class label_maker =
     let init_reg = "__SCORE_REG" in
+
     object (self)
       val mutable reg = init_reg
       val mutable regc = 0
@@ -91,9 +92,21 @@ module Ir2 = struct
 
   (* --- Evaluations --- *)
 
+  let evaluate_binop = function
+    | TokenType.Plus -> "add"
+    | TokenType.Minus -> "sub"
+    | TokenType.Asterisk -> "mul"
+    | TokenType.ForwardSlash -> "div"
+    | TokenType.PlusEquals -> "add"
+    | TokenType.MinusEquals -> "add"
+    | _ -> failwith "evaluate_binop: unimplemented binop"
+
   let rec evaluate_expr (expr : Ast.expr) : string =
     match expr with
-    | Ast.Binary bin -> assert false
+    | Ast.Binary bin ->
+       let lhs = evaluate_expr bin.lhs in
+       let rhs = evaluate_expr bin.rhs in
+       assert false
     | Ast.Array_retrieval ar -> assert false
     | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme
