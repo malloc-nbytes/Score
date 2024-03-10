@@ -39,6 +39,7 @@ module Ir2 = struct
 
   let scr_to_qbe_type = function
     | TokenType.I32 -> "w"
+    | TokenType.Usize -> "l"
     | TokenType.Str -> "l"
     | TokenType.Char -> "b"
     | _ -> failwith "scr_to_qbe_type: invalid type"
@@ -97,19 +98,34 @@ module Ir2 = struct
     | TokenType.Minus -> "sub"
     | TokenType.Asterisk -> "mul"
     | TokenType.ForwardSlash -> "div"
+    | TokenType.DoubleEquals -> "ceqw"
+    | TokenType.LessThan -> "csltw"
+    | TokenType.GreaterThan -> "csgew"
+    | TokenType.NotEqual -> "cnew"
+    | TokenType.Percent -> "rem"
+    | TokenType.DoubleAmpersand -> "and"
+    | TokenType.DoublePipe -> "or"
     | TokenType.PlusEquals -> "add"
-    | TokenType.MinusEquals -> "add"
+    | TokenType.MinusEquals -> "sub"
+    | TokenType.AsteriskEquals -> "mul"
+    | TokenType.PercentEquals -> "rem"
     | _ -> failwith "evaluate_binop: unimplemented binop"
 
-  let rec evaluate_expr (expr : Ast.expr) : string =
+  let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-       let lhs = evaluate_expr bin.lhs in
-       let rhs = evaluate_expr bin.rhs in
-       assert false
+       let lhs, lhs_type = evaluate_expr bin.lhs in
+       let rhs, rhs_type = evaluate_expr bin.rhs in
+       ignore lhs_type;
+       ignore rhs_type;
+       let instr = evaluate_binop bin.op.ttype in
+       let reg = lm#new_reg in
+       __emit_instr reg TokenType.I32 lhs instr;
+       __emit_instr reg TokenType.I32 rhs instr;
+       reg, TokenType.I32
     | Ast.Array_retrieval ar -> assert false
-    | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme
-    | Ast.Term Ast.Intlit intlit -> intlit.lexeme
+    | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme, TokenType.I32
+    | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.I32
     | Ast.Term Ast.Char chara -> assert false
     | Ast.Term Ast.Strlit strlit -> assert false
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
@@ -117,12 +133,21 @@ module Ir2 = struct
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
-    and type_ = stmt.type_
-    and expr = evaluate_expr stmt.expr in
+    and id_lexeme = stmt.id.lexeme
+    and type_ = stmt.type_ in
+
+    Scope.assert_id_not_in_scope id_lexeme;
+    Scope.add_id_to_scope id_lexeme id type_;
+
+    let expr, expr_type = evaluate_expr stmt.expr in
+    ignore expr_type;
+
     emit_copy id.lexeme type_ expr
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
-    List.iter evaluate_stmt bs.stmts
+    Scope.push ();
+    List.iter evaluate_stmt bs.stmts;
+    Scope.pop ()
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     state.cur_proc_id <- pd.id.lexeme, pd.rettype;
@@ -131,7 +156,8 @@ module Ir2 = struct
     emit_rbrace ()
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
-    let expr = evaluate_expr stmt.expr in
+    let expr, expr_type = evaluate_expr stmt.expr in
+    ignore expr_type;
     emit_ret expr
 
   and evaluate_stmt = function

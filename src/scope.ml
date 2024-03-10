@@ -9,11 +9,17 @@ module Scope = struct
 
   let pop () : unit = tbl := List.tl !tbl
 
-  let assert_id_not_in_scope (token : Token.t) : unit =
+  let assert_token_not_in_scope (token : Token.t) : unit =
     if List.exists (fun s -> Hashtbl.mem s token.lexeme) !tbl then
       let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
                 ~msg:(Printf.sprintf "redeclared identifier `%s`" token.lexeme)
                 (Some token) in exit 1
+
+  let assert_id_not_in_scope (id : string) : unit =
+    if List.exists (fun s -> Hashtbl.mem s id) !tbl then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared identifier `%s`" id)
+                None in exit 1
 
   let assert_token_in_scope (token : Token.t) : unit =
     if not (List.exists (fun s -> Hashtbl.mem s token.lexeme) !tbl) then
