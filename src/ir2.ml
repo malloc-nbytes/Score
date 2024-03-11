@@ -12,8 +12,8 @@ module Ir2 = struct
       val mutable reg = init_reg
       val mutable regc = 0
 
-      method new_reg =
-        let ret = reg ^ string_of_int regc in
+      method new_reg (global : bool) : string =
+        let ret = if global then "$" else "%" ^  reg ^ string_of_int regc in
         regc <- regc+1;
         ret
     end
@@ -36,11 +36,19 @@ module Ir2 = struct
 
   (* --- Helpers --- *)
 
+  let scr_type_to_bytes = function
+    | TokenType.I32 -> "4"
+    | TokenType.Usize -> "8"
+    | TokenType.Str -> "8"
+    | TokenType.Char -> "1"
+    | _ -> failwith "scr_type_to_bytes: invalid qbe type"
+
   let scr_to_qbe_type = function
     | TokenType.I32 -> "w"
     | TokenType.Usize -> "l"
     | TokenType.Str -> "l"
     | TokenType.Char -> "b"
+    | TokenType.Number -> "w"
     | _ -> failwith "scr_to_qbe_type: invalid type"
 
   (* --- Emissions --- *)
@@ -80,23 +88,12 @@ module Ir2 = struct
     state.func_section <-
       sprintf "%s    %%%s =l alloc16 %s\n" state.func_section emitted_id bytes
 
-  let emit_storew (value : string) (loc : string) : unit =
+  let emit_store (value : string) (loc : string) (type_ : TokenType.id_type) : unit =
     let emitted_value = value
-    and emitted_location = loc in
+    and emitted_location = loc
+    and emitted_type = scr_to_qbe_type type_ in
     state.func_section <-
-      sprintf "%s    storew %s, %s\n" state.func_section emitted_value emitted_location
-
-  let emit_storel (value : string) (loc : string) : unit =
-    let emitted_value = value
-    and emitted_location = loc in
-    state.func_section <-
-      sprintf "%s    storel %s, %s\n" state.func_section emitted_value emitted_location
-
-  let emit_storeb (value : string) (loc : string) : unit =
-    let emitted_value = value
-    and emitted_location = loc in
-    state.func_section <-
-      sprintf "%s    storeb %s, %s\n" state.func_section emitted_value emitted_location
+      sprintf "%s    store%s %s, %s\n" state.func_section emitted_type emitted_value emitted_location
 
   let __emit_instr (id : string) (type_ : TokenType.id_type) (rhs : string) (instr : string) : unit =
     let emitted_id = id
@@ -119,6 +116,17 @@ module Ir2 = struct
   let emit_assignment (lhs : string) (type_ : TokenType.id_type) (rhs : string) : unit =
     let emitted_type = scr_to_qbe_type type_ in
     state.func_section <- sprintf "%s    %s =%s %s\n" state.func_section lhs emitted_type rhs
+
+  let emit_binop (id : string) (type_ : TokenType.id_type) (left : string) (right : string) (binop : string) : unit =
+    let emitted_id = id
+    and emitted_type = scr_to_qbe_type type_
+    and emitted_left = left
+    and emitted_right = right
+    and emitted_binop = binop in
+    state.func_section <-
+      sprintf "%s    %s =%s %s %s, %s\n"
+        state.func_section emitted_id emitted_type emitted_binop emitted_left emitted_right
+
 
   let emit_ret (value : string) : unit =
     state.func_section <- sprintf "%s    ret %s\n" state.func_section value
@@ -149,14 +157,21 @@ module Ir2 = struct
        let lhs, lhs_type = evaluate_expr bin.lhs in
        let rhs, rhs_type = evaluate_expr bin.rhs in
        let instr = evaluate_binop bin.op.ttype in
-       let reg = lm#new_reg in
-       ignore instr;
-       ignore reg;
-       (match lhs_type, rhs_type with
-        | TokenType.I32, TokenType.I32 -> assert false
-        | TokenType.Usize, TokenType.Usize -> assert false
-        | TokenType.I32, TokenType.Usize -> assert false
-        | _ -> failwith "evaluate_let_stmt: type mismatch")
+       let reg = lm#new_reg false in
+
+       if lhs_type = rhs_type then
+         (* NOTE: can use either lhs_type or rhs_type *)
+         let _ = emit_binop reg lhs_type lhs rhs instr in
+         reg, lhs_type
+       else
+         (match lhs_type, rhs_type with
+          | TokenType.I32, TokenType.Usize -> assert false
+          | TokenType.I32, TokenType.Number -> assert false
+          | TokenType.Usize, TokenType.Number -> assert false
+          | _ ->
+             let t1 = TokenType.id_type_to_string lhs_type
+             and t2 = TokenType.id_type_to_string rhs_type in
+             failwith @@ sprintf "evaluate_let_stmt: type mismatch: %s :: %s" t1 t2)
 
     | Ast.Array_retrieval ar -> assert false
     | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme, snd (Scope.get_token_from_scope ident.lexeme)
@@ -175,12 +190,21 @@ module Ir2 = struct
     Scope.add_id_to_scope id_lexeme id stmt_type;
 
     let expr, expr_type = evaluate_expr stmt.expr in
+    let bytes = scr_type_to_bytes stmt_type in
 
-    match stmt_type, expr_type with
-    | TokenType.I32, TokenType.I32 -> emit_copy id_lexeme stmt_type expr
-    | TokenType.Usize, TokenType.Usize -> emit_copy id_lexeme stmt_type expr
-    | TokenType.I32, TokenType.Usize -> emit_copy id_lexeme stmt_type expr
-    | _ -> failwith "evaluate_let_stmt: type mismatch"
+    if stmt_type = expr_type then
+      (* emit_copy id_lexeme stmt_type expr *)
+      let _ = emit_stack_alloc4 id_lexeme bytes in
+      emit_store expr 0 stmt_type
+    else
+      (match stmt_type, expr_type with
+       | TokenType.I32, TokenType.Usize -> emit_copy id_lexeme stmt_type expr
+       | TokenType.I32, TokenType.Number -> emit_copy id_lexeme stmt_type expr
+       | TokenType.Usize, TokenType.Number -> emit_copy id_lexeme stmt_type expr
+       | _ ->
+          let t1 = TokenType.id_type_to_string stmt_type
+          and t2 = TokenType.id_type_to_string expr_type in
+          failwith @@ sprintf "evaluate_let_stmt: type mismatch: %s %s" t1 t2)
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();
