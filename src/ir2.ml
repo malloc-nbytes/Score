@@ -185,6 +185,7 @@ module Ir2 = struct
 
     | Ast.Array_retrieval ar -> assert false
     | Ast.Term Ast.Ident ident ->
+       Scope.assert_token_in_scope ident;
        let reg = lm#new_reg false in
        let stored_type = snd (Scope.get_token_from_scope ident.lexeme) in
        emit_load reg stored_type ident.lexeme;
@@ -193,22 +194,17 @@ module Ir2 = struct
        intlit.lexeme, TokenType.Number
     | Ast.Cast (cast_type, expr) ->
        let expr, expr_type = evaluate_expr expr in
-       if cast_type = expr_type then
-         expr, cast_type
+       if cast_type = expr_type then expr, cast_type
        else
          let reg = lm#new_reg false in
          (match cast_type, expr_type with
-          | TokenType.I32, TokenType.Usize ->
-             emit_extsh reg cast_type expr;
-             reg, cast_type
-          | TokenType.Usize, TokenType.I32 ->
-             emit_extsw reg cast_type expr;
-             reg, cast_type
+          | TokenType.I32, TokenType.Usize -> emit_extsh reg cast_type expr; reg, cast_type
+          | TokenType.Usize, TokenType.I32 -> emit_extsw reg cast_type expr; reg, cast_type
           | _ -> failwith @@ sprintf "%s: cast error" __FUNCTION__)
     | Ast.Term Ast.Char chara -> assert false
     | Ast.Term Ast.Strlit strlit -> assert false
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
-    | Ast.Proc_call pc -> assert false
+    | Ast.Proc_call pc -> failwith "todo"
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
@@ -216,7 +212,6 @@ module Ir2 = struct
     and stmt_type = stmt.type_ in
 
     Scope.assert_id_not_in_scope id_lexeme;
-    Scope.add_id_to_scope id_lexeme id stmt_type;
 
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = scr_type_to_bytes stmt_type in
@@ -225,17 +220,13 @@ module Ir2 = struct
        || (stmt_type == TokenType.I32 && expr_type = TokenType.Number)
        || (stmt_type == TokenType.Usize && expr_type = TokenType.Number)
     then
+      let _ = Scope.add_id_to_scope id_lexeme id stmt_type in
       let _ = emit_stack_alloc4 id_lexeme bytes in
       emit_store expr ("%" ^ id_lexeme) stmt_type
     else
-      (match stmt_type, expr_type with
-       | TokenType.I32, TokenType.Usize -> emit_copy id_lexeme stmt_type expr
-       | TokenType.I32, TokenType.Number -> emit_copy id_lexeme stmt_type expr
-       | TokenType.Usize, TokenType.Number -> emit_copy id_lexeme stmt_type expr
-       | _ ->
-          let t1 = TokenType.id_type_to_string stmt_type
-          and t2 = TokenType.id_type_to_string expr_type in
-          failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__ t1 t2)
+      let t1 = TokenType.id_type_to_string stmt_type
+      and t2 = TokenType.id_type_to_string expr_type in
+      failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__ t1 t2
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();
