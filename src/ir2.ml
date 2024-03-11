@@ -107,7 +107,7 @@ module Ir2 = struct
     let emitted_id = id
     and emitted_type = scr_to_qbe_type type_ in
     state.func_section <-
-      sprintf "%s    %%%s =%s %s %s\n" state.func_section emitted_id emitted_type instr rhs
+      sprintf "%s    %s =%s %s %s\n" state.func_section emitted_id emitted_type instr rhs
 
   let emit_rbrace () : unit =
     state.func_section <- sprintf "%s}\n" state.func_section
@@ -120,6 +120,9 @@ module Ir2 = struct
 
   let emit_extsw (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
     __emit_instr id type_ rhs "extsw"
+
+  let emit_extsh (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
+    __emit_instr id type_ rhs "extsh"
 
   let emit_assignment (lhs : string) (type_ : TokenType.id_type) (rhs : string) : unit =
     let emitted_type = scr_to_qbe_type type_ in
@@ -178,7 +181,7 @@ module Ir2 = struct
           | _ ->
              let t1 = TokenType.id_type_to_string lhs_type
              and t2 = TokenType.id_type_to_string rhs_type in
-             failwith @@ sprintf "evaluate_let_stmt: type mismatch: %s :: %s" t1 t2)
+             failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__ t1 t2)
 
     | Ast.Array_retrieval ar -> assert false
     | Ast.Term Ast.Ident ident ->
@@ -186,8 +189,22 @@ module Ir2 = struct
        let stored_type = snd (Scope.get_token_from_scope ident.lexeme) in
        emit_load reg stored_type ident.lexeme;
        reg, stored_type
-    (* "%" ^ ident.lexeme, snd (Scope.get_token_from_scope ident.lexeme) *)
-    | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.Number
+    | Ast.Term Ast.Intlit intlit ->
+       intlit.lexeme, TokenType.Number
+    | Ast.Cast (cast_type, expr) ->
+       let expr, expr_type = evaluate_expr expr in
+       if cast_type = expr_type then
+         expr, cast_type
+       else
+         let reg = lm#new_reg false in
+         (match cast_type, expr_type with
+          | TokenType.I32, TokenType.Usize ->
+             emit_extsh reg cast_type expr;
+             reg, cast_type
+          | TokenType.Usize, TokenType.I32 ->
+             emit_extsw reg cast_type expr;
+             reg, cast_type
+          | _ -> failwith @@ sprintf "%s: cast error" __FUNCTION__)
     | Ast.Term Ast.Char chara -> assert false
     | Ast.Term Ast.Strlit strlit -> assert false
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
@@ -218,7 +235,7 @@ module Ir2 = struct
        | _ ->
           let t1 = TokenType.id_type_to_string stmt_type
           and t2 = TokenType.id_type_to_string expr_type in
-          failwith @@ sprintf "evaluate_let_stmt: type mismatch: %s %s" t1 t2)
+          failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__ t1 t2)
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();

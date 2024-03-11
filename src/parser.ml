@@ -122,6 +122,9 @@ module Parser = struct
            let _, tokens = expect tokens TokenType.RBracket in
            Ast.Array_retrieval {id; index}, tokens
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
+    | {ttype = TokenType.Type casted_type;} :: tl ->
+       let expr, tokens = parse_expr tl in
+       Ast.Cast (casted_type, expr), tokens
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
@@ -499,7 +502,7 @@ module Parser = struct
      * their types. We have a function that already does this,
      * however, it takes an expression enclosed in parenthesis.
      * Eventually, we want to use braces instead. *)
-    let fields, tokens = gather_params tokens [] in 
+    let fields, tokens = gather_params tokens [] in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; fields}, tokens
 
