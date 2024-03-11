@@ -95,6 +95,14 @@ module Ir2 = struct
     state.func_section <-
       sprintf "%s    store%s %s, %s\n" state.func_section emitted_type emitted_value emitted_location
 
+  let emit_load (id : string) (type_ : TokenType.id_type) (loc : string) : unit =
+    let emitted_id = id
+    and emitted_type = scr_to_qbe_type type_
+    and emitted_loc = loc in
+    state.func_section <-
+      sprintf "%s    %s =%s load%s %%%s\n"
+        state.func_section emitted_id emitted_type emitted_type emitted_loc
+
   let __emit_instr (id : string) (type_ : TokenType.id_type) (rhs : string) (instr : string) : unit =
     let emitted_id = id
     and emitted_type = scr_to_qbe_type type_ in
@@ -126,7 +134,6 @@ module Ir2 = struct
     state.func_section <-
       sprintf "%s    %s =%s %s %s, %s\n"
         state.func_section emitted_id emitted_type emitted_binop emitted_left emitted_right
-
 
   let emit_ret (value : string) : unit =
     state.func_section <- sprintf "%s    ret %s\n" state.func_section value
@@ -174,7 +181,12 @@ module Ir2 = struct
              failwith @@ sprintf "evaluate_let_stmt: type mismatch: %s :: %s" t1 t2)
 
     | Ast.Array_retrieval ar -> assert false
-    | Ast.Term Ast.Ident ident -> "%" ^ ident.lexeme, snd (Scope.get_token_from_scope ident.lexeme)
+    | Ast.Term Ast.Ident ident ->
+       let reg = lm#new_reg false in
+       let stored_type = snd (Scope.get_token_from_scope ident.lexeme) in
+       emit_load reg stored_type ident.lexeme;
+       reg, stored_type
+    (* "%" ^ ident.lexeme, snd (Scope.get_token_from_scope ident.lexeme) *)
     | Ast.Term Ast.Intlit intlit -> intlit.lexeme, TokenType.Number
     | Ast.Term Ast.Char chara -> assert false
     | Ast.Term Ast.Strlit strlit -> assert false
@@ -192,10 +204,12 @@ module Ir2 = struct
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = scr_type_to_bytes stmt_type in
 
-    if stmt_type = expr_type then
-      (* emit_copy id_lexeme stmt_type expr *)
+    if (stmt_type = expr_type)
+       || (stmt_type == TokenType.I32 && expr_type = TokenType.Number)
+       || (stmt_type == TokenType.Usize && expr_type = TokenType.Number)
+    then
       let _ = emit_stack_alloc4 id_lexeme bytes in
-      emit_store expr 0 stmt_type
+      emit_store expr ("%" ^ id_lexeme) stmt_type
     else
       (match stmt_type, expr_type with
        | TokenType.I32, TokenType.Usize -> emit_copy id_lexeme stmt_type expr
