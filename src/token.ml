@@ -27,6 +27,7 @@ module TokenType = struct
     | Usize
     | Char
     | Void
+    | Number
     | Array of id_type * (int option)
     | Custom of string
 
@@ -135,6 +136,7 @@ module TokenType = struct
     | ForwardSlashEquals -> "ForwardSlashEquals"
     | PercentEquals -> "PercentEquals"
     | Struct -> "Struct"
+    | Type Number -> "Number (SHOULD NOT BE USED)"
 
     let id_type_to_string = function
       | I32 -> "I32"
@@ -142,6 +144,7 @@ module TokenType = struct
       | Usize -> "Usize"
       | Char -> "Char"
       | Void -> "Void"
+      | Number -> "Number"
       | Array _ -> "Array PRINTING UNIMPLEMENTED"
       | Custom s -> "Custom " ^ s
 

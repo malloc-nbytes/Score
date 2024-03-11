@@ -5,6 +5,7 @@ module TokenType : sig
     | Usize
     | Char
     | Void
+    | Number
     | Array of id_type * (int option)
     | Custom of string
 
