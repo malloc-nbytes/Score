@@ -145,6 +145,17 @@ module Ir2 = struct
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
+
+    (* Make sure params are not in scope.
+     * Add the params to the scope. *)
+    List.iter (fun param ->
+        let id = (fst param)
+        and param_type = (snd param)
+        and id_lexeme = (fst param).Token.lexeme in
+        Scope.assert_token_not_in_scope id;
+        Scope.add_id_to_scope id_lexeme id param_type
+      ) pd.params;
+
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
     evaluate_block_stmt pd.block;
     Emit.rbrace ()
