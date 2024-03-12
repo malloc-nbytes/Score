@@ -77,20 +77,29 @@ module Ir2 = struct
                           (TokenType.id_type_to_string rhs_type)
 
     | Ast.Array_retrieval ar -> assert false
+
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
        let reg = lm#new_reg false in
        let stored_var = Scope.get_token_from_scope ident.lexeme in
        let stored_type = stored_var.type_ in
-       (* Emit.load reg stored_type ident.lexeme; *)
        if stored_var.stack_allocd then
          Emit.load reg stored_type ident.lexeme
        else
          Emit.copy reg stored_type ("%" ^ ident.lexeme);
        reg, stored_type
+
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
-    | Ast.Reference r -> failwith "evaluate_expr: Ast.Reference unimplemented"
+
+    | Ast.Reference expr ->
+        let reg = lm#new_reg false in
+        let expr, expr_type = evaluate_expr expr in
+(*
+        Emit.copy reg expr_type expr;
+*)
+        reg, TokenType.Pointer expr_type
+
     | Ast.Cast (cast_type, expr) ->
        let expr, expr_type = evaluate_expr expr in
        if cast_type = expr_type then expr, cast_type
@@ -100,12 +109,16 @@ module Ir2 = struct
           | TokenType.I32, TokenType.Usize -> Emit.extsh reg cast_type expr; reg, cast_type
           | TokenType.Usize, TokenType.I32 -> Emit.extsw reg cast_type expr; reg, cast_type
           | _ -> failwith @@ sprintf "%s: cast error" __FUNCTION__)
+
     | Ast.Term Ast.Char chara -> assert false
+
     | Ast.Term Ast.Strlit strlit ->
        let reg = lm#new_reg true in
        Emit.string_in_data_section reg strlit.lexeme;
        reg, TokenType.Str
+
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
+
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
@@ -119,10 +132,12 @@ module Ir2 = struct
            Emit.proc_call_wassign reg "printf" args TokenType.I32;
            reg, TokenType.I32
         | "exit" -> assert false
-        | _ ->
-           Scope.assert_token_in_scope pc.id;
+        | _ -> (* user-defined proc *)
+           Scope.assert_proc_in_tbl pc.id.lexeme;
+           let proc_rettype = Scope.get_proc_rettype_from_tbl pc.id.lexeme in
+           (* TODO: assert proc params match *)
            let reg = lm#new_reg false in
-           Emit.proc_call_wassign reg pc.id.lexeme args TokenType.I32; (* TODO: fix rettype *)
+           Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype;
            reg, TokenType.I32)
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
@@ -150,7 +165,7 @@ module Ir2 = struct
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
-    Scope.add_id_to_scope pd.id.lexeme pd.id pd.rettype false;
+    Scope.add_proc_to_tbl pd;
 
     Scope.push ();
     (* Make sure params are not in scope.
@@ -160,7 +175,6 @@ module Ir2 = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
-        (* Scope.add_id_to_scope id_lexeme id param_type false *)
         match param_type with
         | TokenType.I32 | TokenType.Usize -> Scope.add_id_to_scope id_lexeme id param_type false
         | TokenType.Pointer _ -> Scope.add_id_to_scope id_lexeme id param_type true

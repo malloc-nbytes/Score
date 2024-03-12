@@ -105,18 +105,6 @@ module Scope = struct
     proc.rettype
 
   let assert_proc_args_match (id : string) (args : (Token.t * TokenType.id_type) list) : unit =
-    let proc = Hashtbl.find !proc_tbl id in
-    if List.length args <> List.length proc.params then
-      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                ~msg:(Printf.sprintf "expected %d arguments, got %d"
-                        (List.length proc.params) (List.length args))
-                None in exit 1
-    else
-      List.iter2 (fun (t, id) (t', id') ->
-          if id <> id' then
-            let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                      ~msg:(Printf.sprintf "expected argument of type `%s`, got `%s`"
-                              (TokenType.id_type_to_string id) (TokenType.id_type_to_string id'))
-                      (Some t) in exit 1) proc.params args
+    failwith "assert_proc_args_match: unimplemented"
 
 end
