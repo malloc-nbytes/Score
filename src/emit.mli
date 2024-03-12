@@ -1,0 +1,2 @@
+module Emit : sig
+end

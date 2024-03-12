@@ -2,7 +2,7 @@ module Scope : sig
   open Token
 
   val id_tbl : (((string, (Token.t * (TokenType.id_type))) Hashtbl.t) list) ref
-  val func_tbl : (((string, ((Token.t * TokenType.id_type) list)) Hashtbl.t) list) ref
+  val func_tbl : (string, (Token.t * TokenType.id_type) list) Hashtbl.t ref
 
   val push : unit -> unit
   val pop : unit -> unit

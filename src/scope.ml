@@ -5,8 +5,8 @@ module Scope = struct
   let id_tbl : (((string, (Token.t * TokenType.id_type)) Hashtbl.t) list) ref
     = ref @@ Hashtbl.create 20 :: []
 
-  let func_tbl : (((string, ((Token.t * TokenType.id_type) list)) Hashtbl.t) list) ref
-    = ref @@ Hashtbl.create 20 :: []
+  let func_tbl : (string, (Token.t * TokenType.id_type) list) Hashtbl.t ref
+    = ref @@ Hashtbl.create 20
 
   let push () : unit = id_tbl := Hashtbl.create 20 :: !id_tbl
 
@@ -51,5 +51,23 @@ module Scope = struct
          else
            get_token_from_scope' ss in
     get_token_from_scope' !id_tbl
+
+  let add_func_to_scope (id : string) (params : (Token.t * TokenType.id_type) list) : unit =
+    Hashtbl.add !func_tbl id params
+
+  let assert_func_params_match (id : string) (params : (Token.t * TokenType.id_type) list) : unit =
+    let expected_params = Hashtbl.find !func_tbl id in
+    if List.length expected_params <> List.length params then
+      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "expected %d arguments, got %d"
+                        (List.length expected_params) (List.length params))
+                         None in let _ = exit 1 in
+    List.iter2 (fun (t1, orig) (t2, _) ->
+        if t1.Token.ttype <> t2.Token.ttype then
+          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+                    ~msg:(Printf.sprintf "expected type %s, got type %s"
+                            (Token.to_string t1)
+                            (Token.to_string t2))
+                    None in exit 1) expected_params params
 
 end
