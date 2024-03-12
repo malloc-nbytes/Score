@@ -93,12 +93,15 @@ module Ir2 = struct
        intlit.lexeme, TokenType.Number
 
     | Ast.Reference expr ->
-        let reg = lm#new_reg false in
-        let expr, expr_type = evaluate_expr expr in
-(*
-        Emit.copy reg expr_type expr;
-*)
-        reg, TokenType.Pointer expr_type
+       (match expr with
+       | Ast.Term (Ast.Ident ident) ->
+          Scope.assert_token_in_scope ident;
+          let reg = lm#new_reg false in
+          let stored_var = Scope.get_token_from_scope ident.lexeme in
+          let stored_type = stored_var.type_ in
+          Emit.copy reg (TokenType.Pointer stored_type) ("%" ^ ident.lexeme);
+          reg, TokenType.Pointer stored_type
+       | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
        let expr, expr_type = evaluate_expr expr in
