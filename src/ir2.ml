@@ -106,12 +106,12 @@ module Ir2 = struct
        reg, TokenType.Str
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
     | Ast.Proc_call pc ->
+       (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
                       let arg, arg_type = evaluate_expr e in
                       let arg_type = Utils.scr_to_qbe_type arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
-       (* printf "ARGS: %s\n" args; *)
        (match pc.id.lexeme with
         | "printf" ->
            let reg = lm#new_reg false in
