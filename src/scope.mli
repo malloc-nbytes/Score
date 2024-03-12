@@ -1,6 +1,15 @@
 module Scope : sig
   open Token
 
+  type state =
+    { mutable func_section : string
+    ; mutable data_section : string
+    ; mutable type_section : string
+    ; mutable cur_proc_id  : string * TokenType.id_type
+    }
+
+  val state : state
+
   val id_tbl : (((string, (Token.t * (TokenType.id_type))) Hashtbl.t) list) ref
   val func_tbl : (string, (Token.t * TokenType.id_type) list) Hashtbl.t ref
 

@@ -4,6 +4,8 @@ module Ir2 = struct
   open Token
   open Err
   open Scope
+  open Utils
+  open Emit
 
   class label_maker =
     let init_reg = "__SCORE_REG" in
@@ -18,38 +20,9 @@ module Ir2 = struct
         ret
     end
 
-  type state =
-    { mutable func_section : string
-    ; mutable data_section : string
-    ; mutable type_section : string
-    ; mutable cur_proc_id  : string * TokenType.id_type
-    }
-
-  let state =
-    {func_section = "";
-     data_section = "";
-     type_section = "";
-     cur_proc_id = "", TokenType.Void
-    }
-
   let lm = new label_maker
 
   (* --- Helpers --- *)
-
-  let scr_type_to_bytes = function
-    | TokenType.I32 -> "4"
-    | TokenType.Usize -> "8"
-    | TokenType.Str -> "8"
-    | TokenType.Char -> "1"
-    | _ -> failwith "scr_type_to_bytes: invalid qbe type"
-
-  let scr_to_qbe_type = function
-    | TokenType.I32 -> "w"
-    | TokenType.Usize -> "l"
-    | TokenType.Str -> "l"
-    | TokenType.Char -> "b"
-    | TokenType.Number -> "w"
-    | _ -> failwith "scr_to_qbe_type: invalid type"
 
   let nums_compatable (type1 : TokenType.id_type) (type2 : TokenType.id_type) : bool =
     match type1, type2 with
@@ -65,110 +38,6 @@ module Ir2 = struct
     (* Number *)
     | TokenType.Number, TokenType.Number -> true
     | _ -> false
-
-  (* --- Emissions --- *)
-
-  let emit_proc_def
-        (export : bool)
-        (procname : string)
-        (params : (Token.t * TokenType.id_type) list)
-        (rettype : TokenType.id_type) : unit =
-
-    let emitted_procname = procname
-    and emitted_params = List.fold_left (fun acc param ->
-                      let id = (fst param).Token.lexeme in
-                      let type_ = scr_to_qbe_type @@ snd param in
-                      acc ^ type_ ^ " %" ^ id ^ ", "
-                    ) "" params
-
-    and emitted_export = if export then "export" else ""
-    and emitted_rettype = scr_to_qbe_type rettype in
-
-    state.func_section <-
-      sprintf "%s%s function %s $%s(%s) {\n@start\n"
-        state.func_section emitted_export emitted_rettype emitted_procname emitted_params
-
-  let emit_string_in_data_section (id : string) (strlit : string) : unit =
-    state.data_section <-
-      sprintf "%sdata %s = { b \"%s\", b 0 }\n"
-        state.data_section id strlit
-
-  let emit_stack_alloc4 (id : string) (bytes : string) : unit =
-    let emitted_id = id in
-    state.func_section <-
-      sprintf "%s    %%%s =l alloc4 %s\n" state.func_section emitted_id bytes
-
-  let emit_stack_alloc8 (id : string) (bytes : string) : unit =
-    let emitted_id = id in
-    state.func_section <-
-      sprintf "%s    %%%s =l alloc8 %s\n" state.func_section emitted_id bytes
-
-  let emit_stack_alloc16 (id : string) (bytes : string) : unit =
-    let emitted_id = id in
-    state.func_section <-
-      sprintf "%s    %%%s =l alloc16 %s\n" state.func_section emitted_id bytes
-
-  let emit_store (value : string) (loc : string) (type_ : TokenType.id_type) : unit =
-    let emitted_value = value
-    and emitted_location = loc
-    and emitted_type = scr_to_qbe_type type_ in
-    state.func_section <-
-      sprintf "%s    store%s %s, %s\n" state.func_section emitted_type emitted_value emitted_location
-
-  let emit_load (id : string) (type_ : TokenType.id_type) (loc : string) : unit =
-    let emitted_id = id
-    and emitted_type = scr_to_qbe_type type_
-    and emitted_loc = loc in
-    state.func_section <-
-      sprintf "%s    %s =%s load%s %%%s\n"
-        state.func_section emitted_id emitted_type emitted_type emitted_loc
-
-  let __emit_instr (id : string) (type_ : TokenType.id_type) (rhs : string) (instr : string) : unit =
-    let emitted_id = id
-    and emitted_type = scr_to_qbe_type type_ in
-    state.func_section <-
-      sprintf "%s    %s =%s %s %s\n" state.func_section emitted_id emitted_type instr rhs
-
-  let emit_rbrace () : unit =
-    state.func_section <- sprintf "%s}\n" state.func_section
-
-  let emit_copy (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
-    __emit_instr id type_ rhs "copy"
-
-  let emit_extsb (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
-    __emit_instr id type_ rhs "extsb"
-
-  let emit_extsw (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
-    __emit_instr id type_ rhs "extsw"
-
-  let emit_extsh (id : string) (type_ : TokenType.id_type) (rhs : string) : unit =
-    __emit_instr id type_ rhs "extsh"
-
-  let emit_assignment (lhs : string) (type_ : TokenType.id_type) (rhs : string) : unit =
-    let emitted_type = scr_to_qbe_type type_ in
-    state.func_section <- sprintf "%s    %s =%s %s\n" state.func_section lhs emitted_type rhs
-
-  let emit_binop (id : string) (type_ : TokenType.id_type) (left : string) (right : string) (binop : string) : unit =
-    let emitted_id = id
-    and emitted_type = scr_to_qbe_type type_
-    and emitted_left = left
-    and emitted_right = right
-    and emitted_binop = binop in
-    state.func_section <-
-      sprintf "%s    %s =%s %s %s, %s\n"
-        state.func_section emitted_id emitted_type emitted_binop emitted_left emitted_right
-
-  let emit_ret (value : string) : unit =
-    state.func_section <- sprintf "%s    ret %s\n" state.func_section value
-
-  let emit_proc_call_wassign (assignee : string) (name : string) (args : string) (rettype : TokenType.id_type) : unit =
-    let emitted_type = scr_to_qbe_type rettype in
-    state.func_section <-
-      sprintf "%s    %s =%s call $%s(%s)\n" state.func_section assignee emitted_type name args
-
-  let emit_proc_call_woassign (name : string) (args : string) : unit =
-    state.func_section <-
-      sprintf "%s    call %s(%s)\n" state.func_section name args
 
   (* --- Evaluations --- *)
 
@@ -200,7 +69,7 @@ module Ir2 = struct
 
        if nums_compatable lhs_type rhs_type then
          (* NOTE: can use either lhs_type or rhs_type *)
-         let _ = emit_binop reg lhs_type lhs rhs instr in
+         let _ = Emit.binop reg lhs_type lhs rhs instr in
          reg, lhs_type
        else
          (match lhs_type, rhs_type with
@@ -217,7 +86,7 @@ module Ir2 = struct
        Scope.assert_token_in_scope ident;
        let reg = lm#new_reg false in
        let stored_type = snd (Scope.get_token_from_scope ident.lexeme) in
-       emit_load reg stored_type ident.lexeme;
+       Emit.load reg stored_type ident.lexeme;
        reg, stored_type
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
@@ -227,26 +96,26 @@ module Ir2 = struct
        else
          let reg = lm#new_reg false in
          (match cast_type, expr_type with
-          | TokenType.I32, TokenType.Usize -> emit_extsh reg cast_type expr; reg, cast_type
-          | TokenType.Usize, TokenType.I32 -> emit_extsw reg cast_type expr; reg, cast_type
+          | TokenType.I32, TokenType.Usize -> Emit.extsh reg cast_type expr; reg, cast_type
+          | TokenType.Usize, TokenType.I32 -> Emit.extsw reg cast_type expr; reg, cast_type
           | _ -> failwith @@ sprintf "%s: cast error" __FUNCTION__)
     | Ast.Term Ast.Char chara -> assert false
     | Ast.Term Ast.Strlit strlit ->
        let reg = lm#new_reg true in
-       emit_string_in_data_section reg strlit.lexeme;
+       Emit.string_in_data_section reg strlit.lexeme;
        reg, TokenType.Str
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
     | Ast.Proc_call pc ->
        let args = List.fold_left (fun acc e ->
                       let arg, arg_type = evaluate_expr e in
-                      let arg_type = scr_to_qbe_type arg_type in
+                      let arg_type = Utils.scr_to_qbe_type arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
        (* printf "ARGS: %s\n" args; *)
        (match pc.id.lexeme with
         | "printf" ->
            let reg = lm#new_reg false in
-           emit_proc_call_wassign reg "printf" args TokenType.I32;
+           Emit.proc_call_wassign reg "printf" args TokenType.I32;
            reg, TokenType.I32
         | "exit" -> assert false
         | _ -> assert false)
@@ -259,12 +128,12 @@ module Ir2 = struct
     Scope.assert_id_not_in_scope id_lexeme;
 
     let expr, expr_type = evaluate_expr stmt.expr in
-    let bytes = scr_type_to_bytes stmt_type in
+    let bytes = Utils.scr_type_to_bytes stmt_type in
 
     if nums_compatable stmt_type expr_type then
       let _ = Scope.add_id_to_scope id_lexeme id stmt_type in
-      let _ = emit_stack_alloc4 id_lexeme bytes in
-      emit_store expr ("%" ^ id_lexeme) stmt_type
+      let _ = Emit.stack_alloc4 id_lexeme bytes in
+      Emit.store expr ("%" ^ id_lexeme) stmt_type
     else failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__
                        (TokenType.id_type_to_string stmt_type)
                        (TokenType.id_type_to_string expr_type)
@@ -275,15 +144,15 @@ module Ir2 = struct
     Scope.pop ()
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
-    state.cur_proc_id <- pd.id.lexeme, pd.rettype;
-    emit_proc_def true pd.id.lexeme pd.params pd.rettype;
+    Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
+    Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
     evaluate_block_stmt pd.block;
-    emit_rbrace ()
+    Emit.rbrace ()
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr, expr_type = evaluate_expr stmt.expr in
     ignore expr_type;
-    emit_ret expr
+    Emit.ret expr
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
     let expr, type_ = evaluate_expr stmt in
@@ -312,7 +181,7 @@ module Ir2 = struct
 
   let generate_inter_lang (program : Ast.program) : string =
     List.iter evaluate_toplvl_stmt program;
-    state.func_section ^ state.data_section ^ state.type_section
+    Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section
 
 end
 
