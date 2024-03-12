@@ -80,8 +80,13 @@ module Ir2 = struct
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
        let reg = lm#new_reg false in
-       let stored_type = snd (Scope.get_token_from_scope ident.lexeme) in
-       Emit.load reg stored_type ident.lexeme;
+       let stored_var = Scope.get_token_from_scope ident.lexeme in
+       let stored_type = stored_var.type_ in
+       (* Emit.load reg stored_type ident.lexeme; *)
+       if stored_var.stack_allocd then
+         Emit.load reg stored_type ident.lexeme
+       else
+         Emit.copy reg stored_type ("%" ^ ident.lexeme);
        reg, stored_type
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
@@ -127,7 +132,7 @@ module Ir2 = struct
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
     if nums_compatable stmt_type expr_type then
-      let _ = Scope.add_id_to_scope id_lexeme id stmt_type in
+      let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
       let _ = Emit.stack_alloc4 id_lexeme bytes in
       Emit.store expr ("%" ^ id_lexeme) stmt_type
     else failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__
@@ -150,7 +155,11 @@ module Ir2 = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
-        Scope.add_id_to_scope id_lexeme id param_type
+        (* Scope.add_id_to_scope id_lexeme id param_type false *)
+        match param_type with
+        | TokenType.I32 | TokenType.Usize -> Scope.add_id_to_scope id_lexeme id param_type false
+        | TokenType.Pointer _ -> Scope.add_id_to_scope id_lexeme id param_type true
+        | _ -> failwith "evaluate_proc_def_stmt: unimplemented param type"
       ) pd.params;
 
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
@@ -173,7 +182,8 @@ module Ir2 = struct
     | Ast.Mut_var mutvar ->
        Scope.assert_token_in_scope mutvar.id;
        let expr, expr_type = evaluate_expr mutvar.expr
-       and mut_type = snd (Scope.get_token_from_scope mutvar.id.lexeme)
+       and stored_var = Scope.get_token_from_scope mutvar.id.lexeme in
+       let mut_type = stored_var.type_
        and mut_id = mutvar.id in
        if mut_type = expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__

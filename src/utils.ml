@@ -17,6 +17,7 @@ module Utils = struct
     | TokenType.Usize -> "8"
     | TokenType.Str -> "8"
     | TokenType.Char -> "1"
+    | TokenType.Pointer _ -> "4"
     | _ -> failwith "scr_type_to_bytes: invalid qbe type"
 
   let scr_to_qbe_type = function
@@ -25,6 +26,8 @@ module Utils = struct
     | TokenType.Str -> "l"
     | TokenType.Char -> "b"
     | TokenType.Number -> "w"
+    | TokenType.Pointer TokenType.I32 -> "l"
+    | TokenType.Pointer TokenType.Usize -> "l"
     | _ -> failwith "scr_to_qbe_type: invalid type"
 
 end
