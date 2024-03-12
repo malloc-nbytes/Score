@@ -1,5 +1,6 @@
 module Scope : sig
   open Token
+  open Ast
 
   type state =
     { mutable func_section : string
@@ -15,10 +16,16 @@ module Scope : sig
     ; stack_allocd : bool
     }
 
+  type proc =
+    { id : string
+    ; params : (Token.t * TokenType.id_type) list
+    ; rettype : TokenType.id_type
+    }
+
   val state : state
 
   val id_tbl : (((string, var) Hashtbl.t) list) ref
-  val func_tbl : (string, var list) Hashtbl.t ref
+  val proc_tbl : (string, proc) Hashtbl.t ref
 
   val push : unit -> unit
   val pop : unit -> unit
@@ -29,4 +36,8 @@ module Scope : sig
   val assert_id_in_scope : string -> unit
   val add_id_to_scope : string -> Token.t -> TokenType.id_type -> bool -> unit
   val get_token_from_scope : string -> var
+  val add_proc_to_tbl : Ast.proc_def_stmt -> unit
+  val assert_proc_in_tbl : string -> unit
+  val get_proc_rettype_from_tbl : string -> TokenType.id_type
+  val assert_proc_args_match : string -> (Token.t * TokenType.id_type) list -> unit
 end
