@@ -102,7 +102,8 @@ module Ast = struct
     | Term of term_expr
     | Proc_call of proc_call_expr
     | Array_retrieval of array_retrieval_expr
-    | Cast of TokenType.id_type * expr
+    | Cast of TokenType.id_type * expr (* TODO: move to term_expr *)
+    | Reference of expr
 
   and array_retrieval_expr =
     { id : Token.t

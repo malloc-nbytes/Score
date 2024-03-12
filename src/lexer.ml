@@ -43,6 +43,7 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "break"     TokenType.Break in
     let _ = Hashtbl.add keywords "for"       TokenType.For in
     let _ = Hashtbl.add keywords "struct"    TokenType.Struct in
+    let _ = Hashtbl.add keywords "ref"       TokenType.Ref in
     ()
 
   let rec repl_quote (lst : char list) : string =
@@ -155,6 +156,7 @@ module Lexer = struct
     | '%' :: tl -> [Token.{lexeme = "%"; ttype = Percent; r; c; fp}]          @ lex_file fp tl r (c+1)
     | '=' :: tl -> [Token.{lexeme = "="; ttype = TokenType.Equals; r; c; fp}] @ lex_file fp tl r (c+1)
     | '.' :: tl -> [Token.{lexeme = "."; ttype = TokenType.Period; r; c; fp}] @ lex_file fp tl r (c+1)
+    | '&' :: tl -> [Token.{lexeme = "&"; ttype = TokenType.Ampersand; r; c; fp}] @ lex_file fp tl r (c+1)
 
     (* Integer literals *)
     | '0'..'9' as hd :: tl ->

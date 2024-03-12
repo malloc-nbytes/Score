@@ -81,6 +81,7 @@ module Ast : sig
     | Proc_call of proc_call_expr
     | Array_retrieval of array_retrieval_expr
     | Cast of TokenType.id_type * expr
+    | Reference of expr
 
   and array_retrieval_expr =
     { id : Token.t

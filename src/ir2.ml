@@ -85,6 +85,7 @@ module Ir2 = struct
        reg, stored_type
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
+    | Ast.Reference r -> failwith "evaluate_expr: Ast.Reference unimplemented"
     | Ast.Cast (cast_type, expr) ->
        let expr, expr_type = evaluate_expr expr in
        if cast_type = expr_type then expr, cast_type

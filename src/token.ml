@@ -27,7 +27,8 @@ module TokenType = struct
     | Usize
     | Char
     | Void
-    | Number
+    | Number (* NOT TO BE USED IN PARSING *)
+    | Pointer of id_type
     | Array of id_type * (int option)
     | Custom of string
 
@@ -79,6 +80,19 @@ module TokenType = struct
     | ForwardSlashEquals
     | PercentEquals
     | Struct
+    | Ref
+    | Ampersand
+
+  let rec id_type_to_string = function
+    | I32 -> "I32"
+    | Str -> "Str"
+    | Usize -> "Usize"
+    | Char -> "Char"
+    | Void -> "Void"
+    | Pointer t -> "Pointer " ^ id_type_to_string t
+    | Number -> "Number"
+    | Array _ -> "Array PRINTING UNIMPLEMENTED"
+    | Custom s -> "Custom " ^ s
 
   (* Convert a Token to a string *)
   let to_string = function
@@ -98,12 +112,13 @@ module TokenType = struct
     | Colon -> "Colon"
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
-    (* | Type t -> "Type " ^ t *)
     | Type I32 -> "Type I32"
     | Type Usize -> "Usize"
     | Type Char -> "Type Char"
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
+    | Type Pointer t -> "Type Pointer " ^ id_type_to_string t
+    | Type Number -> "Number (SHOULD NOT BE USED)"
     | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
     | Type (Custom s) -> "Type Custom " ^ s
     | GreaterThan -> "GreaterThan"
@@ -136,20 +151,9 @@ module TokenType = struct
     | ForwardSlashEquals -> "ForwardSlashEquals"
     | PercentEquals -> "PercentEquals"
     | Struct -> "Struct"
-    | Type Number -> "Number (SHOULD NOT BE USED)"
+    | Ref -> "Ref"
+    | Ampersand -> "&"
 
-    let id_type_to_string = function
-      | I32 -> "I32"
-      | Str -> "Str"
-      | Usize -> "Usize"
-      | Char -> "Char"
-      | Void -> "Void"
-      | Number -> "Number"
-      | Array _ -> "Array PRINTING UNIMPLEMENTED"
-      | Custom s -> "Custom " ^ s
-
-    let id_types = [Type I32;
-                    Type I32;]
 end
 
 module Token = struct

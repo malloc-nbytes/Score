@@ -5,7 +5,8 @@ module TokenType : sig
     | Usize
     | Char
     | Void
-    | Number
+    | Number (* NOT TO BE USED IN PARSING *)
+    | Pointer of id_type
     | Array of id_type * (int option)
     | Custom of string
 
@@ -57,10 +58,11 @@ module TokenType : sig
     | ForwardSlashEquals
     | PercentEquals
     | Struct
+    | Ref
+    | Ampersand
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string
-  val id_types : t list
 end
 
 module Token : sig

@@ -66,7 +66,7 @@ module Parser = struct
 
   (* Helper function to expect a type and also retrive it as well
    * as the rest of the tokens. *)
-  let expect_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+  let expect_primitive_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
     match tokens with
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
@@ -122,9 +122,14 @@ module Parser = struct
            let _, tokens = expect tokens TokenType.RBracket in
            Ast.Array_retrieval {id; index}, tokens
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
-    | {ttype = TokenType.Type casted_type;} :: tl ->
+    | {ttype = TokenType.Type casted_type; _} :: tl ->
        let expr, tokens = parse_expr tl in
        Ast.Cast (casted_type, expr), tokens
+    | {ttype = TokenType.Ampersand; _} :: tl -> (* Taking the address of an ident *)
+       let expr, tokens = parse_primary_expr tl in
+       (match expr with
+        | (Ast.Term Ast.Ident ident) as term -> Ast.Reference term, tokens
+        | _ -> failwith "TODO FIX ERR: References must take the address of an identifier")
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
@@ -261,7 +266,7 @@ module Parser = struct
     | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Type TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
-       let rettype, tokens = expect_type tokens in
+       let rettype, tokens = expect_primitive_type tokens in
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
        Ast.{id; params; block; rettype = rettype}, tokens
@@ -324,7 +329,7 @@ module Parser = struct
 
   (* Helper function to parse types *)
   and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-    let type_, tokens = expect_type tokens in
+    let type_, tokens = expect_primitive_type tokens in
     match peek tokens 0 with (* Check for tokens after primitive type ie `[` *)
     | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
        let _, tokens = expect tokens TokenType.LBracket in
@@ -339,6 +344,9 @@ module Parser = struct
          | _ -> None, tokens in
        let _, tokens = expect tokens TokenType.RBracket in
        TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
+    | Some {ttype = TokenType.Ref; _} -> 
+       let _, tokens = expect tokens TokenType.Ref in
+       TokenType.Pointer type_, tokens
     | _ -> type_, tokens (* Not array *)
 
   (* Parses the statement of `let`. The `let` keyword
