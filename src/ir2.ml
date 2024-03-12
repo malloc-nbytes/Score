@@ -71,15 +71,10 @@ module Ir2 = struct
          (* NOTE: can use either lhs_type or rhs_type *)
          let _ = Emit.binop reg lhs_type lhs rhs instr in
          reg, lhs_type
-       else
-         (match lhs_type, rhs_type with
-          | TokenType.I32, TokenType.Usize -> assert false
-          | TokenType.I32, TokenType.Number -> assert false
-          | TokenType.Usize, TokenType.Number -> assert false
-          | _ ->
-             let t1 = TokenType.id_type_to_string lhs_type
-             and t2 = TokenType.id_type_to_string rhs_type in
-             failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__ t1 t2)
+       else failwith @@ sprintf "%s: type mismatch: %s :: %s"
+                          __FUNCTION__
+                          (TokenType.id_type_to_string lhs_type)
+                          (TokenType.id_type_to_string rhs_type)
 
     | Ast.Array_retrieval ar -> assert false
     | Ast.Term Ast.Ident ident ->
@@ -162,7 +157,7 @@ module Ir2 = struct
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr, expr_type = evaluate_expr stmt.expr in
-    ignore expr_type;
+    ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
     Emit.ret expr
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
@@ -170,17 +165,30 @@ module Ir2 = struct
     ignore expr;
     ignore type_
 
+  and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
+    match stmt with
+    | Ast.Mut_var mutvar ->
+       Scope.assert_token_in_scope mutvar.id;
+       let expr, expr_type = evaluate_expr mutvar.expr
+       and mut_type = snd (Scope.get_token_from_scope mutvar.id.lexeme)
+       and mut_id = mutvar.id in
+       if mut_type = expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                          (TokenType.id_type_to_string mut_type)
+                          (TokenType.id_type_to_string expr_type)
+    | Ast.Mut_arr mutarr -> failwith "evaluate_mut_stmt: mutarr unimplemented"
+
   and evaluate_stmt = function
-    | Ast.Proc_def pd -> assert false
-    | Ast.Block b -> assert false
-    | Ast.Let l -> evaluate_let_stmt l
-    | Ast.Mut m -> assert false
-    | Ast.If i -> assert false
-    | Ast.While w -> assert false
-    | Ast.Stmt_expr se -> evaluate_stmt_expr se
-    | Ast.Ret r -> evaluate_ret_stmt r
-    | Ast.Break b -> assert false
-    | Ast.For f -> assert false
+    | Ast.Proc_def stmt -> assert false
+    | Ast.Block stmt -> assert false
+    | Ast.Let stmt -> evaluate_let_stmt stmt
+    | Ast.Mut stmt -> evaluate_mut_stmt stmt
+    | Ast.If stmt -> assert false
+    | Ast.While stmt -> assert false
+    | Ast.Stmt_expr stmt -> evaluate_stmt_expr stmt
+    | Ast.Ret stmt -> evaluate_ret_stmt stmt
+    | Ast.Break stmt -> assert false
+    | Ast.For stmt -> assert false
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
