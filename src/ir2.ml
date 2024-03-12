@@ -119,7 +119,11 @@ module Ir2 = struct
            Emit.proc_call_wassign reg "printf" args TokenType.I32;
            reg, TokenType.I32
         | "exit" -> assert false
-        | _ -> assert false)
+        | _ ->
+           Scope.assert_token_in_scope pc.id;
+           let reg = lm#new_reg false in
+           Emit.proc_call_wassign reg pc.id.lexeme args TokenType.I32; (* TODO: fix rettype *)
+           reg, TokenType.I32)
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
@@ -146,6 +150,7 @@ module Ir2 = struct
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
+    Scope.add_id_to_scope pd.id.lexeme pd.id pd.rettype false;
 
     Scope.push ();
     (* Make sure params are not in scope.
