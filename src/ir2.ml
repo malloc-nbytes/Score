@@ -96,25 +96,40 @@ module Ir2 = struct
       (match deref with
       | Ast.Term (Ast.Ident ident) ->
          Scope.assert_token_in_scope ident;
-         let reg = lm#new_reg false in
          let stored_var = Scope.get_token_from_scope ident.lexeme in
-         let stored_type = stored_var.type_ in
-         Emit.load reg stored_type ("%" ^ ident.lexeme);
-         let reg2 = lm#new_reg false in
-         let inner_type = Utils.unwrap_ptr stored_type in
-         Emit.load reg2 inner_type reg;
-         reg2, inner_type
+         let inner_type = Utils.unwrap_ptr stored_var.type_ in
+         let reg = lm#new_reg false in
+
+         if stored_var.stack_allocd then
+           let reg2 = lm#new_reg false in
+           let _ = Emit.load reg TokenType.Usize ("%"^stored_var.id) in
+           let _ = Emit.load reg2 inner_type reg in
+           reg2, inner_type
+         else
+           let _ = Emit.load reg inner_type ("%"^stored_var.id) in
+           reg, inner_type
+
+         (* let reg = lm#new_reg false in *)
+         (* let stored_var = Scope.get_token_from_scope ident.lexeme in *)
+         (* let stored_type = stored_var.type_ in *)
+         (* Emit.load reg stored_type ("%" ^ ident.lexeme); *)
+         (* let reg2 = lm#new_reg false in *)
+         (* let inner_type = Utils.unwrap_ptr stored_type in *)
+         (* Emit.load reg2 inner_type reg; *)
+         (* Emit.copy reg2 inner_type reg; *)
+         (* reg2, inner_type *)
       | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
 
     | Ast.Reference expr ->
        (match expr with
        | Ast.Term (Ast.Ident ident) ->
           Scope.assert_token_in_scope ident;
-          let reg = lm#new_reg false in
+          (* let reg = lm#new_reg false in *)
           let stored_var = Scope.get_token_from_scope ident.lexeme in
           let stored_type = stored_var.type_ in
-          Emit.copy reg (TokenType.Pointer stored_type) ("%" ^ ident.lexeme);
-          reg, TokenType.Pointer stored_type
+          (* Emit.copy reg (TokenType.Pointer stored_type) ("%" ^ ident.lexeme); *)
+          "%"^stored_var.id, TokenType.Pointer stored_type
+          (* reg, TokenType.Pointer stored_type *)
        | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
@@ -140,7 +155,6 @@ module Ir2 = struct
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
                       let arg, arg_type = evaluate_expr e in
-                      printf "arg: %s %s\n" arg (TokenType.id_type_to_string arg_type);
                       let arg_type = Utils.scr_to_qbe_type arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
@@ -172,8 +186,6 @@ module Ir2 = struct
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
-    printf "let: %s %s %s\n" id_lexeme (TokenType.id_type_to_string stmt_type) (TokenType.id_type_to_string expr_type);
-
     if nums_compatable stmt_type expr_type then
       let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
       let _ = Emit.stack_alloc4 id_lexeme bytes in
@@ -199,10 +211,11 @@ module Ir2 = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
-        match param_type with
-        | TokenType.I32 | TokenType.Usize -> Scope.add_id_to_scope id_lexeme id param_type false
-        | TokenType.Pointer _ -> Scope.add_id_to_scope id_lexeme id param_type true
-        | _ -> failwith "evaluate_proc_def_stmt: unimplemented param type"
+        Scope.add_id_to_scope id_lexeme id param_type false
+        (* match param_type with *)
+        (* | TokenType.I32 | TokenType.Usize -> Scope.add_id_to_scope id_lexeme id param_type false *)
+        (* | TokenType.Pointer _ -> Scope.add_id_to_scope id_lexeme id param_type true *)
+        (* | _ -> failwith "evaluate_proc_def_stmt: unimplemented param type" *)
       ) pd.params;
 
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
@@ -237,11 +250,15 @@ module Ir2 = struct
        let left, left_type = match deref with
          | Ast.Term (Ast.Ident ident) ->
             Scope.assert_token_in_scope ident;
-            let reg = lm#new_reg false in
             let stored_var = Scope.get_token_from_scope ident.lexeme in
             let stored_type = stored_var.type_ in
-            Emit.load reg stored_type ("%" ^ ident.lexeme);
-            reg, Utils.unwrap_ptr stored_type
+            let inner_type = Utils.unwrap_ptr stored_type in
+            if stored_var.stack_allocd then
+              let reg = lm#new_reg false in
+              Emit.load reg TokenType.Usize ("%" ^ ident.lexeme);
+              reg, inner_type
+            else
+              "%"^stored_var.id, inner_type
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
       let right, right_type = evaluate_expr stmt.right in
