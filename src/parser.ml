@@ -286,77 +286,75 @@ module Parser = struct
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
 
-  (* Used when parsing a statement of mutating a value
-   * that is already declared. *)
-  (* TODO: refactor *)
+(*
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
-    let id, tokens = pop tokens in
-    if id.ttype = TokenType.Asterisk then (* dereference pointer mutation *)
-      let _ = print_endline "HERE" in
-      let id, tokens = pop tokens in
-      let op, tokens = pop tokens in
-      match op with
-      | {ttype = TokenType.Equals; _} ->
-         let expr, tokens = parse_expr tokens in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.Mut_ptr Ast.{id; expr}, tokens
-      | {ttype = TokenType.PlusEquals}
-        | {ttype = TokenType.MinusEquals}
-        | {ttype = TokenType.AsteriskEquals}
-        | {ttype = TokenType.ForwardSlashEquals}
-        | {ttype = TokenType.PercentEquals} as op ->
-         let expr, tokens = parse_expr tokens in
-         let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op} in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.Mut_ptr Ast.{id; expr = rhs}, tokens
-      | _ ->
-         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-         exit 1
-    else (* array or variable mutation *)
-      match peek tokens 0 with
-      | Some {ttype = TokenType.LBracket; _} -> (* Array mutation *)
-         let _, tokens = expect tokens TokenType.LBracket in
-         let index, tokens = parse_expr tokens in
-         let _, tokens = expect tokens TokenType.RBracket in
-         let op, tokens = pop tokens in
+    let id, tokens = expect tokens TokenType.Identifier in
+    match peek tokens 0 with
+    | Some {ttype = TokenType.LBracket; _} -> (* Array mutation *)
+       let _, tokens = expect tokens TokenType.LBracket in
+       let index, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.RBracket in
+       let op, tokens = pop tokens in
 
-         (match op with
-          | {ttype = TokenType.Equals; _} ->
-             let expr, tokens = parse_expr tokens in
-             let _, tokens = expect tokens TokenType.Semicolon in
-             Ast.Mut_arr Ast.{id; index; expr}, tokens
-          | {ttype = TokenType.PlusEquals}
-            | {ttype = TokenType.MinusEquals}
-            | {ttype = TokenType.AsteriskEquals}
-            | {ttype = TokenType.ForwardSlashEquals}
-            | {ttype = TokenType.PercentEquals} as op ->
-             let expr, tokens = parse_expr tokens in
-             let rhs = Ast.Binary {lhs = Ast.Array_retrieval {id; index}; rhs = expr; op} in
-             let _, tokens = expect tokens TokenType.Semicolon in
-             Ast.Mut_arr Ast.{id; index; expr = rhs}, tokens
-          | _ ->
-             let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-             exit 1)
+       (match op with
+        | {ttype = TokenType.Equals; _} ->
+           let expr, tokens = parse_expr tokens in
+           let _, tokens = expect tokens TokenType.Semicolon in
+           Ast.Mut_arr Ast.{id; index; expr}, tokens
+        | {ttype = TokenType.PlusEquals}
+          | {ttype = TokenType.MinusEquals}
+          | {ttype = TokenType.AsteriskEquals}
+          | {ttype = TokenType.ForwardSlashEquals}
+          | {ttype = TokenType.PercentEquals} as op ->
+           let expr, tokens = parse_expr tokens in
+           let rhs = Ast.Binary {lhs = Ast.Array_retrieval {id; index}; rhs = expr; op} in
+           let _, tokens = expect tokens TokenType.Semicolon in
+           Ast.Mut_arr Ast.{id; index; expr = rhs}, tokens
+        | _ ->
+           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+           exit 1)
 
-      | _ -> (* Variable mutation *)
-         let op, tokens = pop tokens in
-         match op with
-         | {ttype = TokenType.Equals; _} ->
-            let expr, tokens = parse_expr tokens in
-            let _, tokens = expect tokens TokenType.Semicolon in
-            Ast.Mut_var Ast.{id; expr}, tokens
-         | {ttype = TokenType.PlusEquals}
-           | {ttype = TokenType.MinusEquals}
-           | {ttype = TokenType.AsteriskEquals}
-           | {ttype = TokenType.ForwardSlashEquals}
-           | {ttype = TokenType.PercentEquals} as op ->
-            let expr, tokens = parse_expr tokens in
-            let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op} in
-            let _, tokens = expect tokens TokenType.Semicolon in
-            Ast.Mut_var Ast.{id; expr = rhs}, tokens
-         | _ ->
-            let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-            exit 1
+    | _ -> (* Variable mutation *)
+       let op, tokens = pop tokens in
+       match op with
+       | {ttype = TokenType.Equals; _} ->
+          let expr, tokens = parse_expr tokens in
+          let _, tokens = expect tokens TokenType.Semicolon in
+          Ast.Mut_var Ast.{id; expr}, tokens
+       | {ttype = TokenType.PlusEquals}
+         | {ttype = TokenType.MinusEquals}
+         | {ttype = TokenType.AsteriskEquals}
+         | {ttype = TokenType.ForwardSlashEquals}
+         | {ttype = TokenType.PercentEquals} as op ->
+          let expr, tokens = parse_expr tokens in
+          let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op} in
+          let _, tokens = expect tokens TokenType.Semicolon in
+          Ast.Mut_var Ast.{id; expr = rhs}, tokens
+       | _ ->
+          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+          exit 1
+*)
+
+  and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
+    let left, tokens = parse_primary_expr tokens in
+    let op, tokens = pop tokens in
+    match op with
+    | {ttype = TokenType.Equals; _} ->
+       let right, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{left; right}, tokens
+    | {ttype = TokenType.PlusEquals}
+      | {ttype = TokenType.MinusEquals}
+      | {ttype = TokenType.AsteriskEquals}
+      | {ttype = TokenType.ForwardSlashEquals}
+      | {ttype = TokenType.PercentEquals} as op ->
+       let right, tokens = parse_expr tokens in
+       let right = Ast.Binary {lhs = left; rhs = right; op} in
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{left; right}, tokens
+    | _ ->
+        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+        exit 1
 
   (* Helper function to parse types *)
   and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =

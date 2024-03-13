@@ -214,19 +214,19 @@ module Ir2 = struct
     ignore type_
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
-    match stmt with
-    | Ast.Mut_var mutvar ->
-       Scope.assert_token_in_scope mutvar.id;
-       let expr, expr_type = evaluate_expr mutvar.expr
-       and stored_var = Scope.get_token_from_scope mutvar.id.lexeme in
+    match stmt.left with
+    | Term Ident ident ->
+       Scope.assert_token_in_scope ident;
+       let expr, expr_type = evaluate_expr stmt.right
+       and stored_var = Scope.get_token_from_scope ident.lexeme in
        let mut_type = stored_var.type_
-       and mut_id = mutvar.id in
-       if mut_type = expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+       and mut_id = ident in
+
+       if nums_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string mut_type)
                           (TokenType.id_type_to_string expr_type)
-    | Ast.Mut_ptr mutptr -> failwith "evaluate_mut_stmt: mutptr unimplemented"
-    | Ast.Mut_arr mutarr -> failwith "evaluate_mut_stmt: mutarr unimplemented"
+    | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_stmt = function
     | Ast.Proc_def stmt -> assert false
