@@ -9,16 +9,29 @@ module Ir2 = struct
 
   class label_maker =
     object (self)
-      val mutable reg = "__SCORE_REG"
+      val reg = "__SCORE_REG"
       val mutable regc = 0
 
-      val mutable ret_lbl = "__RET_LBL"
+      val ret_lbl = "__RET_LBL"
       val mutable ret_lblc = 0
 
-      val mutable if_lbl = "__IF"
-      val mutable else_lbl = "__ELSE"
-      val mutable if_done_lbl = "__IF_DONE"
+      val if_lbl = "__IF"
+      val else_lbl = "__ELSE"
+      val if_done_lbl = "__IF_DONE"
       val mutable if_lblc = 0
+
+      val loop_entry_lbl = "__LOOP_ENTRY"
+      val loop_begin_lbl = "__LOOP_BEGIN"
+      val loop_end_lbl = "__LOOP_END"
+      val mutable loop_lblc = 0
+
+      method new_loop_lbl () : string * string * string =
+        let c = string_of_int loop_lblc in
+        let entry = loop_entry_lbl^c
+        and begin_ = loop_begin_lbl^c
+        and end_ = loop_end_lbl^c in
+        loop_lblc <- loop_lblc+1;
+        entry, begin_, end_
 
       method new_if_lbl () : string * string * string =
         let c = string_of_int if_lblc in
@@ -316,17 +329,55 @@ module Ir2 = struct
 
     Emit.lbl if_done_lbl
 
+  and evaluate_while_stmt (stmt : Ast.while_stmt) : unit =
+    let loop_entry_lbl, loop_begin_lbl, loop_end_lbl = lm#new_loop_lbl () in
+    Emit.lbl loop_entry_lbl;
+
+    let cond, _ = evaluate_expr stmt.expr in
+    Emit.jnz cond loop_begin_lbl loop_end_lbl;
+    Emit.lbl loop_begin_lbl;
+
+    evaluate_block_stmt stmt.block;
+
+    (match List.hd (List.rev stmt.block.stmts) with
+     | Ast.Ret _ -> ()
+     | _ -> Emit.jmp loop_entry_lbl);
+
+    Emit.lbl loop_end_lbl
+
+  and evaluate_for_stmt (stmt : Ast.for_stmt) : unit =
+    Scope.push ();
+
+    let loop_entry_lbl, loop_begin_lbl, loop_end_lbl = lm#new_loop_lbl () in
+    evaluate_stmt stmt.init;
+
+    Emit.lbl loop_entry_lbl;
+
+    let expr, _ = evaluate_expr stmt.cond in
+
+    Emit.jnz expr loop_begin_lbl loop_end_lbl;
+    Emit.lbl loop_begin_lbl;
+    evaluate_block_stmt stmt.block;
+    evaluate_stmt stmt.after;
+
+    (match List.hd (List.rev stmt.block.stmts) with
+     | Ast.Ret _ -> ()
+     | _ -> Emit.jmp loop_entry_lbl);
+
+    Emit.lbl loop_end_lbl;
+    Scope.pop ()
+
   and evaluate_stmt = function
     | Ast.Proc_def stmt -> assert false
     | Ast.Block stmt -> assert false
     | Ast.Let stmt -> evaluate_let_stmt stmt
     | Ast.Mut stmt -> evaluate_mut_stmt stmt
     | Ast.If stmt -> evaluate_if_stmt stmt
-    | Ast.While stmt -> assert false
+    | Ast.While stmt -> evaluate_while_stmt stmt
     | Ast.Stmt_expr stmt -> evaluate_stmt_expr stmt
     | Ast.Ret stmt -> evaluate_ret_stmt stmt
     | Ast.Break stmt -> assert false
-    | Ast.For stmt -> assert false
+    | Ast.For stmt -> evaluate_for_stmt stmt
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
