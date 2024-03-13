@@ -132,7 +132,7 @@ module Parser = struct
        let expr, tokens = parse_primary_expr tl in
        (match expr with
         | (Ast.Term Ast.Ident ident) as term -> Ast.Reference term, tokens
-        | _ -> failwith "TODO FIX ERR: References must take the address of an identifier")
+        | _ -> failwith "References must take the address of an identifier")
     | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing an ident *)
        let expr, tokens = parse_primary_expr tl in
        (match expr with

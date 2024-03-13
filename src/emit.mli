@@ -16,7 +16,7 @@ module Emit : sig
   val extsh : string -> TokenType.id_type -> string -> unit
   val assignment : string -> TokenType.id_type -> string -> unit
   val binop : string -> TokenType.id_type -> string -> string -> string -> unit
-  val ret : string -> unit
+  val ret : string -> string -> unit
   val proc_call_wassign : string -> string -> string -> TokenType.id_type -> unit
   val proc_call_woassign : string -> string -> unit
 end

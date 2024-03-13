@@ -94,7 +94,8 @@ module Emit = struct
       sprintf "%s    %s =%s %s %s, %s\n"
         Scope.state.func_section emitted_id emitted_type emitted_binop emitted_left emitted_right
 
-  let ret (value : string) : unit =
+  let ret (value : string) (lbl : string) : unit =
+    Scope.state.func_section <- sprintf "%s@%s\n" Scope.state.func_section lbl;
     Scope.state.func_section <- sprintf "%s    ret %s\n" Scope.state.func_section value
 
   let proc_call_wassign (assignee : string) (name : string) (args : string) (rettype : TokenType.id_type) : unit =

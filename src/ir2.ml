@@ -8,11 +8,16 @@ module Ir2 = struct
   open Emit
 
   class label_maker =
-    let init_reg = "__SCORE_REG" in
-
     object (self)
-      val mutable reg = init_reg
+      val mutable reg = "__SCORE_REG"
+      val mutable ret_lbl = "__RET_LBL"
       val mutable regc = 0
+      val mutable ret_lblc = 0
+
+      method new_ret_lbl () : string =
+        let ret = ret_lbl ^ string_of_int ret_lblc in
+        ret_lblc <- ret_lblc+1;
+        ret
 
       method new_reg (global : bool) : string =
         let ret = (if global then "$" else "%") ^ reg ^ string_of_int regc in
@@ -109,27 +114,15 @@ module Ir2 = struct
            let _ = Emit.load reg inner_type ("%"^stored_var.id) in
            reg, inner_type
 
-         (* let reg = lm#new_reg false in *)
-         (* let stored_var = Scope.get_token_from_scope ident.lexeme in *)
-         (* let stored_type = stored_var.type_ in *)
-         (* Emit.load reg stored_type ("%" ^ ident.lexeme); *)
-         (* let reg2 = lm#new_reg false in *)
-         (* let inner_type = Utils.unwrap_ptr stored_type in *)
-         (* Emit.load reg2 inner_type reg; *)
-         (* Emit.copy reg2 inner_type reg; *)
-         (* reg2, inner_type *)
       | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
 
     | Ast.Reference expr ->
        (match expr with
        | Ast.Term (Ast.Ident ident) ->
           Scope.assert_token_in_scope ident;
-          (* let reg = lm#new_reg false in *)
           let stored_var = Scope.get_token_from_scope ident.lexeme in
           let stored_type = stored_var.type_ in
-          (* Emit.copy reg (TokenType.Pointer stored_type) ("%" ^ ident.lexeme); *)
           "%"^stored_var.id, TokenType.Pointer stored_type
-          (* reg, TokenType.Pointer stored_type *)
        | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
@@ -212,10 +205,6 @@ module Ir2 = struct
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
         Scope.add_id_to_scope id_lexeme id param_type false
-        (* match param_type with *)
-        (* | TokenType.I32 | TokenType.Usize -> Scope.add_id_to_scope id_lexeme id param_type false *)
-        (* | TokenType.Pointer _ -> Scope.add_id_to_scope id_lexeme id param_type true *)
-        (* | _ -> failwith "evaluate_proc_def_stmt: unimplemented param type" *)
       ) pd.params;
 
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
@@ -226,7 +215,7 @@ module Ir2 = struct
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     let expr, expr_type = evaluate_expr stmt.expr in
     ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
-    Emit.ret expr
+    Emit.ret expr (lm#new_ret_lbl ())
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
     let expr, type_ = evaluate_expr stmt in
@@ -268,12 +257,15 @@ module Ir2 = struct
                         (TokenType.id_type_to_string right_type)
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
+  and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
+    failwith "todo"
+
   and evaluate_stmt = function
     | Ast.Proc_def stmt -> assert false
     | Ast.Block stmt -> assert false
     | Ast.Let stmt -> evaluate_let_stmt stmt
     | Ast.Mut stmt -> evaluate_mut_stmt stmt
-    | Ast.If stmt -> assert false
+    | Ast.If stmt -> evaluate_if_stmt stmt
     | Ast.While stmt -> assert false
     | Ast.Stmt_expr stmt -> evaluate_stmt_expr stmt
     | Ast.Ret stmt -> evaluate_ret_stmt stmt
