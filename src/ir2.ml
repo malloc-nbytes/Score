@@ -1,22 +1,3 @@
-(*
---- Dereferencing ---
-export function w $main() {
-@start
-    %a =l alloc4 4 # variable
-    storew 37, %a # storing into it
-
-    %p =l alloc4 8 # allocate pointer
-    storel %a, %p # store address of %a into %p
-
-    %deref =l loadl %p # load the address of %a
-    %deref2 =w loadw %deref # load the value at the address of %a
-
-    %__SCORE_REG3 =w call $printf(l $__SCORE_REG1, w %deref2 )
-    ret 0
-}
-data $__SCORE_REG1 = { b "%d\n", b 0 }
-*)
-
 module Ir2 = struct
   open Printf
   open Ast

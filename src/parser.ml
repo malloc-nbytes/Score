@@ -485,6 +485,9 @@ module Parser = struct
         | _ ->
            let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
            exit 1)
+    | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing *)
+       let stmt, tokens = parse_mut_stmt tl in
+       Mut stmt, tokens
     | {ttype = TokenType.If; _} :: tl ->
        let stmt, tokens = parse_if_stmt tl in
        Ast.If stmt, tokens
