@@ -99,7 +99,7 @@ module Ir2 = struct
          let reg = lm#new_reg false in
          let stored_var = Scope.get_token_from_scope ident.lexeme in
          let stored_type = stored_var.type_ in
-         Emit.load reg (stored_type) ("%" ^ ident.lexeme);
+         Emit.load reg stored_type ("%" ^ ident.lexeme);
          let reg2 = lm#new_reg false in
          let inner_type = Utils.unwrap_ptr stored_type in
          Emit.load reg2 inner_type reg;
@@ -140,6 +140,7 @@ module Ir2 = struct
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
                       let arg, arg_type = evaluate_expr e in
+                      printf "arg: %s %s\n" arg (TokenType.id_type_to_string arg_type);
                       let arg_type = Utils.scr_to_qbe_type arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
@@ -150,12 +151,16 @@ module Ir2 = struct
            reg, TokenType.I32
         | "exit" -> assert false
         | _ -> (* user-defined proc *)
+           (* TODO: assert proc params match *)
            Scope.assert_proc_in_tbl pc.id.lexeme;
            let proc_rettype = Scope.get_proc_rettype_from_tbl pc.id.lexeme in
-           (* TODO: assert proc params match *)
            let reg = lm#new_reg false in
-           Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype;
-           reg, TokenType.I32)
+           if proc_rettype = TokenType.Void then
+             let _ = Emit.proc_call_woassign pc.id.lexeme args in
+             reg, proc_rettype
+           else
+             let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
+             reg, proc_rettype)
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
@@ -166,6 +171,8 @@ module Ir2 = struct
 
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = Utils.scr_type_to_bytes stmt_type in
+
+    printf "let: %s %s %s\n" id_lexeme (TokenType.id_type_to_string stmt_type) (TokenType.id_type_to_string expr_type);
 
     if nums_compatable stmt_type expr_type then
       let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
@@ -226,6 +233,22 @@ module Ir2 = struct
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string mut_type)
                           (TokenType.id_type_to_string expr_type)
+    | Ast.Dereference deref ->
+       let left, left_type = match deref with
+         | Ast.Term (Ast.Ident ident) ->
+            Scope.assert_token_in_scope ident;
+            let reg = lm#new_reg false in
+            let stored_var = Scope.get_token_from_scope ident.lexeme in
+            let stored_type = stored_var.type_ in
+            Emit.load reg stored_type ("%" ^ ident.lexeme);
+            reg, Utils.unwrap_ptr stored_type
+         | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
+
+      let right, right_type = evaluate_expr stmt.right in
+      if nums_compatable left_type right_type then Emit.store right left left_type
+      else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                        (TokenType.id_type_to_string left_type)
+                        (TokenType.id_type_to_string right_type)
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_stmt = function

@@ -104,6 +104,6 @@ module Emit = struct
 
   let proc_call_woassign (name : string) (args : string) : unit =
     Scope.state.func_section <-
-      sprintf "%s    call %s(%s)\n" Scope.state.func_section name args
+      sprintf "%s    call $%s(%s)\n" Scope.state.func_section name args
 
 end

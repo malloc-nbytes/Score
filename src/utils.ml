@@ -30,6 +30,7 @@ module Utils = struct
     | TokenType.Number -> "w"
     | TokenType.Pointer TokenType.I32 -> "l"
     | TokenType.Pointer TokenType.Usize -> "l"
+    | TokenType.Void -> ""
     | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.id_type_to_string type_)
 
   let unwrap_ptr (type_: TokenType.id_type) =
