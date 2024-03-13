@@ -27,7 +27,7 @@ module Ast : sig
 
   and block_stmt = { stmts : stmt list }
 
-  and ret_stmt = { expr : expr }
+  and ret_stmt = { expr : expr option }
 
   and while_stmt =
     { expr : expr

@@ -1,6 +1,10 @@
 module Utils = struct
   open Token
 
+  let unwrap = function
+    | Some k -> k
+    | None -> failwith "unwrap: tried to unwrap a None value"
+
   let file_to_str filepath =
     let ch = open_in_bin filepath in
     let s = really_input_string ch (in_channel_length ch) in

@@ -10,9 +10,23 @@ module Ir2 = struct
   class label_maker =
     object (self)
       val mutable reg = "__SCORE_REG"
-      val mutable ret_lbl = "__RET_LBL"
       val mutable regc = 0
+
+      val mutable ret_lbl = "__RET_LBL"
       val mutable ret_lblc = 0
+
+      val mutable if_lbl = "__IF"
+      val mutable else_lbl = "__ELSE"
+      val mutable if_done_lbl = "__IF_DONE"
+      val mutable if_lblc = 0
+
+      method new_if_lbl () : string * string * string =
+        let c = string_of_int if_lblc in
+        let if_ = if_lbl^c
+        and else_ = else_lbl^c
+        and if_done = if_done_lbl^c in
+        if_lblc <- if_lblc+1;
+        if_, else_, if_done
 
       method new_ret_lbl () : string =
         let ret = ret_lbl ^ string_of_int ret_lblc in
@@ -29,7 +43,7 @@ module Ir2 = struct
 
   (* --- Helpers --- *)
 
-  let nums_compatable (type1 : TokenType.id_type) (type2 : TokenType.id_type) : bool =
+  let types_compatable (type1 : TokenType.id_type) (type2 : TokenType.id_type) : bool =
     match type1, type2 with
     | a, b when a = b -> true
     (* I32 *)
@@ -53,7 +67,9 @@ module Ir2 = struct
     | TokenType.ForwardSlash -> "div"
     | TokenType.DoubleEquals -> "ceqw"
     | TokenType.LessThan -> "csltw"
-    | TokenType.GreaterThan -> "csgew"
+    | TokenType.GreaterThan -> "csgtw"
+    | TokenType.LessThanEqual -> "cslew"
+    | TokenType.GreaterThanEqual -> "csgew"
     | TokenType.NotEqual -> "cnew"
     | TokenType.Percent -> "rem"
     | TokenType.DoubleAmpersand -> "and"
@@ -72,7 +88,7 @@ module Ir2 = struct
        let instr = evaluate_binop bin.op.ttype in
        let reg = lm#new_reg false in
 
-       if nums_compatable lhs_type rhs_type then
+       if types_compatable lhs_type rhs_type then
          (* NOTE: can use either lhs_type or rhs_type *)
          let _ = Emit.binop reg lhs_type lhs rhs instr in
          reg, lhs_type
@@ -179,7 +195,7 @@ module Ir2 = struct
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
-    if nums_compatable stmt_type expr_type then
+    if types_compatable stmt_type expr_type then
       let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
       let _ = Emit.stack_alloc4 id_lexeme bytes in
       Emit.store expr ("%" ^ id_lexeme) stmt_type
@@ -210,12 +226,21 @@ module Ir2 = struct
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
     evaluate_block_stmt pd.block;
     Scope.pop ();
+
+    (if pd.rettype = TokenType.Void then
+       let ret_lbl = lm#new_ret_lbl () in
+       Emit.ret "" ret_lbl);
+
     Emit.rbrace ()
 
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
-    let expr, expr_type = evaluate_expr stmt.expr in
-    ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
-    Emit.ret expr (lm#new_ret_lbl ())
+    match stmt.expr with
+    | Some expr ->
+       let expr, expr_type = evaluate_expr (Utils.unwrap stmt.expr) in
+       ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
+       Emit.ret expr (lm#new_ret_lbl ())
+    | None -> Emit.ret "" (lm#new_ret_lbl ())
+
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
     let expr, type_ = evaluate_expr stmt in
@@ -231,7 +256,7 @@ module Ir2 = struct
        let mut_type = stored_var.type_
        and mut_id = ident in
 
-       if nums_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+       if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string mut_type)
                           (TokenType.id_type_to_string expr_type)
@@ -251,14 +276,31 @@ module Ir2 = struct
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
       let right, right_type = evaluate_expr stmt.right in
-      if nums_compatable left_type right_type then Emit.store right left left_type
+      if types_compatable left_type right_type then Emit.store right left left_type
       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                         (TokenType.id_type_to_string left_type)
                         (TokenType.id_type_to_string right_type)
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    failwith "todo"
+    let condition, condition_type = evaluate_expr stmt.expr in
+    let if_lbl, else_lbl, if_done_lbl = lm#new_if_lbl () in
+    Emit.jnz condition if_lbl (if stmt.else_ = None then if_done_lbl else else_lbl);
+    Emit.lbl if_lbl;
+
+    evaluate_block_stmt stmt.block;
+
+    (match List.hd (List.rev stmt.block.stmts) with
+     | Ast.Ret _ -> ()
+     | _ -> Emit.jmp if_done_lbl);
+
+    (match stmt.else_ with
+     | Some block ->
+        Emit.lbl else_lbl;
+        evaluate_block_stmt block
+     | None -> ());
+
+    Emit.lbl if_done_lbl
 
   and evaluate_stmt = function
     | Ast.Proc_def stmt -> assert false

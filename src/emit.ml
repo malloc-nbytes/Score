@@ -107,4 +107,15 @@ module Emit = struct
     Scope.state.func_section <-
       sprintf "%s    call $%s(%s)\n" Scope.state.func_section name args
 
+  let jnz (cond : string) (true_lbl : string) (false_lbl : string) : unit =
+    Scope.state.func_section <-
+      sprintf "%s    jnz %s, @%s, @%s\n"
+        Scope.state.func_section cond true_lbl false_lbl
+
+  let lbl (lbl : string) : unit =
+    Scope.state.func_section <- sprintf "%s@%s\n" Scope.state.func_section lbl
+
+  let jmp (lbl : string) : unit =
+    Scope.state.func_section <- sprintf "%s    jmp @%s\n" Scope.state.func_section lbl
+
 end

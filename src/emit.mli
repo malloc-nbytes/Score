@@ -19,4 +19,7 @@ module Emit : sig
   val ret : string -> string -> unit
   val proc_call_wassign : string -> string -> string -> TokenType.id_type -> unit
   val proc_call_woassign : string -> string -> unit
+  val jnz : string -> string -> string -> unit
+  val lbl : string -> unit
+  val jmp : string -> unit
 end
