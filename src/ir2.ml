@@ -225,6 +225,7 @@ module Ir2 = struct
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string mut_type)
                           (TokenType.id_type_to_string expr_type)
+    | Ast.Mut_ptr mutptr -> failwith "evaluate_mut_stmt: mutptr unimplemented"
     | Ast.Mut_arr mutarr -> failwith "evaluate_mut_stmt: mutarr unimplemented"
 
   and evaluate_stmt = function

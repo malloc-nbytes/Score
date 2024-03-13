@@ -84,9 +84,15 @@ module Ast = struct
 
   and mut_stmt =
     | Mut_var of mut_var_stmt
+    | Mut_ptr of mut_ptr_stmt
     | Mut_arr of mut_arr_stmt
 
   and mut_var_stmt =
+    { id : Token.t
+    ; expr : expr
+    }
+
+  and mut_ptr_stmt =
     { id : Token.t
     ; expr : expr
     }
