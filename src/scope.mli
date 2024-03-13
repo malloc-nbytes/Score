@@ -10,10 +10,10 @@ module Scope : sig
     }
 
   type var =
-    { id : string
-    ; token : Token.t
-    ; type_ : TokenType.id_type
-    ; stack_allocd : bool
+    { mutable id : string
+    ; mutable token : Token.t
+    ; mutable type_ : TokenType.id_type
+    ; mutable stack_allocd : bool
     }
 
   type proc =
@@ -35,6 +35,7 @@ module Scope : sig
   val assert_token_in_scope : Token.t -> unit
   val assert_id_in_scope : string -> unit
   val add_id_to_scope : string -> Token.t -> TokenType.id_type -> bool -> unit
+  val modify_token_in_scope : string -> string option -> Token.t option -> TokenType.id_type option -> bool option -> unit
   val get_token_from_scope : string -> var
   val add_proc_to_tbl : Ast.proc_def_stmt -> unit
   val assert_proc_in_tbl : string -> unit

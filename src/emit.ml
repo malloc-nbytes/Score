@@ -14,7 +14,9 @@ module Emit = struct
     and emitted_params = List.fold_left (fun acc param ->
                              let id = (fst param).Token.lexeme in
                              let type_ = Utils.scr_to_qbe_type @@ snd param in
-                             acc ^ type_ ^ " %" ^ id ^ ", "
+                             ignore type_;
+                             (* acc ^ type_ ^ " %" ^ id ^ ", " *)
+                             acc ^ "l" ^ " %" ^ id ^ ", "
                            ) "" params
 
     and emitted_export = if export then "export" else ""

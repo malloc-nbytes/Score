@@ -39,8 +39,7 @@ See `./scr --help` for more options
 - Arrays [X]
 - Turing complete [X]
 - unary operators [ ]
-- Semantic analysis [ ]
-- ADTs [ ]
+- structs [ ]
 - Self-hosted [ ]
 
 # Current Bugs

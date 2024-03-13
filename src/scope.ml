@@ -18,10 +18,10 @@ module Scope = struct
     }
 
   type var =
-    { id : string
-    ; token : Token.t
-    ; type_ : TokenType.id_type
-    ; stack_allocd : bool
+    { mutable id : string
+    ; mutable token : Token.t
+    ; mutable type_ : TokenType.id_type
+    ; mutable stack_allocd : bool
     }
 
   type proc =
@@ -80,6 +80,31 @@ module Scope = struct
          else
            get_token_from_scope' ss in
     get_token_from_scope' !id_tbl
+
+  let modify_token_in_scope (orig_id : string) (new_id : string option) (new_token : Token.t option) (new_type : TokenType.id_type option) (new_stack_allocd : bool option) : unit =
+    let rec modify_token_in_scope' (tbl : ((string, var) Hashtbl.t) list) : unit =
+      match tbl with
+      | [] -> failwith "unreachable"
+      | s :: ss ->
+         if Hashtbl.mem s orig_id then
+           let v = Hashtbl.find s orig_id in
+           let new_id = match new_id with
+             | Some id -> id
+             | None -> v.id in
+           let new_token = match new_token with
+             | Some token -> token
+             | None -> v.token in
+           let new_type = match new_type with
+             | Some type_ -> type_
+             | None -> v.type_ in
+           let new_stack_allocd = match new_stack_allocd with
+             | Some stack_allocd -> stack_allocd
+             | None -> v.stack_allocd in
+           Hashtbl.remove s orig_id;
+           Hashtbl.add s new_id {id = new_id; token = new_token; type_ = new_type; stack_allocd = new_stack_allocd}
+         else
+           modify_token_in_scope' ss in
+    modify_token_in_scope' !id_tbl
 
   (*** Procedures ***)
 

@@ -183,7 +183,7 @@ module Ir2 = struct
            let reg = lm#new_reg false in
            if proc_rettype = TokenType.Void then
              let _ = Emit.proc_call_woassign pc.id.lexeme args in
-             reg, proc_rettype
+             reg, proc_rettype (* NOTE: remove `reg` here if issues are caused *)
            else
              let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
              reg, proc_rettype)
@@ -244,7 +244,6 @@ module Ir2 = struct
        Emit.ret expr (lm#new_ret_lbl ())
     | None -> Emit.ret "" (lm#new_ret_lbl ())
 
-
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
     let expr, type_ = evaluate_expr stmt in
     ignore expr;
@@ -259,10 +258,22 @@ module Ir2 = struct
        let mut_type = stored_var.type_
        and mut_id = ident in
 
-       if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
-       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
-                          (TokenType.id_type_to_string mut_type)
-                          (TokenType.id_type_to_string expr_type)
+       if not stored_var.stack_allocd then
+         let reg = lm#new_reg false in
+         Emit.copy reg mut_type ("%" ^ mut_id.lexeme);
+         Emit.stack_alloc4 (mut_id.lexeme) (Utils.scr_type_to_bytes mut_type);
+         Emit.store reg ("%" ^ mut_id.lexeme) mut_type;
+         Scope.modify_token_in_scope mut_id.lexeme None None None (Some true);
+
+         if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+         else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                            (TokenType.id_type_to_string mut_type)
+                            (TokenType.id_type_to_string expr_type)
+        else
+         if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+         else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                            (TokenType.id_type_to_string mut_type)
+                            (TokenType.id_type_to_string expr_type)
     | Ast.Dereference deref ->
        let left, left_type = match deref with
          | Ast.Term (Ast.Ident ident) ->

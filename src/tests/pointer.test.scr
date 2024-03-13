@@ -1,0 +1,78 @@
+proc basic(void): i32 {
+    printf("basic\n");
+
+    let a: i32 = 1;
+    let p: i32 ref = &a;
+    *p = 2;
+    return a;
+}
+
+proc basic2(void): i32 {
+    printf("basic2\n");
+
+    let a: i32 = 1;
+    let p: i32 ref = &a;
+    *p = 2;
+    return *p;
+}
+
+proc mod_var_by_ref'(a: i32 ref): void {
+    *a = 100;
+    *a += 1;
+}
+
+proc mod_var_by_ref(void): i32 {
+    printf("mod_var_by_ref\n");
+
+    let a: i32 = 0;
+    mod_var_by_ref'(&a);
+    return a;
+}
+
+proc mod_var_by_ref2(void): i32 {
+    printf("mod_var_by_ref2\n");
+
+    let a: i32 = 0;
+    let p: i32 ref = &a;
+    mod_var_by_ref'(p);
+    return *p;
+}
+
+proc mod_var_by_ref3(void): i32 {
+    printf("mod_var_by_ref3\n");
+
+    let a: i32 = 0;
+    let p: i32 ref = &a;
+    mod_var_by_ref'(p);
+    return a;
+}
+
+proc main(void): i32 {
+    if basic() != 2 {
+        printf("basic failed\n");
+        exit(1);
+    }
+
+    if basic2() != 2 {
+        printf("basic2 failed\n");
+        exit(1);
+    }
+
+    if mod_var_by_ref() != 101 {
+        printf("mod_var_by_ref failed\n");
+        exit(1);
+    }
+
+    if mod_var_by_ref2() != 101 {
+        printf("mod_var_by_ref2 failed\n");
+        exit(1);
+    }
+
+    if mod_var_by_ref3() != 101 {
+        printf("mod_var_by_ref3 failed\n");
+        exit(1);
+    }
+
+
+    return 0;
+}
