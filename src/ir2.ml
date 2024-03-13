@@ -172,7 +172,10 @@ module Ir2 = struct
            let reg = lm#new_reg false in
            Emit.proc_call_wassign reg "printf" args TokenType.I32;
            reg, TokenType.I32
-        | "exit" -> assert false
+        | "exit" ->
+           assert (List.length pc.args = 1);
+           Emit.proc_call_woassign "exit" args;
+           "", TokenType.Void
         | _ -> (* user-defined proc *)
            (* TODO: assert proc params match *)
            Scope.assert_proc_in_tbl pc.id.lexeme;
