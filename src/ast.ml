@@ -104,6 +104,7 @@ module Ast = struct
     | Array_retrieval of array_retrieval_expr
     | Cast of TokenType.id_type * expr (* TODO: move to term_expr *)
     | Reference of expr
+    | Dereference of expr
 
   and array_retrieval_expr =
     { id : Token.t

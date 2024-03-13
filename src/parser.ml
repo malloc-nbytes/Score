@@ -130,6 +130,11 @@ module Parser = struct
        (match expr with
         | (Ast.Term Ast.Ident ident) as term -> Ast.Reference term, tokens
         | _ -> failwith "TODO FIX ERR: References must take the address of an identifier")
+    | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing an ident *)
+       let expr, tokens = parse_primary_expr tl in
+       (match expr with
+        | (Ast.Term Ast.Ident ident) as term -> Ast.Dereference term, tokens
+        | _ -> failwith "TODO FIX ERR: Dereferences must take the address of an identifier")
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl

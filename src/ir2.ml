@@ -1,3 +1,22 @@
+(*
+--- Dereferencing ---
+export function w $main() {
+@start
+    %a =l alloc4 4 # variable
+    storew 37, %a # storing into it
+
+    %p =l alloc4 8 # allocate pointer
+    storel %a, %p # store address of %a into %p
+
+    %deref =l loadl %p # load the address of %a
+    %deref2 =w loadw %deref # load the value at the address of %a
+
+    %__SCORE_REG3 =w call $printf(l $__SCORE_REG1, w %deref2 )
+    ret 0
+}
+data $__SCORE_REG1 = { b "%d\n", b 0 }
+*)
+
 module Ir2 = struct
   open Printf
   open Ast
@@ -84,13 +103,27 @@ module Ir2 = struct
        let stored_var = Scope.get_token_from_scope ident.lexeme in
        let stored_type = stored_var.type_ in
        if stored_var.stack_allocd then
-         Emit.load reg stored_type ident.lexeme
+         Emit.load reg stored_type ("%" ^ ident.lexeme)
        else
          Emit.copy reg stored_type ("%" ^ ident.lexeme);
        reg, stored_type
 
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
+
+    | Ast.Dereference deref ->
+      (match deref with
+      | Ast.Term (Ast.Ident ident) ->
+         Scope.assert_token_in_scope ident;
+         let reg = lm#new_reg false in
+         let stored_var = Scope.get_token_from_scope ident.lexeme in
+         let stored_type = stored_var.type_ in
+         Emit.load reg (stored_type) ("%" ^ ident.lexeme);
+         let reg2 = lm#new_reg false in
+         let inner_type = Utils.unwrap_ptr stored_type in
+         Emit.load reg2 inner_type reg;
+         reg2, inner_type
+      | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
 
     | Ast.Reference expr ->
        (match expr with
