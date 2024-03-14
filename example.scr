@@ -14,28 +14,6 @@ proc factorial(n: i32): i32 {
     return res;
 }
 
--- Check if a given number is prime.
-proc is_prime(n: i32): i32 {
-    let flag: i32 = 1;
-
-    -- `for let` loops can also have parenthesis.
-    for (let i: i32 = 2; i <= n/2; i += 1;) {
-        if n % i == 0 {
-            flag = 0;
-            break; -- Break statements are currently unstable.
-        }
-    }
-
-    if flag {
-        printf("The number %d is prime\n", n);
-    }
-    else {
-        printf("The number %d is not prime\n", n);
-    }
-
-    return 0;
-}
-
 -- The classic "FizzBuzz" problem.
 proc fizzbuzz(void): void {
     let i: i32 = 1;
@@ -91,23 +69,18 @@ proc print_matrix(void): void {
     }
 }
 
-proc compare_strs(s1: str, s2: str): i32 {
-     -- Call to C function strcmp().
-     return strcmp(s1, s2) == 0;
-}
-
--- Arrays example.
+-- Arrays and casting example.
 proc find_majority_elem(arr: i32[], n: usize): i32 {
     let freqs: i32[10] = {0};
 
-    for let i: i32 = 0; i < n; i += 1; {
-        freqs[arr[i]] += 1;
+    for let i: usize = 0; i < n; i += 1; {
+        freqs[usize arr[i]] += 1;
     }
 
     let m: i32 = 0;
-    for let i: i32 = 0; i < 10; i += 1; {
-        if freqs[i] > freqs[m] {
-            m = i;
+    for let i: usize = 0; i < 10; i += 1; {
+        if freqs[i] > freqs[usize m] {
+            m = i32 i;
         }
     }
 
@@ -128,17 +101,7 @@ proc main(void): i32 {
 
     print_name("John", "Doe");
 
-    is_prime(13);
-
     printf("Factorial of 5: %d\n", factorial(5));
-
-    let strs_eq: i32 = compare_strs("hello", "hello");
-    if strs_eq {
-        printf("the strings are equal\n");
-    }
-    else {
-        printf("the strings are not equal\n");
-    }
 
     -- Intitialze arrays with len = `..` and
     -- will be infered from the len of the rhs
