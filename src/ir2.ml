@@ -54,6 +54,8 @@ module Ir2 = struct
 
   let lm = new label_maker
 
+  let last_tok : (Token.t option) ref = ref None
+
   (* --- Helpers --- *)
 
   let types_compatable (type1 : TokenType.id_type) (type2 : TokenType.id_type) : bool =
@@ -105,10 +107,15 @@ module Ir2 = struct
          (* NOTE: can use either lhs_type or rhs_type *)
          let _ = Emit.binop reg lhs_type lhs rhs instr in
          reg, lhs_type
-       else failwith @@ sprintf "%s: type mismatch: %s :: %s"
+       else
+         let _ = Err.err_type_mismatch !last_tok lhs_type rhs_type in
+         exit 1
+(*
+         failwith @@ sprintf "%s: type mismatch: %s :: %s"
                           __FUNCTION__
                           (TokenType.id_type_to_string lhs_type)
                           (TokenType.id_type_to_string rhs_type)
+*)
 
     | Ast.Array_retrieval ar ->
        Scope.assert_token_in_scope ar.id;
@@ -136,6 +143,7 @@ module Ir2 = struct
        let reg = lm#new_reg false in
        let stored_var = Scope.get_token_from_scope ident.lexeme in
        let stored_type = stored_var.type_ in
+       last_tok := Some ident;
 
        (match stored_type with
         | TokenType.Array (_, _) ->
@@ -191,11 +199,12 @@ module Ir2 = struct
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
         let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
         let array_reg = lm#new_reg false in
-        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*4));
+        let stride = if force_long then 8 else 4 in
+        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
 
         for i = 0 to len - 1 do
           let added_reg = lm#new_reg false in
-          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*4)) "add";
+          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
           let expr, expr_type = evaluate_expr (List.nth exprs i) force_long in
           Emit.store expr added_reg expr_type
         done;
@@ -237,7 +246,9 @@ module Ir2 = struct
 
     Scope.assert_token_not_in_scope id;
 
-    let expr, expr_type = evaluate_expr stmt.expr false in
+    let expr, expr_type = match stmt_type with
+    | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true
+    | _ -> evaluate_expr stmt.expr false in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
     match stmt_type with
@@ -249,7 +260,8 @@ module Ir2 = struct
         let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
         let _ = Emit.stack_alloc4 id_lexeme bytes in
         Emit.store expr ("%" ^ id_lexeme) stmt_type
-      else failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
+      else
+        failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
                         (TokenType.id_type_to_string stmt_type)
                         (TokenType.id_type_to_string expr_type)
 
@@ -324,9 +336,10 @@ module Ir2 = struct
        assert (stored_var.stack_allocd);
 
        if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
-       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
-                          (TokenType.id_type_to_string mut_type)
-                          (TokenType.id_type_to_string expr_type)
+       else
+         let _ = Err.err_type_mismatch (Some mut_id) mut_type expr_type in
+         exit 1
+
     | Ast.Dereference deref ->
        let left, left_type = match deref with
          | Ast.Term (Ast.Ident ident) ->

@@ -25,7 +25,8 @@ module Utils = struct
     | TokenType.Pointer _ -> "8"
     | TokenType.Number -> "w"
     | TokenType.Array (TokenType.I32, Some len) -> Printf.sprintf "%d" (4 * len)
-    | TokenType.Array (TokenType.I32, None) -> "8"
+    | TokenType.Array (TokenType.Usize, Some len) -> Printf.sprintf "%d" (8 * len)
+    | TokenType.Array (_, None) -> "8"
     | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
 
   let scr_to_qbe_type (type_: TokenType.id_type) =
