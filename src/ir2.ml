@@ -117,10 +117,7 @@ module Ir2 = struct
        let reg = lm#new_reg false in
        let stored_var = Scope.get_token_from_scope ident.lexeme in
        let stored_type = stored_var.type_ in
-       if stored_var.stack_allocd then
-         Emit.load reg stored_type ("%" ^ ident.lexeme)
-       else
-         Emit.copy reg stored_type ("%" ^ ident.lexeme);
+       (if stored_var.stack_allocd then Emit.load reg stored_type ("%" ^ ident.lexeme));
        reg, stored_type
 
     | Ast.Term Ast.Intlit intlit ->
@@ -236,10 +233,21 @@ module Ir2 = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
-        Scope.add_id_to_scope id_lexeme id param_type false
+        Scope.add_id_to_scope id_lexeme id param_type true
       ) pd.params;
 
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
+    (* stack alloc params *)
+    List.iter (fun param ->
+        let id_lexeme = (fst param).Token.lexeme
+        and param_type = (snd param) in
+        let bytes = Utils.scr_type_to_bytes param_type in
+        let reg = lm#new_reg false in
+        Emit.copy reg param_type ("%" ^ id_lexeme);
+        Emit.stack_alloc4 id_lexeme bytes;
+        Emit.store reg ("%" ^ id_lexeme) param_type
+      ) pd.params;
+
     evaluate_block_stmt pd.block;
     Scope.pop ();
 
@@ -334,6 +342,7 @@ module Ir2 = struct
     Emit.lbl loop_entry_lbl;
 
     let cond, _ = evaluate_expr stmt.expr in
+
     Emit.jnz cond loop_begin_lbl loop_end_lbl;
     Emit.lbl loop_begin_lbl;
 
