@@ -7,15 +7,6 @@ module Ir2 = struct
   open Utils
   open Emit
 
-(*
-arrays:
-
-%arr =l alloc4 8
-storew 1, %arr
-%t =l add %arr, 4
-storew 2, %t
-*)
-
   class label_maker =
     object (self)
       val reg = "__SCORE_REG"
@@ -131,7 +122,7 @@ storew 2, %t
         let index, index_type = evaluate_expr index in
         let reg = lm#new_reg false in
 
-        if index_type <> TokenType.Usize then
+        if index_type <> TokenType.Usize && index_type <> TokenType.Number then
           failwith "evaluate_expr: Array_retrieval: arrays can only be indexed by Usize";
 
         Emit.binop reg TokenType.Usize ("%"^ar.id.lexeme) index "add";
@@ -145,8 +136,14 @@ storew 2, %t
        let reg = lm#new_reg false in
        let stored_var = Scope.get_token_from_scope ident.lexeme in
        let stored_type = stored_var.type_ in
-       (if stored_var.stack_allocd then Emit.load reg stored_type ("%" ^ ident.lexeme));
-       reg, stored_type
+
+       (match stored_type with
+        | TokenType.Array (_, _) ->
+           (* We want to avoid loading with an array *)
+           "%"^stored_var.id, TokenType.Usize
+        | _ ->
+           if stored_var.stack_allocd then Emit.load reg stored_type ("%" ^ ident.lexeme);
+           reg, stored_type)
 
     | Ast.Term Ast.Intlit intlit ->
        intlit.lexeme, TokenType.Number
@@ -283,10 +280,14 @@ storew 2, %t
         let id_lexeme = (fst param).Token.lexeme
         and param_type = (snd param) in
         let bytes = Utils.scr_type_to_bytes param_type in
-        let reg = lm#new_reg false in
-        Emit.copy reg param_type ("%" ^ id_lexeme);
-        Emit.stack_alloc4 id_lexeme bytes;
-        Emit.store reg ("%" ^ id_lexeme) param_type
+
+        match param_type with
+        | TokenType.Array (_, _) -> ()
+        | _ ->
+           let reg = lm#new_reg false in
+           Emit.copy reg param_type ("%" ^ id_lexeme);
+           Emit.stack_alloc4 id_lexeme bytes;
+           Emit.store reg ("%" ^ id_lexeme) param_type
       ) pd.params;
 
     evaluate_block_stmt pd.block;
@@ -313,7 +314,7 @@ storew 2, %t
 
   and evaluate_mut_stmt (stmt : Ast.mut_stmt) : unit =
     match stmt.left with
-    | Term Ident ident ->
+    | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
        let expr, expr_type = evaluate_expr stmt.right
        and stored_var = Scope.get_token_from_scope ident.lexeme in
@@ -339,6 +340,10 @@ storew 2, %t
             let reg = lm#new_reg false in
             Emit.load reg TokenType.Usize ("%" ^ ident.lexeme);
             reg, inner_type
+         | Ast.Array_retrieval ar -> failwith "todo"
+            (* Scope.assert_token_in_scope ar.id; *)
+            (* evaluate_expr ar; *)
+            (* "%"^ar.id, inner_type *)
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
        let right, right_type = evaluate_expr stmt.right in
