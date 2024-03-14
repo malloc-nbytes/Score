@@ -93,11 +93,11 @@ module Ir2 = struct
     | TokenType.PercentEquals -> "rem"
     | _ -> failwith "evaluate_binop: invalid binop"
 
-  let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
+  let rec evaluate_expr (expr : Ast.expr) (force_long : bool) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-       let lhs, lhs_type = evaluate_expr bin.lhs in
-       let rhs, rhs_type = evaluate_expr bin.rhs in
+       let lhs, lhs_type = evaluate_expr bin.lhs force_long in
+       let rhs, rhs_type = evaluate_expr bin.rhs force_long in
        let instr = evaluate_binop bin.op.ttype in
        let reg = lm#new_reg false in
 
@@ -119,7 +119,7 @@ module Ir2 = struct
         let index = Ast.Binary {lhs = ar.index;
                                 op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                 rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-        let index, index_type = evaluate_expr index in
+        let index, index_type = evaluate_expr index true in
         let reg = lm#new_reg false in
 
         if index_type <> TokenType.Usize && index_type <> TokenType.Number then
@@ -146,7 +146,7 @@ module Ir2 = struct
            reg, stored_type)
 
     | Ast.Term Ast.Intlit intlit ->
-       intlit.lexeme, TokenType.Number
+        intlit.lexeme, (if force_long then TokenType.Usize else TokenType.Number)
 
     | Ast.Dereference deref ->
        (match deref with
@@ -172,7 +172,7 @@ module Ir2 = struct
         | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
-       let expr, expr_type = evaluate_expr expr in
+       let expr, expr_type = evaluate_expr expr force_long in
        if cast_type = expr_type then expr, cast_type
        else
          let reg = lm#new_reg false in
@@ -196,7 +196,7 @@ module Ir2 = struct
         for i = 0 to len - 1 do
           let added_reg = lm#new_reg false in
           Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*4)) "add";
-          let expr, expr_type = evaluate_expr (List.nth exprs i) in
+          let expr, expr_type = evaluate_expr (List.nth exprs i) force_long in
           Emit.store expr added_reg expr_type
         done;
 
@@ -205,7 +205,7 @@ module Ir2 = struct
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
-                      let arg, arg_type = evaluate_expr e in
+                      let arg, arg_type = evaluate_expr e force_long in
                       let arg_type = Utils.scr_to_qbe_type arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
@@ -237,7 +237,7 @@ module Ir2 = struct
 
     Scope.assert_token_not_in_scope id;
 
-    let expr, expr_type = evaluate_expr stmt.expr in
+    let expr, expr_type = evaluate_expr stmt.expr false in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
     match stmt_type with
@@ -302,13 +302,13 @@ module Ir2 = struct
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     match stmt.expr with
     | Some expr ->
-       let expr, expr_type = evaluate_expr (Utils.unwrap stmt.expr) in
+       let expr, expr_type = evaluate_expr (Utils.unwrap stmt.expr) false in
        ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
        Emit.ret expr (lm#new_ret_lbl ())
     | None -> Emit.ret "" (lm#new_ret_lbl ())
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
-    let expr, type_ = evaluate_expr stmt in
+    let expr, type_ = evaluate_expr stmt false in
     ignore expr;
     ignore type_
 
@@ -316,7 +316,7 @@ module Ir2 = struct
     match stmt.left with
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
-       let expr, expr_type = evaluate_expr stmt.right
+       let expr, expr_type = evaluate_expr stmt.right false
        and stored_var = Scope.get_token_from_scope ident.lexeme in
        let mut_type = stored_var.type_
        and mut_id = ident in
@@ -340,21 +340,32 @@ module Ir2 = struct
             let reg = lm#new_reg false in
             Emit.load reg TokenType.Usize ("%" ^ ident.lexeme);
             reg, inner_type
-         | Ast.Array_retrieval ar -> failwith "todo"
-            (* Scope.assert_token_in_scope ar.id; *)
-            (* evaluate_expr ar; *)
-            (* "%"^ar.id, inner_type *)
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
-       let right, right_type = evaluate_expr stmt.right in
+       let right, right_type = evaluate_expr stmt.right false in
        if types_compatable left_type right_type then Emit.store right left left_type
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string left_type)
                           (TokenType.id_type_to_string right_type)
+    | Ast.Array_retrieval ar ->
+        Scope.assert_token_in_scope ar.id;
+        let stored_var = Scope.get_token_from_scope ar.id.lexeme in
+        let stored_type = stored_var.type_ in
+        let inner_type = Utils.unwrap_array stored_type in
+        let multiplicative = Utils.scr_type_to_bytes inner_type in
+        let index = Ast.Binary {lhs = ar.index;
+                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+        let index, index_type = evaluate_expr index true in
+        let expr, expr_type = evaluate_expr stmt.right false in
+        let array_reg = "%"^ar.id.lexeme in
+        let added_reg = lm#new_reg false in
+        Emit.binop added_reg TokenType.Usize array_reg index "add";
+        Emit.store expr added_reg expr_type
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    let condition, condition_type = evaluate_expr stmt.expr in
+    let condition, condition_type = evaluate_expr stmt.expr false in
     let if_lbl, else_lbl, if_done_lbl = lm#new_if_lbl () in
     Emit.jnz condition if_lbl (if stmt.else_ = None then if_done_lbl else else_lbl);
     Emit.lbl if_lbl;
@@ -377,7 +388,7 @@ module Ir2 = struct
     let loop_entry_lbl, loop_begin_lbl, loop_end_lbl = lm#new_loop_lbl () in
     Emit.lbl loop_entry_lbl;
 
-    let cond, _ = evaluate_expr stmt.expr in
+    let cond, _ = evaluate_expr stmt.expr false in
 
     Emit.jnz cond loop_begin_lbl loop_end_lbl;
     Emit.lbl loop_begin_lbl;
@@ -398,7 +409,7 @@ module Ir2 = struct
 
     Emit.lbl loop_entry_lbl;
 
-    let expr, _ = evaluate_expr stmt.cond in
+    let expr, _ = evaluate_expr stmt.cond false in
 
     Emit.jnz expr loop_begin_lbl loop_end_lbl;
     Emit.lbl loop_begin_lbl;

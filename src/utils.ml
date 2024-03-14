@@ -23,7 +23,7 @@ module Utils = struct
     | TokenType.Str -> "8"
     | TokenType.Char -> "1"
     | TokenType.Pointer _ -> "8"
-    | TokenType.Number -> "8"
+    | TokenType.Number -> "w"
     | TokenType.Array (TokenType.I32, Some len) -> Printf.sprintf "%d" (4 * len)
     | TokenType.Array (TokenType.I32, None) -> "8"
     | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
@@ -34,7 +34,7 @@ module Utils = struct
     | TokenType.Usize -> "l"
     | TokenType.Str -> "l"
     | TokenType.Char -> "b"
-    | TokenType.Number -> "l"
+    | TokenType.Number -> "w"
     | TokenType.Pointer TokenType.I32 -> "l"
     | TokenType.Pointer TokenType.Usize -> "l"
     | TokenType.Void -> ""
