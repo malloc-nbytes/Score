@@ -7,6 +7,15 @@ module Ir2 = struct
   open Utils
   open Emit
 
+(*
+arrays:
+
+%arr =l alloc4 8
+storew 1, %arr
+%t =l add %arr, 4
+storew 2, %t
+*)
+
   class label_maker =
     object (self)
       val reg = "__SCORE_REG"
@@ -110,7 +119,25 @@ module Ir2 = struct
                           (TokenType.id_type_to_string lhs_type)
                           (TokenType.id_type_to_string rhs_type)
 
-    | Ast.Array_retrieval ar -> assert false
+    | Ast.Array_retrieval ar ->
+       Scope.assert_token_in_scope ar.id;
+        let stored_var = Scope.get_token_from_scope ar.id.lexeme in
+        let stored_type = stored_var.type_ in
+        let inner_type = Utils.unwrap_array stored_type in
+        let multiplicative = Utils.scr_type_to_bytes inner_type in
+        let index = Ast.Binary {lhs = ar.index;
+                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+        let index, index_type = evaluate_expr index in
+        let reg = lm#new_reg false in
+
+        Emit.extsw reg TokenType.Usize index;
+        let reg2 = lm#new_reg false in
+        Emit.binop reg2 TokenType.Usize ("%"^ar.id.lexeme) index "add";
+
+        let reg3 = lm#new_reg false in
+        Emit.load reg3 inner_type reg2;
+        reg3, inner_type
 
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
@@ -124,28 +151,27 @@ module Ir2 = struct
        intlit.lexeme, TokenType.Number
 
     | Ast.Dereference deref ->
-      (match deref with
-      | Ast.Term (Ast.Ident ident) ->
-         Scope.assert_token_in_scope ident;
-         let stored_var = Scope.get_token_from_scope ident.lexeme in
-         let inner_type = Utils.unwrap_ptr stored_var.type_ in
-         let reg = lm#new_reg false in
-         let reg2 = lm#new_reg false in
+       (match deref with
+        | Ast.Term (Ast.Ident ident) ->
+           Scope.assert_token_in_scope ident;
+           let stored_var = Scope.get_token_from_scope ident.lexeme in
+           let inner_type = Utils.unwrap_ptr stored_var.type_ in
+           let reg = lm#new_reg false in
+           let reg2 = lm#new_reg false in
 
-         Emit.load reg TokenType.Usize ("%"^stored_var.id);
-         Emit.load reg2 inner_type reg;
-         reg2, inner_type
-
-      | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
+           Emit.load reg TokenType.Usize ("%"^stored_var.id);
+           Emit.load reg2 inner_type reg;
+           reg2, inner_type
+        | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
 
     | Ast.Reference expr ->
        (match expr with
-       | Ast.Term (Ast.Ident ident) ->
-          Scope.assert_token_in_scope ident;
-          let stored_var = Scope.get_token_from_scope ident.lexeme in
-          let stored_type = stored_var.type_ in
-          "%"^stored_var.id, TokenType.Pointer stored_type
-       | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
+        | Ast.Term (Ast.Ident ident) ->
+           Scope.assert_token_in_scope ident;
+           let stored_var = Scope.get_token_from_scope ident.lexeme in
+           let stored_type = stored_var.type_ in
+           "%"^stored_var.id, TokenType.Pointer stored_type
+        | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
        let expr, expr_type = evaluate_expr expr in
@@ -164,7 +190,19 @@ module Ir2 = struct
        Emit.string_in_data_section reg strlit.lexeme;
        reg, TokenType.Str
 
-    | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> assert false
+    | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
+        let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
+        let array_reg = lm#new_reg false in
+        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*4));
+
+        for i = 0 to len - 1 do
+          let added_reg = lm#new_reg false in
+          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*4)) "add";
+          let expr, expr_type = evaluate_expr (List.nth exprs i) in
+          Emit.store expr added_reg expr_type
+        done;
+
+        array_reg, TokenType.Array (TokenType.I32, Some len)
 
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
@@ -204,13 +242,18 @@ module Ir2 = struct
     let expr, expr_type = evaluate_expr stmt.expr in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
-    if types_compatable stmt_type expr_type then
-      let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
-      let _ = Emit.stack_alloc4 id_lexeme bytes in
-      Emit.store expr ("%" ^ id_lexeme) stmt_type
-    else failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
-                       (TokenType.id_type_to_string stmt_type)
-                       (TokenType.id_type_to_string expr_type)
+    match stmt_type with
+    | TokenType.Array (inner_type, len) ->
+       Emit.copy ("%" ^ id_lexeme) stmt_type expr;
+       Scope.add_id_to_scope id_lexeme id stmt_type true
+    | _ ->
+      if types_compatable stmt_type expr_type then
+        let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
+        let _ = Emit.stack_alloc4 id_lexeme bytes in
+        Emit.store expr ("%" ^ id_lexeme) stmt_type
+      else failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
+                        (TokenType.id_type_to_string stmt_type)
+                        (TokenType.id_type_to_string expr_type)
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();
@@ -297,11 +340,11 @@ module Ir2 = struct
             reg, inner_type
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
-      let right, right_type = evaluate_expr stmt.right in
-      if types_compatable left_type right_type then Emit.store right left left_type
-      else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
-                        (TokenType.id_type_to_string left_type)
-                        (TokenType.id_type_to_string right_type)
+       let right, right_type = evaluate_expr stmt.right in
+       if types_compatable left_type right_type then Emit.store right left left_type
+       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                          (TokenType.id_type_to_string left_type)
+                          (TokenType.id_type_to_string right_type)
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =

@@ -91,7 +91,7 @@ module TokenType = struct
     | Void -> "Void"
     | Pointer t -> "Pointer " ^ id_type_to_string t
     | Number -> "Number"
-    | Array _ -> "Array PRINTING UNIMPLEMENTED"
+    | Array (a,len) -> "Array " ^ id_type_to_string a ^ " len " ^ (match len with Some l -> string_of_int l | None -> "None")
     | Custom s -> "Custom " ^ s
 
   (* Convert a Token to a string *)

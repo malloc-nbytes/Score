@@ -20,9 +20,6 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-(* TODO:
- * > refactor parse_mut_stmt *)
-
 module Parser = struct
   open Token
   open Ast
