@@ -110,12 +110,6 @@ module Ir2 = struct
        else
          let _ = Err.err_type_mismatch !last_tok lhs_type rhs_type in
          exit 1
-(*
-         failwith @@ sprintf "%s: type mismatch: %s :: %s"
-                          __FUNCTION__
-                          (TokenType.id_type_to_string lhs_type)
-                          (TokenType.id_type_to_string rhs_type)
-*)
 
     | Ast.Array_retrieval ar ->
        Scope.assert_token_in_scope ar.id;
@@ -129,8 +123,9 @@ module Ir2 = struct
         let index, index_type = evaluate_expr index true in
         let reg = lm#new_reg false in
 
-        if index_type <> TokenType.Usize && index_type <> TokenType.Number then
-          failwith "evaluate_expr: Array_retrieval: arrays can only be indexed by Usize";
+        (if index_type <> TokenType.Usize && index_type <> TokenType.Number then
+          let _ = Err.err_type_mismatch !last_tok TokenType.Usize index_type in
+          exit 1);
 
         Emit.binop reg TokenType.Usize ("%"^ar.id.lexeme) index "add";
 
@@ -261,9 +256,8 @@ module Ir2 = struct
         let _ = Emit.stack_alloc4 id_lexeme bytes in
         Emit.store expr ("%" ^ id_lexeme) stmt_type
       else
-        failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
-                        (TokenType.id_type_to_string stmt_type)
-                        (TokenType.id_type_to_string expr_type)
+        let _ = Err.err_type_mismatch (Some id) stmt_type expr_type in
+        exit 1
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();

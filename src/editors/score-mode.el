@@ -52,7 +52,7 @@
   :syntax-table score-mode-syntax-table
   (setq font-lock-defaults '(score-highlights))
   (setq-local comment-start "--")
-  (setq-local indent-tabs-mode nil) ; Set to t if you want to use tabs instead
+  (setq-local indent-tabs-mode nil)
   (setq-local tab-width 4)
   (setq-local indent-line-function #'score-indent-line)
   (setq-local standard-indent 2))

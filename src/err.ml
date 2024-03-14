@@ -79,6 +79,6 @@ module Err = struct
       | None -> "None", "None" in
     let lt_str = TokenType.id_type_to_string left_type
     and rt_str = TokenType.id_type_to_string right_type in
-    Printf.eprintf "[ERR]: %s\n%s\n  Reason: %s\n  At: %s\n  Types: %s <> %s\n" failure where reason at lt_str rt_str
+    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\nTypes: %s <> %s\n%s\n" failure reason at lt_str rt_str where
 
 end
