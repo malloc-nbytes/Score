@@ -25,7 +25,7 @@ open Token
 open Lexer
 open Parser
 open Ast
-open Ir2
+open Ir
 
 let run_qbe inter_code_fp output_fp should_del =
   let cmd = Printf.sprintf "qbe -o %s %s" output_fp inter_code_fp in
@@ -96,7 +96,7 @@ let () =
   (* Ast.ast_dump program; (\* debug *\) *)
 
   (* Generate intermediate code for QBE *)
-  let code = Ir2.generate_inter_lang program in
+  let code = Ir.generate_inter_lang program in
   (* print_endline code; (\* debug *\) *)
 
   (* Run QBE on the intermediate code *)

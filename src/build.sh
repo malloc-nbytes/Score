@@ -18,7 +18,7 @@ ocamlc -annot -c scope.mli
 ocamlc -annot -c scope.ml
 ocamlc -annot -c emit.mli
 ocamlc -annot -c emit.ml
-ocamlc -annot -c ir2.mli
-ocamlc -annot -c ir2.ml
+ocamlc -annot -c ir.mli
+ocamlc -annot -c ir.ml
 ocamlc -annot -c main.ml
-ocamlc -o scr token.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo ir2.cmo lexer.cmo parser.cmo main.cmo
+ocamlc -o scr token.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo ir.cmo lexer.cmo parser.cmo main.cmo
