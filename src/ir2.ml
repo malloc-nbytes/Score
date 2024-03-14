@@ -131,13 +131,14 @@ storew 2, %t
         let index, index_type = evaluate_expr index in
         let reg = lm#new_reg false in
 
-        Emit.extsw reg TokenType.Usize index;
-        let reg2 = lm#new_reg false in
-        Emit.binop reg2 TokenType.Usize ("%"^ar.id.lexeme) index "add";
+        if index_type <> TokenType.Usize then
+          failwith "evaluate_expr: Array_retrieval: arrays can only be indexed by Usize";
 
-        let reg3 = lm#new_reg false in
-        Emit.load reg3 inner_type reg2;
-        reg3, inner_type
+        Emit.binop reg TokenType.Usize ("%"^ar.id.lexeme) index "add";
+
+        let reg2 = lm#new_reg false in
+        Emit.load reg2 inner_type reg;
+        reg2, inner_type
 
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
