@@ -91,7 +91,7 @@ module Ir2 = struct
     | TokenType.MinusEquals -> "sub"
     | TokenType.AsteriskEquals -> "mul"
     | TokenType.PercentEquals -> "rem"
-    | _ -> failwith "evaluate_binop: unimplemented binop"
+    | _ -> failwith "evaluate_binop: invalid binop"
 
   let rec evaluate_expr (expr : Ast.expr) : string * TokenType.id_type =
     match expr with
@@ -130,15 +130,11 @@ module Ir2 = struct
          let stored_var = Scope.get_token_from_scope ident.lexeme in
          let inner_type = Utils.unwrap_ptr stored_var.type_ in
          let reg = lm#new_reg false in
+         let reg2 = lm#new_reg false in
 
-         if stored_var.stack_allocd then
-           let reg2 = lm#new_reg false in
-           let _ = Emit.load reg TokenType.Usize ("%"^stored_var.id) in
-           let _ = Emit.load reg2 inner_type reg in
-           reg2, inner_type
-         else
-           let _ = Emit.load reg inner_type ("%"^stored_var.id) in
-           reg, inner_type
+         Emit.load reg TokenType.Usize ("%"^stored_var.id);
+         Emit.load reg2 inner_type reg;
+         reg2, inner_type
 
       | _ -> failwith "evaluate_expr: Ast.Dereference: unreachable")
 
@@ -212,7 +208,7 @@ module Ir2 = struct
       let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
       let _ = Emit.stack_alloc4 id_lexeme bytes in
       Emit.store expr ("%" ^ id_lexeme) stmt_type
-    else failwith @@ sprintf "%s: type mismatch: %s %s" __FUNCTION__
+    else failwith @@ sprintf "%s: type mismatch: %s :: %s" __FUNCTION__
                        (TokenType.id_type_to_string stmt_type)
                        (TokenType.id_type_to_string expr_type)
 
@@ -237,6 +233,7 @@ module Ir2 = struct
       ) pd.params;
 
     Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
+
     (* stack alloc params *)
     List.iter (fun param ->
         let id_lexeme = (fst param).Token.lexeme
@@ -279,22 +276,12 @@ module Ir2 = struct
        let mut_type = stored_var.type_
        and mut_id = ident in
 
-       if not stored_var.stack_allocd then
-         let reg = lm#new_reg false in
-         Emit.copy reg mut_type ("%" ^ mut_id.lexeme);
-         Emit.stack_alloc4 (mut_id.lexeme) (Utils.scr_type_to_bytes mut_type);
-         Emit.store reg ("%" ^ mut_id.lexeme) mut_type;
-         Scope.modify_token_in_scope mut_id.lexeme None None None (Some true);
+       assert (stored_var.stack_allocd);
 
-         if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
-         else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
-                            (TokenType.id_type_to_string mut_type)
-                            (TokenType.id_type_to_string expr_type)
-        else
-         if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
-         else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
-                            (TokenType.id_type_to_string mut_type)
-                            (TokenType.id_type_to_string expr_type)
+       if types_compatable mut_type expr_type then Emit.store expr ("%" ^ mut_id.lexeme) mut_type
+       else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
+                          (TokenType.id_type_to_string mut_type)
+                          (TokenType.id_type_to_string expr_type)
     | Ast.Dereference deref ->
        let left, left_type = match deref with
          | Ast.Term (Ast.Ident ident) ->
@@ -302,12 +289,12 @@ module Ir2 = struct
             let stored_var = Scope.get_token_from_scope ident.lexeme in
             let stored_type = stored_var.type_ in
             let inner_type = Utils.unwrap_ptr stored_type in
-            if stored_var.stack_allocd then
-              let reg = lm#new_reg false in
-              Emit.load reg TokenType.Usize ("%" ^ ident.lexeme);
-              reg, inner_type
-            else
-              "%"^stored_var.id, inner_type
+
+            assert (stored_var.stack_allocd);
+
+            let reg = lm#new_reg false in
+            Emit.load reg TokenType.Usize ("%" ^ ident.lexeme);
+            reg, inner_type
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
       let right, right_type = evaluate_expr stmt.right in
