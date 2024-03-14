@@ -1,3 +1,25 @@
+(* MIT License
+
+   * Copyright (c) 2023 malloc-nbytes
+
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
+
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
+
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE. *)
+
 module Ast : sig
   open Token
 
@@ -27,7 +49,7 @@ module Ast : sig
 
   and block_stmt = { stmts : stmt list }
 
-  and ret_stmt = { expr : expr }
+  and ret_stmt = { expr : expr option }
 
   and while_stmt =
     { expr : expr
@@ -61,18 +83,8 @@ module Ast : sig
     }
 
   and mut_stmt =
-    | Mut_var of mut_var_stmt
-    | Mut_arr of mut_arr_stmt
-
-  and mut_var_stmt =
-    { id : Token.t
-    ; expr : expr
-    }
-
-  and mut_arr_stmt =
-    { id : Token.t
-    ; index : expr
-    ; expr : expr
+    { left : expr
+    ; right : expr
     }
 
   and expr =
@@ -80,6 +92,9 @@ module Ast : sig
     | Term of term_expr
     | Proc_call of proc_call_expr
     | Array_retrieval of array_retrieval_expr
+    | Cast of TokenType.id_type * expr
+    | Reference of expr
+    | Dereference of expr
 
   and array_retrieval_expr =
     { id : Token.t

@@ -49,7 +49,7 @@ module Ast = struct
 
   and block_stmt = { stmts : stmt list }
 
-  and ret_stmt = { expr : expr }
+  and ret_stmt = { expr : expr option }
 
   and while_stmt =
     { expr : expr
@@ -83,18 +83,8 @@ module Ast = struct
     }
 
   and mut_stmt =
-    | Mut_var of mut_var_stmt
-    | Mut_arr of mut_arr_stmt
-
-  and mut_var_stmt =
-    { id : Token.t
-    ; expr : expr
-    }
-
-  and mut_arr_stmt =
-    { id : Token.t
-    ; index : expr
-    ; expr : expr
+    { left : expr
+    ; right : expr
     }
 
   and expr =
@@ -102,6 +92,9 @@ module Ast = struct
     | Term of term_expr
     | Proc_call of proc_call_expr
     | Array_retrieval of array_retrieval_expr
+    | Cast of TokenType.id_type * expr (* TODO: move to term_expr *)
+    | Reference of expr
+    | Dereference of expr
 
   and array_retrieval_expr =
     { id : Token.t

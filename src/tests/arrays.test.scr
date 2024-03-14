@@ -1,109 +1,102 @@
-proc sum_arr(void): i32 {
-    printf("sum_arr\n");
-    let arr: i32[5] = {1,2,3,4,5};
-    let s: i32 = 0;
-    for let i: usize = 0; i < 5; i += 1; {
-        s += arr[i];
-    }
-    return s;
+proc arr_i32_decl(void): i32 {
+    printf("arr_i32_decl\n");
+
+    let arr: i32[..] = {1,2,3};
+    return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
 }
 
-proc find_biggest(void): i32 {
-    printf("find_biggest\n");
-    let arr: i32[5] = {3,1,5,2,4};
-    let m: i32 = arr[0];
+proc arr_usize_decl(void): i32 {
+    printf("arr_usize_decl\n");
+
+    let arr: usize[..] = {1,2,3};
+    return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
+}
+
+proc zero_init(void): i32 {
+    printf("zero_init\n");
+
+    let arr: i32[10] = {0};
+    for let i: usize = 0; i < 10; i += 1; {
+        if arr[i] != 0 {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+proc arr_sum(void): i32 {
+    printf("arr_sum\n");
+
+    let arr: i32[5] = {1,2,3,4,5};
+    let res: i32 = 0;
     for let i: usize = 0; i < 5; i += 1; {
-        if arr[i] > m { m = arr[i]; }
+        res += arr[i];
+    }
+    return res;
+}
+
+proc find_largest(arr: i32[], n: usize): i32 {
+    printf("find_largest\n");
+
+    let m: i32 = 0;
+    for let i: usize = 0; i < n; i += 1; {
+        if arr[i] > m {
+            m = arr[i];
+        }
     }
     return m;
 }
 
-proc small_arr(void): i32 {
-    printf("small_arr\n");
-    let arr: i32[2] = {1,2};
-    return arr[0] + arr[1];
-}
+proc most_freq(arr: i32[], n: usize): i32 {
+    printf("most_freq\n");
 
-proc index_wanother_arr(void): i32 {
-    printf("index_wanother_arr\n");
-    let arr: i32[5] = {1,2,3,4,5};
-    let index_arr: i32[2] = {0,4};
-    return arr[index_arr[0]] + arr[index_arr[1]];
-}
-
-proc index_arr_backwards(void): i32 {
-    printf("index_arr_backwards\n");
-    let arr: i32[3] = {1,2,3};
-    let s: i32 = 0;
-    for let i: usize = 2; i >= 0; i -= 1; {
-        s += arr[i];
-    }
-    return s;
-}
-
-proc find_maj_elem(void): usize {
-    printf("find_maj_elem\n");
-    let arr: i32[5] = {1,1,5,1,5};
-    let freqs: i32[6] = {0,0,0,0,0,0};
-
-    for let i: usize = 0; i < 5; i += 1; {
-        freqs[arr[i]] += 1;
+    let freqs: i32[10] = {0};
+    for let i: usize = 0; i < n; i += 1; {
+        freqs[usize arr[i]] += 1;
     }
 
-    let m: usize = 0;
-    for let i: usize = 0; i < 6; i += 1; {
-        if freqs[i] > freqs[m] {
-            m = i;
+    let m: i32 = 0;
+    for let i: usize = 0; i < 10; i += 1; {
+        if freqs[i] > freqs[usize m] {
+            m = i32 i;
         }
     }
 
     return m;
 }
 
-proc test_zero_init(void): i32 {
-    printf("test_zero_init\n");
-
-    let arr: i32[5] = {0};
-    let m: i32 = 0;
-    for let i: i32 = 0; i < 5; i += 1; {
-        if arr[i] != 0 { m = 1; }
-    }
-    return m;
-}
-
-proc main(i: i32): i32 {
-    if sum_arr() != 15 {
-        printf("sum arr failed\n");
+proc main(void): i32 {
+    if arr_i32_decl() != 1 {
+        printf("arr_i32_decl failed\n");
         exit(1);
     }
 
-    if find_biggest() != 5 {
-        printf("find_biggest failed\n");
+    if arr_usize_decl() != 1 {
+        printf("arr_usize_decl failed\n");
         exit(1);
     }
 
-    if small_arr() != 3 {
-        printf("small_arr failed\n");
+    if zero_init() != 1 {
+        printf("zero_init failed\n");
         exit(1);
     }
 
-    if index_wanother_arr() != 6 {
-        printf("index_wanother_arr failed\n");
+    if arr_sum() != 15 {
+        printf("arr_sum failed\n");
         exit(1);
     }
 
-    if index_arr_backwards() != 6 {
-        printf("index_arr_backwards() failed\n");
+    let find_largest_arr: i32[..] = {1,5,2,3,4};
+    let find_largest_arr_len: usize = 5;
+    if find_largest(find_largest_arr, find_largest_arr_len) != 5 {
+        printf("find_largest failed\n");
         exit(1);
     }
 
-    if find_maj_elem() != 1 {
-        printf("find_maj_elem failed\n");
-        exit(1);
-    }
-
-    if test_zero_init() != 0 {
-        printf("test_zero_init failed\n");
+    let most_freq_arr: i32[..] = {1,1,5,5,1};
+    let most_freq_arr_len: usize = 5;
+    if most_freq(most_freq_arr, most_freq_arr_len) != 1 {
+        printf("most_freq failed\n");
         exit(1);
     }
 

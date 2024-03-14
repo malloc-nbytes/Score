@@ -37,6 +37,7 @@ module Err = struct
     | Missing_binding
     | Missing_type
     | No_return
+    | Type_mismatch
 
   let err_to_str (err_type : err_type) : string =
     match err_type with
@@ -53,17 +54,31 @@ module Err = struct
     | Missing_binding -> "Missing_binding"
     | Missing_type -> "Missing_type"
     | No_return -> "No_return"
+    | Type_mismatch -> "Type_mismatch"
 
   let err (err_type : err_type) (file : string) (func : string)
         ?(msg="") (token : Token.t option) : unit =
     let open Printf in
     let e = err_to_str err_type in
     let failure = e ^ " in " ^ file ^ " " ^ func ^ " ()" in
-    let reason = if msg = "" then "None" else msg in
+    let reason = if msg = "" then "N/A" else msg in
     let at, where = match token with
       | Some token ->
          (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
       | None -> "None", "None" in
-    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\n%s\n" failure reason at where
+    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\n%s" failure reason at where
+
+  let err_type_mismatch ?(msg="") (t1 : Token.t option) (left_type : TokenType.id_type) (right_type : TokenType.id_type) : unit =
+    let open Printf in
+    let e = err_to_str Type_mismatch in
+    let failure = e in
+    let reason = if msg = "" then "N/A" else msg in
+    let at, where = match t1 with
+      | Some token ->
+         (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:" token.fp token.r token.c
+      | None -> "None", "None" in
+    let lt_str = TokenType.id_type_to_string left_type
+    and rt_str = TokenType.id_type_to_string right_type in
+    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\nTypes: %s <> %s\n%s\n" failure reason at lt_str rt_str where
 
 end

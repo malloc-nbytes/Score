@@ -66,7 +66,7 @@ module Parser = struct
 
   (* Helper function to expect a type and also retrive it as well
    * as the rest of the tokens. *)
-  let expect_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
+  let expect_primitive_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
     match tokens with
     | {ttype = TokenType.Type (TokenType.Void as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.I32 as hd)} :: tl -> hd, tl
@@ -122,6 +122,19 @@ module Parser = struct
            let _, tokens = expect tokens TokenType.RBracket in
            Ast.Array_retrieval {id; index}, tokens
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
+    | {ttype = TokenType.Type casted_type; _} :: tl ->
+       let expr, tokens = parse_expr tl in
+       Ast.Cast (casted_type, expr), tokens
+    | {ttype = TokenType.Ampersand; _} :: tl -> (* Taking the address of an ident *)
+       let expr, tokens = parse_primary_expr tl in
+       (match expr with
+        | (Ast.Term Ast.Ident ident) as term -> Ast.Reference term, tokens
+        | _ -> failwith "References must take the address of an identifier")
+    | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing an ident *)
+       let expr, tokens = parse_primary_expr tl in
+       (match expr with
+        | (Ast.Term Ast.Ident ident) as term -> Ast.Dereference term, tokens
+        | _ -> failwith "TODO FIX ERR: Dereferences must take the address of an identifier")
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
@@ -258,7 +271,7 @@ module Parser = struct
     | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Type TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
-       let rettype, tokens = expect_type tokens in
+       let rettype, tokens = expect_primitive_type tokens in
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
        Ast.{id; params; block; rettype = rettype}, tokens
@@ -270,58 +283,30 @@ module Parser = struct
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
 
-  (* Used when parsing a statement of mutating a value
-   * that is already declared. *)
   and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
-    let id, tokens = expect tokens TokenType.Identifier in
-    match peek tokens 0 with
-    | Some {ttype = TokenType.LBracket; _} -> (* Array mutation *)
-       let _, tokens = expect tokens TokenType.LBracket in
-       let index, tokens = parse_expr tokens in
-       let _, tokens = expect tokens TokenType.RBracket in
-       let op, tokens = pop tokens in
-
-       (match op with
-        | {ttype = TokenType.Equals; _} ->
-           let expr, tokens = parse_expr tokens in
-           let _, tokens = expect tokens TokenType.Semicolon in
-           Ast.Mut_arr Ast.{id; index; expr}, tokens
-        | {ttype = TokenType.PlusEquals}
-          | {ttype = TokenType.MinusEquals}
-          | {ttype = TokenType.AsteriskEquals}
-          | {ttype = TokenType.ForwardSlashEquals}
-          | {ttype = TokenType.PercentEquals} as op ->
-           let expr, tokens = parse_expr tokens in
-           let rhs = Ast.Binary {lhs = Ast.Array_retrieval {id; index}; rhs = expr; op} in
-           let _, tokens = expect tokens TokenType.Semicolon in
-           Ast.Mut_arr Ast.{id; index; expr = rhs}, tokens
-        | _ ->
-           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-           exit 1)
-
-    | _ -> (* Variable mutation *)
-       let op, tokens = pop tokens in
-       match op with
-       | {ttype = TokenType.Equals; _} ->
-          let expr, tokens = parse_expr tokens in
-          let _, tokens = expect tokens TokenType.Semicolon in
-          Ast.Mut_var Ast.{id; expr}, tokens
-       | {ttype = TokenType.PlusEquals}
-         | {ttype = TokenType.MinusEquals}
-         | {ttype = TokenType.AsteriskEquals}
-         | {ttype = TokenType.ForwardSlashEquals}
-         | {ttype = TokenType.PercentEquals} as op ->
-          let expr, tokens = parse_expr tokens in
-          let rhs = Ast.Binary {lhs = Ast.Term (Ast.Ident id); rhs = expr; op} in
-          let _, tokens = expect tokens TokenType.Semicolon in
-          Ast.Mut_var Ast.{id; expr = rhs}, tokens
-       | _ ->
-          let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-          exit 1
+    let left, tokens = parse_primary_expr tokens in
+    let op, tokens = pop tokens in
+    match op with
+    | {ttype = TokenType.Equals; _} ->
+       let right, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{left; right}, tokens
+    | {ttype = TokenType.PlusEquals}
+      | {ttype = TokenType.MinusEquals}
+      | {ttype = TokenType.AsteriskEquals}
+      | {ttype = TokenType.ForwardSlashEquals}
+      | {ttype = TokenType.PercentEquals} as op ->
+       let right, tokens = parse_expr tokens in
+       let right = Ast.Binary {lhs = left; rhs = right; op} in
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{left; right}, tokens
+    | _ ->
+        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
+        exit 1
 
   (* Helper function to parse types *)
   and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-    let type_, tokens = expect_type tokens in
+    let type_, tokens = expect_primitive_type tokens in
     match peek tokens 0 with (* Check for tokens after primitive type ie `[` *)
     | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
        let _, tokens = expect tokens TokenType.LBracket in
@@ -336,6 +321,9 @@ module Parser = struct
          | _ -> None, tokens in
        let _, tokens = expect tokens TokenType.RBracket in
        TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
+    | Some {ttype = TokenType.Ref; _} -> 
+       let _, tokens = expect tokens TokenType.Ref in
+       TokenType.Pointer type_, tokens
     | _ -> type_, tokens (* Not array *)
 
   (* Parses the statement of `let`. The `let` keyword
@@ -414,9 +402,14 @@ module Parser = struct
 
   (* Parses the `return` statement. *)
   and parse_ret_stmt (tokens : Token.t list) : Ast.ret_stmt * Token.t list =
-    let expr, tokens = parse_expr tokens in
-    let _, tokens = expect tokens TokenType.Semicolon in
-    Ast.{expr}, tokens
+    match peek tokens 0 with
+    | Some {ttype = TokenType.Semicolon; _} -> (* Allows for no expr after `return` *)
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{expr = None}, tokens
+    | _ ->
+       let expr, tokens = parse_expr tokens in
+       let _, tokens = expect tokens TokenType.Semicolon in
+       Ast.{expr = Some expr}, tokens
 
   (* Parses the `break` statement. *)
   and parse_break_stmt (tokens : Token.t list) : Token.t * Token.t list =
@@ -469,6 +462,9 @@ module Parser = struct
         | _ ->
            let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
            exit 1)
+    | {ttype = TokenType.Asterisk; _} as hd :: tl -> (* Dereferencing *)
+       let stmt, tokens = parse_mut_stmt (hd :: tl) in
+       Mut stmt, tokens
     | {ttype = TokenType.If; _} :: tl ->
        let stmt, tokens = parse_if_stmt tl in
        Ast.If stmt, tokens
@@ -499,7 +495,7 @@ module Parser = struct
      * their types. We have a function that already does this,
      * however, it takes an expression enclosed in parenthesis.
      * Eventually, we want to use braces instead. *)
-    let fields, tokens = gather_params tokens [] in 
+    let fields, tokens = gather_params tokens [] in
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; fields}, tokens
 
