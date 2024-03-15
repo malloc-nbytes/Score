@@ -35,9 +35,9 @@
 
 (eval-and-compile
   (defconst score-keywords
-    '("if" "else" "while" "let" "use" "void" "i32"
+    '("if" "else" "while" "let" "void" "i32"
       "str" "for" "proc" "return" "mut" "break" "macro" "done"
-      "usize" "struct" "char" "import" "ref" "end")))
+      "usize" "struct" "char" "import" "ref" "end" "export")))
 
 (defconst score-highlights
   `((,(regexp-opt score-keywords 'symbols) . font-lock-keyword-face)
