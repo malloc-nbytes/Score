@@ -25,7 +25,7 @@ proc if_else_if(a: i32, b: i32): i32 {
     return 3;
 }
 
-proc main(void): i32 {
+export proc main(void): i32 {
     if max(2, 1) != 2 {
         printf("max failed\n");
         exit(1);

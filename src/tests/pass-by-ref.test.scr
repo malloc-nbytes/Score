@@ -47,7 +47,7 @@ proc mod_var_by_ref3(void): i32 {
     return a;
 }
 
-proc main(void): i32 {
+export proc main(void): i32 {
     if basic() != 2 {
         printf("basic failed\n");
         exit(1);

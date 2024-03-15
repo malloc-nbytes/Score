@@ -85,7 +85,7 @@ proc modify_str_arr(arr: str[..], s: str): void {
     arr[1] = s;
 }
 
-proc main(void): i32 {
+export proc main(void): i32 {
     if arr_i32_decl() != 1 {
         printf("arr_i32_decl failed\n");
         exit(1);

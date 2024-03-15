@@ -92,7 +92,7 @@ proc triple_nested_loops(void): i32 {
 }
 
 
-proc main(void): i32 {
+export proc main(void): i32 {
     if while_basic() != 10 {
         printf("while_basic failed\n");
         exit(1);

@@ -308,7 +308,7 @@ module Ir = struct
         Scope.add_id_to_scope id_lexeme id param_type true
       ) pd.params;
 
-    Emit.proc_def true pd.id.lexeme pd.params pd.rettype;
+    Emit.proc_def pd.export pd.id.lexeme pd.params pd.rettype;
 
     (* stack alloc params *)
     List.iter (fun param ->
@@ -476,6 +476,7 @@ module Ir = struct
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
     | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
     | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
+    | Ast.Import i -> failwith "ir.ml: import statements are unimplemented at the top-level"
 
   (* --- Entrypoint --- *)
 

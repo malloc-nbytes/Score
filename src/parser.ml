@@ -264,6 +264,13 @@ module Parser = struct
    * Does not need to consume `proc` keyword as the caller
    * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
   and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
+    let export, tokens = match peek tokens 0 with
+      | Some {ttype = TokenType.Export; _} ->
+         let _, tokens = expect tokens TokenType.Export in
+         let _, tokens = expect tokens TokenType.Proc in
+         true, tokens
+      | _ -> false, tokens in
+
     let id, tokens = expect tokens TokenType.Identifier in
     let _, tokens = expect tokens TokenType.LParen in
 
@@ -274,7 +281,7 @@ module Parser = struct
        let rettype, tokens = expect_primitive_type tokens in
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
-       Ast.{id; params; block; rettype = rettype}, tokens
+       Ast.{id; params; block; rettype; export}, tokens
     | Some t ->
        let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
                  ~msg:"procedure definitions must either have parameters or `void`" (Some t) in
@@ -506,6 +513,10 @@ module Parser = struct
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
     | {ttype = TokenType.Proc; _} :: tl ->
+       let stmt, tokens = parse_proc_def_stmt tl in
+       Proc_def stmt, tokens
+    | ({ttype = TokenType.Export; _} as e) :: tl ->
+       let tl = e :: tl in
        let stmt, tokens = parse_proc_def_stmt tl in
        Proc_def stmt, tokens
     | {ttype = TokenType.Let; _} :: tl ->

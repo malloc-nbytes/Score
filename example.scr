@@ -87,8 +87,8 @@ proc find_majority_elem(arr: i32[], n: usize): i32 {
     return m;
 }
 
--- Entrypoint
-proc main(void): i32 {
+-- `main` MUST start with `export`.
+export proc main(void): i32 {
     let n: i32 = 10;
 
     -- Call to C function printf().

@@ -34,16 +34,18 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "usize"  @@ TokenType.Type TokenType.Usize in
     let _ = Hashtbl.add keywords "str"    @@ TokenType.Type TokenType.Str in
     let _ = Hashtbl.add keywords "void"   @@ TokenType.Type TokenType.Void in
-    let _ = Hashtbl.add keywords "proc"   @@ TokenType.Proc in
-    let _ = Hashtbl.add keywords "return" @@ TokenType.Return in
-    let _ = Hashtbl.add keywords "let"    @@ TokenType.Let in
-    let _ = Hashtbl.add keywords "if"     @@ TokenType.If in
-    let _ = Hashtbl.add keywords "else"   @@ TokenType.Else in
+    let _ = Hashtbl.add keywords "proc"      TokenType.Proc in
+    let _ = Hashtbl.add keywords "return"    TokenType.Return in
+    let _ = Hashtbl.add keywords "let"       TokenType.Let in
+    let _ = Hashtbl.add keywords "if"        TokenType.If in
+    let _ = Hashtbl.add keywords "else"      TokenType.Else in
     let _ = Hashtbl.add keywords "while"     TokenType.While in
     let _ = Hashtbl.add keywords "break"     TokenType.Break in
     let _ = Hashtbl.add keywords "for"       TokenType.For in
     let _ = Hashtbl.add keywords "struct"    TokenType.Struct in
     let _ = Hashtbl.add keywords "ref"       TokenType.Ref in
+    let _ = Hashtbl.add keywords "import"    TokenType.Import in
+    let _ = Hashtbl.add keywords "export"    TokenType.Export in
     ()
 
   let rec repl_quote (lst : char list) : string =

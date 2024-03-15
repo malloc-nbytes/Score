@@ -62,7 +62,7 @@ proc for_wparam(stop: i32): i32 {
     return res == stop;
 }
 
-proc main(void): i32 {
+export proc main(void): i32 {
     if basic_for() != 10 {
         printf("basic_for failed\n");
         exit(1);
