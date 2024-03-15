@@ -77,11 +77,14 @@ module Emit = struct
 
   let load (id : string) (type_ : TokenType.id_type) (loc : string) : unit =
     let emitted_id = id
-    and emitted_type = Utils.scr_to_qbe_type type_
+    and emitted_type = Utils.scr_to_qbe_type type_ in
+
+    let emitted_type' = match type_ with | TokenType.Char -> "sb" | _ -> emitted_type
     and emitted_loc = loc in
+
     Scope.state.func_section <-
       sprintf "%s    %s =%s load%s %s\n"
-        Scope.state.func_section emitted_id emitted_type emitted_type emitted_loc
+        Scope.state.func_section emitted_id emitted_type emitted_type' emitted_loc
 
   let __instr (id : string) (type_ : TokenType.id_type) (rhs : string) (instr : string) : unit =
     let emitted_id = id

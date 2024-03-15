@@ -135,25 +135,42 @@ module Ir = struct
 
     | Ast.Array_retrieval ar ->
        Scope.assert_token_in_scope ar.id;
-        let stored_var = Scope.get_token_from_scope ar.id.lexeme in
-        let stored_type = stored_var.type_ in
-        let inner_type = Utils.unwrap_array stored_type in
-        let multiplicative = Utils.scr_type_to_bytes inner_type in
-        let index = Ast.Binary {lhs = ar.index;
-                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-        let index, index_type = evaluate_expr index true in
-        let reg = lm#new_reg false in
+       let stored_var = Scope.get_token_from_scope ar.id.lexeme in
+       let stored_type = stored_var.type_ in
+       let inner_type = Utils.unwrap_array stored_type in
 
-        (if index_type <> TokenType.Usize && index_type <> TokenType.Number then
-          let _ = Err.err_type_mismatch !last_tok TokenType.Usize index_type in
-          exit 1);
+       (match stored_type with
+        | TokenType.Str ->
+           let multiplicative = "1" in
+           let index = Ast.Binary {lhs = ar.index;
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+           let index, index_type = evaluate_expr index true in
+           let reg = lm#new_reg false in
 
-        Emit.binop reg TokenType.Usize ("%"^ar.id.lexeme) index "add";
+           Emit.load reg TokenType.Usize ("%"^stored_var.id);
+           Emit.binop index TokenType.Usize index reg "add";
+           Emit.__instr reg TokenType.Usize index "loadsb";
 
-        let reg2 = lm#new_reg false in
-        Emit.load reg2 inner_type reg;
-        reg2, inner_type
+           reg, inner_type
+
+        | _ ->
+           let multiplicative = Utils.scr_type_to_bytes inner_type in
+           let index = Ast.Binary {lhs = ar.index;
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+           let index, index_type = evaluate_expr index true in
+           let reg = lm#new_reg false in
+
+           (if index_type <> TokenType.Usize && index_type <> TokenType.Number then
+              let _ = Err.err_type_mismatch !last_tok TokenType.Usize index_type in
+              exit 1);
+
+           Emit.binop reg TokenType.Usize ("%"^ar.id.lexeme) index "add";
+
+           let reg2 = lm#new_reg false in
+           Emit.load reg2 inner_type reg;
+           reg2, inner_type)
 
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
@@ -171,7 +188,7 @@ module Ir = struct
            reg, stored_type)
 
     | Ast.Term Ast.Intlit intlit ->
-        intlit.lexeme, (if force_long then TokenType.Usize else TokenType.Number)
+       intlit.lexeme, (if force_long then TokenType.Usize else TokenType.Number)
 
     | Ast.Dereference deref ->
        (match deref with
@@ -214,19 +231,19 @@ module Ir = struct
        reg, TokenType.Str
 
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
-        let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
-        let array_reg = lm#new_reg false in
-        let stride = if force_long then 8 else 4 in
-        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
+       let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
+       let array_reg = lm#new_reg false in
+       let stride = if force_long then 8 else 4 in
+       Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
 
-        for i = 0 to len - 1 do
-          let added_reg = lm#new_reg false in
-          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
-          let expr, expr_type = evaluate_expr (List.nth exprs i) force_long in
-          Emit.store expr added_reg expr_type
-        done;
+       for i = 0 to len - 1 do
+         let added_reg = lm#new_reg false in
+         Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
+         let expr, expr_type = evaluate_expr (List.nth exprs i) force_long in
+         Emit.store expr added_reg expr_type
+       done;
 
-        array_reg, TokenType.Array (TokenType.I32, Some len)
+       array_reg, TokenType.Array (TokenType.I32, Some len)
 
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
@@ -384,20 +401,20 @@ module Ir = struct
                           (TokenType.id_type_to_string left_type)
                           (TokenType.id_type_to_string right_type)
     | Ast.Array_retrieval ar ->
-        Scope.assert_token_in_scope ar.id;
-        let stored_var = Scope.get_token_from_scope ar.id.lexeme in
-        let stored_type = stored_var.type_ in
-        let inner_type = Utils.unwrap_array stored_type in
-        let multiplicative = Utils.scr_type_to_bytes inner_type in
-        let index = Ast.Binary {lhs = ar.index;
-                                op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-        let index, index_type = evaluate_expr index true in
-        let expr, expr_type = evaluate_expr stmt.right false in
-        let array_reg = "%"^ar.id.lexeme in
-        let added_reg = lm#new_reg false in
-        Emit.binop added_reg TokenType.Usize array_reg index "add";
-        Emit.store expr added_reg expr_type
+       Scope.assert_token_in_scope ar.id;
+       let stored_var = Scope.get_token_from_scope ar.id.lexeme in
+       let stored_type = stored_var.type_ in
+       let inner_type = Utils.unwrap_array stored_type in
+       let multiplicative = Utils.scr_type_to_bytes inner_type in
+       let index = Ast.Binary {lhs = ar.index;
+                               op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
+                               rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+       let index, index_type = evaluate_expr index true in
+       let expr, expr_type = evaluate_expr stmt.right false in
+       let array_reg = "%"^ar.id.lexeme in
+       let added_reg = lm#new_reg false in
+       Emit.binop added_reg TokenType.Usize array_reg index "add";
+       Emit.store expr added_reg expr_type
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
