@@ -91,8 +91,26 @@ proc triple_nested_loops(void): i32 {
     return res;
 }
 
+proc big(void): i32 {
+    printf("big\n");
 
-proc main(void): i32 {
+    let res: i32 = 0;
+    let i: i32 = 0;
+    let j: i32 = 0;
+
+    while i < 30000 {
+        while j < 30000 {
+            res += j;
+            j += 1;
+        }
+        i += 1;
+        j = 0;
+    }
+
+    return res;
+}
+
+export proc main(void): i32 {
     if while_basic() != 10 {
         printf("while_basic failed\n");
         exit(1);
@@ -125,6 +143,11 @@ proc main(void): i32 {
 
     if triple_nested_loops() != 1000 {
         printf("triple_nested_loops failed\n");
+        exit(1);
+    }
+
+    if big() != 467788672 {
+        printf("big failed\n");
         exit(1);
     }
 

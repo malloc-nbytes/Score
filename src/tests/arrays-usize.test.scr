@@ -1,0 +1,107 @@
+proc arr_usize_decl(void): i32 {
+    printf("arr_usize_decl\n");
+
+    let arr: usize[..] = {1,2,3};
+    return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
+}
+
+proc zero_init(void): i32 {
+    printf("zero_init\n");
+
+    for let i: usize = 0; i < 10; i += 1; {
+    let arr: usize[10] = {0};
+        if arr[i] != 0 {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+proc arr_sum(void): i32 {
+    printf("arr_sum\n");
+
+    let arr: usize[5] = {1,2,3,4,5};
+    let res: i32 = 0;
+    for let i: usize = 0; i < 5; i += 1; {
+        res += i32 arr[i];
+    }
+    return res;
+}
+
+proc find_largest(arr: usize[..], n: usize): i32 {
+    printf("find_largest\n");
+
+    let m: i32 = 0;
+    for let i: usize = 0; i < n; i += 1; {
+        if arr[i] > usize m {
+            m = i32 arr[i];
+        }
+    }
+    return m;
+}
+
+proc most_freq(arr: usize[..], n: usize): i32 {
+    printf("most_freq\n");
+
+    let freqs: i32[10] = {0};
+    for let i: usize = 0; i < n; i += 1; {
+        freqs[usize arr[i]] += 1;
+    }
+
+    let m: i32 = 0;
+    for let i: usize = 0; i < 10; i += 1; {
+        if freqs[i] > freqs[usize m] {
+            m = i32 i;
+        }
+    }
+
+    return m;
+}
+
+proc modify_usize_arr(arr: usize[..]): void {
+    printf("modify_usize_arr\n");
+
+    arr[1] = 100;
+}
+
+
+export proc main(void): i32 {
+    if arr_usize_decl() != 1 {
+        printf("arr_usize_decl failed\n");
+        exit(1);
+    }
+
+    if zero_init() != 1 {
+        printf("zero_init failed\n");
+        exit(1);
+    }
+
+    if arr_sum() != 15 {
+        printf("arr_sum failed\n");
+        exit(1);
+    }
+
+    let find_largest_arr: usize[..] = {1,5,2,3,4};
+    let find_largest_arr_len: usize = 5;
+    if find_largest(find_largest_arr, find_largest_arr_len) != 5 {
+        printf("find_largest failed\n");
+        exit(1);
+    }
+
+    let most_freq_arr: usize[..] = {1,1,5,5,1};
+    let most_freq_arr_len: usize = 5;
+    if most_freq(most_freq_arr, most_freq_arr_len) != 1 {
+        printf("most_freq failed\n");
+        exit(1);
+    }
+
+    let modify_usize_arr: usize[..] = {1,2,3};
+    modify_usize_arr(modify_usize_arr);
+    if modify_usize_arr[1] != 100 {
+        printf("modify_i32_arr failed\n");
+        exit(1);
+    }
+
+
+    return 0;
+}

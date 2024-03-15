@@ -82,6 +82,8 @@ module TokenType = struct
     | Struct
     | Ref
     | Ampersand
+    | Import
+    | Export
 
   let rec id_type_to_string = function
     | I32 -> "I32"
@@ -153,6 +155,8 @@ module TokenType = struct
     | Struct -> "Struct"
     | Ref -> "Ref"
     | Ampersand -> "&"
+    | Import -> "Import"
+    | Export -> "Export"
 
 end
 

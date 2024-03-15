@@ -29,6 +29,7 @@ module Ast : sig
     | Proc_def of proc_def_stmt
     | Let of let_stmt
     | Struct of struct_stmt
+    | Import of import_stmt
 
   and stmt =
     | Proc_def of proc_def_stmt
@@ -41,6 +42,10 @@ module Ast : sig
     | Ret of ret_stmt
     | Break of Token.t
     | For of for_stmt
+
+  and import_stmt =
+    { path : Token.t
+    }
 
   and struct_stmt =
     { id : Token.t
@@ -74,6 +79,7 @@ module Ast : sig
     ; params : (Token.t * TokenType.id_type) list
     ; block : block_stmt
     ; rettype : TokenType.id_type
+    ; export : bool
     }
 
   and let_stmt =

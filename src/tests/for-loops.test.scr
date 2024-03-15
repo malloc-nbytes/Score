@@ -62,7 +62,20 @@ proc for_wparam(stop: i32): i32 {
     return res == stop;
 }
 
-proc main(void): i32 {
+proc big(void): i32 {
+    printf("big\n");
+
+    let res: i32 = 0;
+    for let i: i32 = 0; i < 30000; i += 1; {
+        for let j: i32 = 0; j < 30000; j += 1; {
+            res += j;
+        }
+    }
+
+    return res;
+}
+
+export proc main(void): i32 {
     if basic_for() != 10 {
         printf("basic_for failed\n");
         exit(1);
@@ -85,6 +98,11 @@ proc main(void): i32 {
 
     if for_wparam(10) != 1 {
         printf("for_wparam failed\n");
+        exit(1);
+    }
+
+    if big(10) != 467788672 {
+        printf("big failed\n");
         exit(1);
     }
 
