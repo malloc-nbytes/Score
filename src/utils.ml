@@ -45,9 +45,10 @@ module Utils = struct
     | TokenType.Str -> "8"
     | TokenType.Char -> "1"
     | TokenType.Pointer _ -> "8"
-    | TokenType.Number -> "w"
+    | TokenType.Number -> "4"
+    | TokenType.Array (TokenType.Str, Some len) -> Printf.sprintf "%d" (8 * len)
     | TokenType.Array (TokenType.I32, Some len) -> Printf.sprintf "%d" (4 * len)
-    | TokenType.Array (TokenType.Usize, Some len) -> Printf.sprintf "%d" (8 * len)
+    | TokenType.Array (_, Some len) -> Printf.sprintf "%d" (8 * len)
     | TokenType.Array (_, None) -> "8"
     | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
 
@@ -60,6 +61,7 @@ module Utils = struct
     | TokenType.Number -> "w"
     | TokenType.Pointer TokenType.I32 -> "l"
     | TokenType.Pointer TokenType.Usize -> "l"
+    | TokenType.Pointer TokenType.Str -> "l"
     | TokenType.Void -> ""
     | TokenType.Array (t, _) -> "l"
     | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.id_type_to_string type_)
@@ -67,6 +69,7 @@ module Utils = struct
   let unwrap_array (type_: TokenType.id_type) =
     match type_ with
     | TokenType.Array (t, _) -> t
+    | TokenType.Str -> type_
     | _ -> failwith @@ Printf.sprintf "unwrap_array: %s not an array" (TokenType.id_type_to_string type_)
 
   let unwrap_ptr (type_: TokenType.id_type) =

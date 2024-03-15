@@ -264,8 +264,9 @@ module Ir = struct
     Scope.assert_token_not_in_scope id;
 
     let expr, expr_type = match stmt_type with
-    | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true
-    | _ -> evaluate_expr stmt.expr false in
+      | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true
+      | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true
+      | _ -> evaluate_expr stmt.expr false in
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
     match stmt_type with
@@ -273,13 +274,13 @@ module Ir = struct
        Emit.copy ("%" ^ id_lexeme) stmt_type expr;
        Scope.add_id_to_scope id_lexeme id stmt_type true
     | _ ->
-      if types_compatable stmt_type expr_type then
-        let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
-        let _ = Emit.stack_alloc4 id_lexeme bytes in
-        Emit.store expr ("%" ^ id_lexeme) stmt_type
-      else
-        let _ = Err.err_type_mismatch (Some id) stmt_type expr_type in
-        exit 1
+       if types_compatable stmt_type expr_type then
+         let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
+         let _ = Emit.stack_alloc4 id_lexeme bytes in
+         Emit.store expr ("%" ^ id_lexeme) stmt_type
+       else
+         let _ = Err.err_type_mismatch (Some id) stmt_type expr_type in
+         exit 1
 
   let rec evaluate_block_stmt (bs : Ast.block_stmt) : unit =
     Scope.push ();
