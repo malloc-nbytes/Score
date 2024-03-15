@@ -1,6 +1,47 @@
-proc 
+proc init_char_arr(void): i32 {
+    printf("init_char_arr\n");
+
+    let arr: char[..] = {'a', 'b', 'c'};
+    return arr[0] == 'a' && arr[1] == 'b' && arr[2] == 'c';
+}
+
+proc char_arr_in_loop(void): i32 {
+    printf("char_arr_in_loop\n");
+
+    let arr: char[..] = {'a', 'b', 'c'};
+    let ans: char[..] = {'a', 'b', 'c'};
+
+    for let i: usize = 0; i < 3; i += 1; {
+        if arr[i] != ans[i] {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+proc modify_arr(arr: char[..]): void {
+    printf("modify_arr\n");
+    arr[1] = 'b';
+}
 
 export proc main(void): i32 {
+    if init_char_arr() != 1 {
+        printf("init_char_arr failed\n");
+        exit(1);
+    }
+
+    if char_arr_in_loop() != 1 {
+        printf("char_arr_in_loop failed\n");
+        exit(1);
+    }
+
+    let modify_arr: char[..] = {'x', 'y', 'z'};
+    modify_arr(modify_arr);
+    if modify_arr[1] != 'b' {
+        printf("modify_arr failed\n");
+        exit(1);
+    }
 
     return 0;
 }
