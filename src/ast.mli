@@ -44,7 +44,7 @@ module Ast : sig
     | For of for_stmt
 
   and import_stmt =
-    { path : string
+    { path : Token.t
     }
 
   and struct_stmt =

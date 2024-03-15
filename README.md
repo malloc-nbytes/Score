@@ -7,6 +7,7 @@ See `example.scr` or `./src/tests/` for what is currently possible.
 # Requirements
 - OCaml https://ocaml.org/
 - QBE https://c9x.me/compile/
+- gcc https://gcc.gnu.org/
 
 # Running It
 
@@ -44,5 +45,4 @@ See `./scr --help` for more options
 
 # Current Bugs
 - Having a `break` statement inside of multiple `while` loops does not function correctly.
-- Having a `return` statement in the middle of a procedure does not work.
 
