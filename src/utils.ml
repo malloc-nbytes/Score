@@ -63,6 +63,7 @@ module Utils = struct
     | TokenType.Pointer TokenType.I32 -> "l"
     | TokenType.Pointer TokenType.Usize -> "l"
     | TokenType.Pointer TokenType.Str -> "l"
+    | TokenType.Pointer TokenType.Char -> "l"
     | TokenType.Void -> ""
     | TokenType.Array (t, _) -> "l"
     | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.id_type_to_string type_)

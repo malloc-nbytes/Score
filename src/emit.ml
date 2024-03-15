@@ -44,6 +44,7 @@ module Emit = struct
 
     and emitted_export = if export then "export" else ""
     and emitted_rettype = Utils.scr_to_qbe_type rettype in
+    let emitted_rettype = if emitted_rettype = "b" then "w" else emitted_rettype in
 
     Scope.state.func_section <-
       sprintf "%s%s function %s $%s(%s) {\n@start\n"
@@ -120,6 +121,7 @@ module Emit = struct
     and emitted_left = left
     and emitted_right = right
     and emitted_binop = binop in
+    let emitted_type = if emitted_type = "b" then "w" else emitted_type in
     Scope.state.func_section <-
       sprintf "%s    %s =%s %s %s, %s\n"
         Scope.state.func_section emitted_id emitted_type emitted_binop emitted_left emitted_right
@@ -130,6 +132,7 @@ module Emit = struct
 
   let proc_call_wassign (assignee : string) (name : string) (args : string) (rettype : TokenType.id_type) : unit =
     let emitted_type = Utils.scr_to_qbe_type rettype in
+    let emitted_type = if emitted_type = "b" then "w" else emitted_type in
     Scope.state.func_section <-
       sprintf "%s    %s =%s call $%s(%s)\n" Scope.state.func_section assignee emitted_type name args
 

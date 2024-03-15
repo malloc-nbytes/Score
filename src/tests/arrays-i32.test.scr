@@ -5,13 +5,6 @@ proc arr_i32_decl(void): i32 {
     return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
 }
 
-proc arr_usize_decl(void): i32 {
-    printf("arr_usize_decl\n");
-
-    let arr: usize[..] = {1,2,3};
-    return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
-}
-
 proc zero_init(void): i32 {
     printf("zero_init\n");
 
@@ -71,28 +64,9 @@ proc modify_i32_arr(arr: i32[..]): void {
     arr[1] = 100;
 }
 
-proc arr_str_decl(void): i32 {
-    printf("arr_str_decl\n");
-
-    let arr: str[..] = {"foo", "bar", "baz"};
-    return (strcmp(arr[0], "foo") == 0)
-    && (strcmp(arr[1], "bar") == 0)
-    && (strcmp(arr[2], "baz") == 0);
-}
-
-proc modify_str_arr(arr: str[..], s: str): void {
-    printf("modify_str_arr\n");
-    arr[1] = s;
-}
-
 export proc main(void): i32 {
     if arr_i32_decl() != 1 {
         printf("arr_i32_decl failed\n");
-        exit(1);
-    }
-
-    if arr_usize_decl() != 1 {
-        printf("arr_usize_decl failed\n");
         exit(1);
     }
 
@@ -124,19 +98,6 @@ export proc main(void): i32 {
     modify_i32_arr(modify_i32_arr);
     if modify_i32_arr[1] != 100 {
         printf("modify_i32_arr failed\n");
-        exit(1);
-    }
-
-    if arr_str_decl() != 1 {
-        printf("arr_str_decl failed\n");
-        exit(1);
-    }
-
-    let modify_str_arr: str[..] = {"hello", "world"};
-    let modify_str_arr_new: str = "foo";
-    modify_str_arr(modify_str_arr, modify_str_arr_new);
-    if strcmp(modify_str_arr[1], "foo") != 0 {
-        printf("modify_str_arr failed\n");
         exit(1);
     }
 

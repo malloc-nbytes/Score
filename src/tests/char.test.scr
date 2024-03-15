@@ -1,0 +1,37 @@
+proc init_char(void): char {
+    printf("init_char\n");
+
+    let c: char = 'a';
+    return c;
+}
+
+proc take_char(c: char): char {
+    printf("take_char\n");
+    return c;
+}
+
+proc take_char_ref(c: char ref): void {
+    printf("take_char_ref\n");
+    *c = 'z';
+}
+
+export proc main(void): i32 {
+    if init_char() != 'a' {
+        printf("init_char failed\n");
+        exit(1);
+    }
+
+    if take_char('c') != 'c' {
+        printf("take_char failed\n");
+        exit(1);
+    }
+
+    let c: char = 'a';
+    take_char_ref(&c);
+    if c != 'z' {
+        printf("take_char_ref failed\n");
+        exit(1);
+    }
+
+    return 0;
+}

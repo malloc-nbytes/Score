@@ -1,0 +1,30 @@
+proc arr_str_decl(void): i32 {
+    printf("arr_str_decl\n");
+
+    let arr: str[..] = {"foo", "bar", "baz"};
+    return (strcmp(arr[0], "foo") == 0)
+    && (strcmp(arr[1], "bar") == 0)
+    && (strcmp(arr[2], "baz") == 0);
+}
+
+proc modify_str_arr(arr: str[..], s: str): void {
+    printf("modify_str_arr\n");
+    arr[1] = s;
+}
+
+export proc main(void): i32 {
+    if arr_str_decl() != 1 {
+        printf("arr_str_decl failed\n");
+        exit(1);
+    }
+
+    let modify_str_arr: str[..] = {"hello", "world"};
+    let modify_str_arr_new: str = "foo";
+    modify_str_arr(modify_str_arr, modify_str_arr_new);
+    if strcmp(modify_str_arr[1], "foo") != 0 {
+        printf("modify_str_arr failed\n");
+        exit(1);
+    }
+
+    return 0;
+}
