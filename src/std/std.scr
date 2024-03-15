@@ -1,0 +1,10 @@
+export proc streq(s1: str ref, s2: str ref): i32 {
+    return strcmp(*s1, *s2);
+}
+
+export proc strlen(s: str ref): usize {
+    let i: usize = 0;
+    while s[i] { i += 1; }
+    return i;
+}
+

@@ -460,23 +460,26 @@ module Ir = struct
     Scope.pop ()
 
   and evaluate_stmt = function
-    | Ast.Proc_def stmt -> assert false
-    | Ast.Block stmt -> assert false
+    | Ast.Proc_def stmt -> failwith "evaluate_stmt: Ast.Proc_def unimplemented"
+    | Ast.Block stmt -> failwith "evaluate_stmt: Ast.Block unimplemented"
     | Ast.Let stmt -> evaluate_let_stmt stmt
     | Ast.Mut stmt -> evaluate_mut_stmt stmt
     | Ast.If stmt -> evaluate_if_stmt stmt
     | Ast.While stmt -> evaluate_while_stmt stmt
     | Ast.Stmt_expr stmt -> evaluate_stmt_expr stmt
     | Ast.Ret stmt -> evaluate_ret_stmt stmt
-    | Ast.Break stmt -> assert false
+    | Ast.Break stmt -> failwith "evaluate_stmt: Ast.Break unimplemented"
     | Ast.For stmt -> evaluate_for_stmt stmt
+
+  let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
+    failwith "todo"
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
     | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
     | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
-    | Ast.Import i -> failwith "ir.ml: import statements are unimplemented at the top-level"
+    | Ast.Import i -> evaluate_import_stmt i
 
   (* --- Entrypoint --- *)
 
