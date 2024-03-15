@@ -270,8 +270,9 @@ module Ir = struct
 
     let expr, expr_type = match stmt_type with
       | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true
-      | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true
+      | TokenType.Array (TokenType.Str, Some _) -> evaluate_expr stmt.expr true
       | _ -> evaluate_expr stmt.expr false in
+
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
     match stmt_type with

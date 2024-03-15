@@ -35,7 +35,7 @@ proc arr_sum(void): i32 {
     return res;
 }
 
-proc find_largest(arr: i32[], n: usize): i32 {
+proc find_largest(arr: i32[..], n: usize): i32 {
     printf("find_largest\n");
 
     let m: i32 = 0;
@@ -47,7 +47,7 @@ proc find_largest(arr: i32[], n: usize): i32 {
     return m;
 }
 
-proc most_freq(arr: i32[], n: usize): i32 {
+proc most_freq(arr: i32[..], n: usize): i32 {
     printf("most_freq\n");
 
     let freqs: i32[10] = {0};
@@ -65,7 +65,7 @@ proc most_freq(arr: i32[], n: usize): i32 {
     return m;
 }
 
-proc modify_i32_arr(arr: i32[]): void {
+proc modify_i32_arr(arr: i32[..]): void {
     printf("modify_arr\n");
 
     arr[1] = 100;
@@ -80,7 +80,7 @@ proc arr_str_decl(void): i32 {
     && (strcmp(arr[2], "baz") == 0);
 }
 
-proc modify_str_arr(arr: str[], s: str): void {
+proc modify_str_arr(arr: str[..], s: str): void {
     printf("modify_str_arr\n");
     arr[1] = s;
 }

@@ -318,10 +318,13 @@ module Parser = struct
             let _, tokens = expect tokens TokenType.Period in
             let _, tokens = expect tokens TokenType.Period in
             Some Token.{ttype = IntegerLiteral; lexeme = "-1"; r=0; c=0; fp=""}, tokens
-         | _ -> None, tokens in
+         | _ ->
+            (let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
+                      ~msg:"array decl must either be an integer or `..`" (peek tokens 0) in exit 1) in
+            (* None, tokens in *)
        let _, tokens = expect tokens TokenType.RBracket in
        TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
-    | Some {ttype = TokenType.Ref; _} -> 
+    | Some {ttype = TokenType.Ref; _} ->
        let _, tokens = expect tokens TokenType.Ref in
        TokenType.Pointer type_, tokens
     | _ -> type_, tokens (* Not array *)
