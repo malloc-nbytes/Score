@@ -27,8 +27,9 @@ open Parser
 open Ast
 open Ir
 
-let run_qbe inter_code_fp output_fp should_del =
-  let cmd = Printf.sprintf "qbe -o %s %s" output_fp inter_code_fp in
+let run_qbe inter_code_fp output_fp should_del (other_files : string list) =
+  let cmd = Printf.sprintf "qbe -o %s %s %s"
+              output_fp inter_code_fp (String.concat " " other_files) in
   let _ = Sys.command cmd in (* TODO: deal with exit failure *)
   if should_del then
     try Sys.remove inter_code_fp;
@@ -59,6 +60,30 @@ let usage (progname : string) : unit =
   printf "  --gen-debug-info :: enable debug symbols\n";
   exit 1
 
+let ssas = ref []
+
+let rec compile (infp : string) (outfp : string) (debug_syms : bool) (should_del : bool) =
+  Printf.printf "Compiling: %s\n" infp;
+  let intermediate_code_fp = outfp ^ ".ssa" in
+  let asm_fp = outfp ^ ".s" in
+
+  let data = Utils.file_to_str infp in
+  let tokens = Lexer.lex_file infp (String.to_seq data |> List.of_seq) 1 1 in
+  let program = Parser.produce_ast tokens in
+  let code, import_scr_fps = Ir.generate_inter_lang program in
+  Printf.printf "number of import_scr_fps: %d\n" (List.length import_scr_fps);
+
+  (* for each import_scr, compile it *)
+  for i = 0 to List.length import_scr_fps - 1 do
+    let scr_fp = List.nth import_scr_fps i in
+    let inter_code_fp, asm_fp = compile scr_fp (Filename.chop_extension scr_fp) debug_syms should_del in
+    ssas := inter_code_fp :: !ssas;
+  done;
+
+  (* Run QBE on the intermediate code *)
+  let _ = Utils.write_to_file intermediate_code_fp code in
+  intermediate_code_fp, asm_fp
+
 let () =
   let argv = Array.to_list Sys.argv in
   let progname = List.hd argv in
@@ -81,27 +106,10 @@ let () =
 
   parse_args argv;
 
-  let intermediate_code_fp = !outfp ^ ".ssa" in
-  let asm_fp = !outfp ^ ".s" in
-
-  let data = Utils.file_to_str !infp in
-
-  (* Begin lexing *)
-  Lexer.populate_keywords ();
-  let tokens = Lexer.lex_file !infp (String.to_seq data |> List.of_seq) 1 1 in
-  (* Lexer.print_tokens tokens; (\* debug *\) *)
-
-  (* Product an AST *)
-  let program = Parser.produce_ast tokens in
-  (* Ast.ast_dump program; (\* debug *\) *)
-
-  (* Generate intermediate code for QBE *)
-  let code = Ir.generate_inter_lang program in
-  (* print_endline code; (\* debug *\) *)
-
-  (* Run QBE on the intermediate code *)
-  let _ = Utils.write_to_file intermediate_code_fp code in
-  let _ = run_qbe intermediate_code_fp asm_fp !should_del in
-
-  (* Create an executable *)
-  assemble !outfp asm_fp !debug_syms !should_del
+  if !infp = "" then
+    usage progname
+  else
+    Lexer.populate_keywords ();
+    let intermediate_code_fp, asm_fp = compile !infp !outfp !debug_syms !should_del in
+    let _ = run_qbe intermediate_code_fp asm_fp !should_del !ssas in
+    assemble !outfp asm_fp !debug_syms !should_del

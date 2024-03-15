@@ -29,14 +29,16 @@ module Scope = struct
     { mutable func_section : string
     ; mutable data_section : string
     ; mutable type_section : string
+    ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
     }
 
   let state =
-    {func_section = "";
-     data_section = "";
-     type_section = "";
-     cur_proc_id = "", TokenType.Void
+    { func_section = "";
+      data_section = "";
+      type_section = "";
+      imports = [];
+      cur_proc_id = "", TokenType.Void
     }
 
   type var =

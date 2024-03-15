@@ -509,7 +509,7 @@ module Ir = struct
     | Ast.For stmt -> evaluate_for_stmt stmt
 
   let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
-    failwith "todo"
+    Scope.state.imports <- stmt.path.lexeme :: Scope.state.imports
 
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
@@ -520,9 +520,10 @@ module Ir = struct
 
   (* --- Entrypoint --- *)
 
-  let generate_inter_lang (program : Ast.program) : string =
+  let generate_inter_lang (program : Ast.program) : string * (string list) =
     List.iter evaluate_toplvl_stmt program;
-    Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section
+    Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section,
+    Scope.state.imports
 
 end
 

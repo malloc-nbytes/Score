@@ -28,6 +28,7 @@ module Scope : sig
     { mutable func_section : string
     ; mutable data_section : string
     ; mutable type_section : string
+    ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
     }
 
