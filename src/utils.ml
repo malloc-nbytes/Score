@@ -58,7 +58,7 @@ module Utils = struct
     | TokenType.I32 -> "w"
     | TokenType.Usize -> "l"
     | TokenType.Str -> "l"
-    | TokenType.Char -> "w" (* NOTE: was originally `b` *)
+    | TokenType.Char -> "b" (* NOTE: was originally `b` *)
     | TokenType.Number -> "w"
     | TokenType.Pointer TokenType.I32 -> "l"
     | TokenType.Pointer TokenType.Usize -> "l"

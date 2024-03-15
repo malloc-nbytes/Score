@@ -36,6 +36,7 @@ module Emit = struct
     and emitted_params = List.fold_left (fun acc param ->
                              let id = (fst param).Token.lexeme in
                              let type_ = Utils.scr_to_qbe_type @@ snd param in
+                             let type_ = if type_ = "b" then "w" else type_ in
                              ignore type_;
                              (* acc ^ type_ ^ " %" ^ id ^ ", " *)
                              acc ^ "l" ^ " %" ^ id ^ ", "
@@ -73,12 +74,13 @@ module Emit = struct
     and emitted_location = loc
     and emitted_type = Utils.scr_to_qbe_type type_ in
     Scope.state.func_section <-
-      sprintf "%s    store%s %s, %s\n" Scope.state.func_section emitted_type emitted_value emitted_location
+      sprintf "%s    store%s %s, %s\n" Scope.state.func_section  emitted_type emitted_value emitted_location
 
   let load (id : string) (type_ : TokenType.id_type) (loc : string) : unit =
     let emitted_id = id
     and emitted_type = Utils.scr_to_qbe_type type_ in
 
+    let emitted_type = if emitted_type = "b" then "w" else emitted_type in
     let emitted_type' = match type_ with | TokenType.Char -> "sb" | _ -> emitted_type
     and emitted_loc = loc in
 
@@ -89,6 +91,7 @@ module Emit = struct
   let __instr (id : string) (type_ : TokenType.id_type) (rhs : string) (instr : string) : unit =
     let emitted_id = id
     and emitted_type = Utils.scr_to_qbe_type type_ in
+    let emitted_type = if emitted_type = "b" then "w" else emitted_type in
     Scope.state.func_section <-
       sprintf "%s    %s =%s %s %s\n" Scope.state.func_section emitted_id emitted_type instr rhs
 

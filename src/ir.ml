@@ -117,11 +117,11 @@ module Ir = struct
     | TokenType.PercentEquals -> "rem"
     | _ -> failwith "evaluate_binop: invalid binop"
 
-  let rec evaluate_expr (expr : Ast.expr) (force_long : bool) : string * TokenType.id_type =
+  let rec evaluate_expr (expr : Ast.expr) (force_long : bool) (callee_type : TokenType.id_type) : string * TokenType.id_type =
     match expr with
     | Ast.Binary bin ->
-       let lhs, lhs_type = evaluate_expr bin.lhs force_long in
-       let rhs, rhs_type = evaluate_expr bin.rhs force_long in
+       let lhs, lhs_type = evaluate_expr bin.lhs force_long callee_type in
+       let rhs, rhs_type = evaluate_expr bin.rhs force_long callee_type in
        let instr = evaluate_binop bin.op.ttype in
        let reg = lm#new_reg false in
 
@@ -145,7 +145,7 @@ module Ir = struct
            let index = Ast.Binary {lhs = ar.index;
                                    op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                    rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-           let index, index_type = evaluate_expr index true in
+           let index, index_type = evaluate_expr index true callee_type in
            let reg = lm#new_reg false in
 
            Emit.load reg TokenType.Usize ("%"^stored_var.id);
@@ -159,7 +159,7 @@ module Ir = struct
            let index = Ast.Binary {lhs = ar.index;
                                    op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                    rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-           let index, index_type = evaluate_expr index true in
+           let index, index_type = evaluate_expr index true callee_type in
            let reg = lm#new_reg false in
 
            (if index_type <> TokenType.Usize && index_type <> TokenType.Number then
@@ -214,7 +214,7 @@ module Ir = struct
         | _ -> failwith "evaluate_expr: Ast.Reference: unreachable")
 
     | Ast.Cast (cast_type, expr) ->
-       let expr, expr_type = evaluate_expr expr force_long in
+       let expr, expr_type = evaluate_expr expr force_long callee_type in
        if cast_type = expr_type then expr, cast_type
        else
          let reg = lm#new_reg false in
@@ -233,13 +233,13 @@ module Ir = struct
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
        let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
        let array_reg = lm#new_reg false in
-       let stride = if force_long then 8 else 4 in
+       let stride = if force_long then 8 else (int_of_string (Utils.scr_type_to_bytes callee_type)) in
        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
 
        for i = 0 to len - 1 do
          let added_reg = lm#new_reg false in
          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
-         let expr, expr_type = evaluate_expr (List.nth exprs i) force_long in
+         let expr, expr_type = evaluate_expr (List.nth exprs i) force_long callee_type in
          Emit.store expr added_reg expr_type
        done;
 
@@ -248,8 +248,9 @@ module Ir = struct
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
-                      let arg, arg_type = evaluate_expr e force_long in
+                      let arg, arg_type = evaluate_expr e force_long callee_type in
                       let arg_type = Utils.scr_to_qbe_type arg_type in
+                      let arg_type = if arg_type = "b" then "w" else arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
        (match pc.id.lexeme with
@@ -286,9 +287,12 @@ module Ir = struct
     Scope.assert_token_not_in_scope id;
 
     let expr, expr_type = match stmt_type with
-      | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true
-      | TokenType.Array (TokenType.Str, Some _) -> evaluate_expr stmt.expr true
-      | _ -> evaluate_expr stmt.expr false in
+      | TokenType.Array (TokenType.Usize, _) -> evaluate_expr stmt.expr true TokenType.Usize
+      | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true TokenType.Str
+      | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
+      | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
+      | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
+      | _ -> evaluate_expr stmt.expr false stmt_type in
 
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
@@ -354,13 +358,13 @@ module Ir = struct
   and evaluate_ret_stmt (stmt : Ast.ret_stmt) : unit =
     match stmt.expr with
     | Some expr ->
-       let expr, expr_type = evaluate_expr (Utils.unwrap stmt.expr) false in
+       let expr, expr_type = evaluate_expr (Utils.unwrap stmt.expr) false TokenType.Void in
        ignore expr_type; (* TODO: make sure this matches cur_proc rettype *)
        Emit.ret expr (lm#new_ret_lbl ())
     | None -> Emit.ret "" (lm#new_ret_lbl ())
 
   and evaluate_stmt_expr (stmt : Ast.stmt_expr) : unit =
-    let expr, type_ = evaluate_expr stmt false in
+    let expr, type_ = evaluate_expr stmt false TokenType.Void in
     ignore expr;
     ignore type_
 
@@ -368,10 +372,10 @@ module Ir = struct
     match stmt.left with
     | Ast.Term Ast.Ident ident ->
        Scope.assert_token_in_scope ident;
-       let expr, expr_type = evaluate_expr stmt.right false
-       and stored_var = Scope.get_token_from_scope ident.lexeme in
-       let mut_type = stored_var.type_
-       and mut_id = ident in
+       let stored_var = Scope.get_token_from_scope ident.lexeme in
+       let expr, expr_type = evaluate_expr stmt.right false stored_var.type_ in
+       let mut_type = stored_var.type_ in
+       let mut_id = ident in
 
        assert (stored_var.stack_allocd);
 
@@ -395,7 +399,7 @@ module Ir = struct
             reg, inner_type
          | _ -> failwith "evaluate_mut_stmt: Ast.Dereference: unreachable" in
 
-       let right, right_type = evaluate_expr stmt.right false in
+       let right, right_type = evaluate_expr stmt.right false left_type in
        if types_compatable left_type right_type then Emit.store right left left_type
        else failwith @@ sprintf "%s: type mismatch: %s <> %s" __FUNCTION__
                           (TokenType.id_type_to_string left_type)
@@ -413,20 +417,20 @@ module Ir = struct
            let index = Ast.Binary {lhs = ar.index;
                                    op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                    rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-           let index, index_type = evaluate_expr index true in
+           let index, index_type = evaluate_expr index true stored_type in
            let reg = lm#new_reg false in
 
            Emit.load reg TokenType.Usize ("%"^stored_var.id);
            Emit.binop index TokenType.Usize index reg "add";
-           let expr, _ = evaluate_expr stmt.right false in
+           let expr, _ = evaluate_expr stmt.right false stored_type in
            Emit.store expr index TokenType.Char
         | _ ->
            let multiplicative = Utils.scr_type_to_bytes inner_type in
            let index = Ast.Binary {lhs = ar.index;
                                    op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
                                    rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
-           let index, index_type = evaluate_expr index true in
-           let expr, expr_type = evaluate_expr stmt.right false in
+           let index, index_type = evaluate_expr index true stored_type in
+           let expr, expr_type = evaluate_expr stmt.right false stored_type in
            let array_reg = "%"^ar.id.lexeme in
            let added_reg = lm#new_reg false in
            Emit.binop added_reg TokenType.Usize array_reg index "add";
@@ -434,7 +438,7 @@ module Ir = struct
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
-    let condition, condition_type = evaluate_expr stmt.expr false in
+    let condition, condition_type = evaluate_expr stmt.expr false TokenType.Void in
     let if_lbl, else_lbl, if_done_lbl = lm#new_if_lbl () in
     Emit.jnz condition if_lbl (if stmt.else_ = None then if_done_lbl else else_lbl);
     Emit.lbl if_lbl;
@@ -457,7 +461,7 @@ module Ir = struct
     let loop_entry_lbl, loop_begin_lbl, loop_end_lbl = lm#new_loop_lbl () in
     Emit.lbl loop_entry_lbl;
 
-    let cond, _ = evaluate_expr stmt.expr false in
+    let cond, _ = evaluate_expr stmt.expr false TokenType.Void in
 
     Emit.jnz cond loop_begin_lbl loop_end_lbl;
     Emit.lbl loop_begin_lbl;
@@ -478,7 +482,7 @@ module Ir = struct
 
     Emit.lbl loop_entry_lbl;
 
-    let expr, _ = evaluate_expr stmt.cond false in
+    let expr, _ = evaluate_expr stmt.cond false TokenType.Void in
 
     Emit.jnz expr loop_begin_lbl loop_end_lbl;
     Emit.lbl loop_begin_lbl;
