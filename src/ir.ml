@@ -236,11 +236,16 @@ module Ir = struct
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
        (match pc.id.lexeme with
-        | "printf" ->
+        | "printf" -> (* INTRINSIC *)
            let reg = lm#new_reg false in
            Emit.proc_call_wassign reg "printf" args TokenType.I32;
            reg, TokenType.I32
-        | "exit" ->
+        | "strcmp" -> (* INTRINSIC *)
+           assert (List.length pc.args = 2);
+           let reg = lm#new_reg false in
+           Emit.proc_call_wassign reg "strcmp" args TokenType.I32;
+           reg, TokenType.I32
+        | "exit" -> (* INTRINSIC *)
            assert (List.length pc.args = 1);
            Emit.proc_call_woassign "exit" args;
            "", TokenType.Void
