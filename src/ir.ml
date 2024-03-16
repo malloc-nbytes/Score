@@ -316,6 +316,7 @@ module Ir = struct
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
+    Scope.assert_id_not_in_scope pd.id.lexeme;
     Scope.add_proc_to_tbl pd;
 
     Scope.push ();
@@ -522,8 +523,13 @@ module Ir = struct
 
   let generate_inter_lang (program : Ast.program) : string * (string list) =
     List.iter evaluate_toplvl_stmt program;
-    Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section,
-    Scope.state.imports
+    let ret = Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section,
+              Scope.state.imports in
+    Scope.state.func_section <- "";
+    Scope.state.data_section <- "";
+    Scope.state.type_section <- "";
+    Scope.state.imports <- [];
+    ret
 
 end
 

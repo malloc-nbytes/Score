@@ -65,8 +65,8 @@ module Err = struct
     let at, where = match token with
       | Some token ->
          (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
-      | None -> "None", "None" in
-    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\n%s" failure reason at where
+      | None -> "N/A", "N/A" in
+    Printf.eprintf " ERR\n%s\nReason: %s\nAt: %s\n%s" failure reason at where
 
   let err_type_mismatch ?(msg="") (t1 : Token.t option) (left_type : TokenType.id_type) (right_type : TokenType.id_type) : unit =
     let open Printf in
@@ -79,6 +79,6 @@ module Err = struct
       | None -> "None", "None" in
     let lt_str = TokenType.id_type_to_string left_type
     and rt_str = TokenType.id_type_to_string right_type in
-    Printf.eprintf "[ERR]: %s\nReason: %s\nAt: %s\nTypes: %s <> %s\n%s\n" failure reason at lt_str rt_str where
+    Printf.eprintf " ERR\n%s\nReason: %s\nAt: %s\nTypes: %s ::: %s\n%s\n" failure reason at lt_str rt_str where
 
 end
