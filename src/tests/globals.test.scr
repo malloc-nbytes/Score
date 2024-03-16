@@ -1,0 +1,5 @@
+export proc test_globals(void): i32 {
+
+
+    return 0;
+}

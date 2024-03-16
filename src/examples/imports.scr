@@ -1,0 +1,17 @@
+-- Import custom files. All procs with
+-- the keyword `export` will be available.
+import "examples/__import_file.scr";
+
+export proc main(void): i32 {
+    let arr: i32[..] = {1,2,3,4,5};
+    let n: usize = 5;
+
+    -- This works
+    custom_print_arr(arr, n);
+
+    -- This will not work since it
+    -- is not exported.
+    -- do_something();
+
+    return 0;
+}

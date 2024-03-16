@@ -9,6 +9,7 @@ import "tests/arrays-usize.test.scr";
 import "tests/char.test.scr";
 import "tests/conditionals.test.scr";
 import "tests/for-loops.test.scr";
+import "tests/globals.test.scr";
 import "tests/pass-by-copy.test.scr";
 import "tests/pass-by-ref.test.scr";
 import "tests/str.test.scr";
@@ -24,6 +25,7 @@ export proc main(void): i32 {
     assert_i32_eq(test_char(), 0);
     assert_i32_eq(test_conditionals(), 0);
     assert_i32_eq(test_for_loops(), 0);
+    assert_i32_eq(test_globals(), 0);
     assert_i32_eq(test_pass_by_copy(), 0);
     assert_i32_eq(test_pass_by_ref(), 0);
     assert_i32_eq(test_str(), 0);

@@ -29,17 +29,24 @@ export proc panic(s: str ref): void {
     halt(1);
 }
 
+export proc i32assert(cond: i32): void {
+    if cond == 0 {
+        printf("assert failure. cond = %d\n", cond);
+        halt(1);
+    }
+}
+
 export proc assert_i32_eq(l: i32, r: i32): void {
     if l != r {
         printf("assert_i32_eq failure. left = %d, right = %d\n", l, r);
-        exit(1);
+        halt(1);
     }
 }
 
 export proc assert_usize_eq(l: usize, r: usize): void {
     if l != r {
         printf("assert_usize_eq failure. left = %d, right = %d\n", l, r);
-        exit(1);
+        halt(1);
     }
 }
 

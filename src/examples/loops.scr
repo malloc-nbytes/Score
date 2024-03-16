@@ -1,0 +1,16 @@
+export proc main(void): i32 {
+
+    -- for loops
+    for let i: i32 = 0; i < 10; i += 1; {
+        printf("%d\n", i);
+    }
+
+    -- while loops
+    let j: usize = 0;
+    while j < 10 {
+        printf("%d\n", j);
+        j += 1;
+    }
+
+    return 0;
+}
