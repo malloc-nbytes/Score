@@ -29,7 +29,6 @@ cd ./Score/src/
 cd ./Score/src/
 ./test.sh
 ```
-
 # TODO
 - Integer Types [X]
 - String Types [X]
@@ -41,6 +40,7 @@ cd ./Score/src/
 - `for` loops [X]
 - Arrays [X]
 - Turing complete [X]
+- Imports [X]
 - Self-hosted tests [X]
 - unary operators [ ]
 - break statements [ ]
