@@ -65,7 +65,7 @@ let rec compile input_filepath =
   Printf.printf " parsing ...";
   let tree = Parser.produce_ast tokens in
 
-  let imports = Proc.populate_proc_tbl tree in
+  (* let imports = Proc.populate_proc_tbl tree in *)
 
   Printf.printf " generating IR ...";
   let ircode = Ir.generate_ir tree in
