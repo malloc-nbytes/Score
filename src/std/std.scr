@@ -95,11 +95,10 @@ proc i32partition(arr: i32[..], low: usize, high: usize): usize {
     return i+1;
 }
 
-export proc arr_i32_quicksort(arr: i32[..], low: usize, high: usize): void {
-    panic("arr_i32_quicksort: unimplemented");
+export proc arr_i32_qsort(arr: i32[..], low: usize, high: usize): void {
     if low < high {
         let pi: usize = i32partition(arr, low, high);
-        arr_i32_quicksort(arr, low, pi-1);
-        arr_i32_quicksort(arr, pi+1, high);
+        arr_i32_qsort(arr, low, pi-1);
+        arr_i32_qsort(arr, pi+1, high);
     }
 }

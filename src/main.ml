@@ -35,8 +35,8 @@ let output_bin = ref ""
 let ssas : string list ref = ref []
 let asms : string list ref = ref []
 
-let ssas_contains s =
-  List.exists (fun x -> x = s) !ssas
+let ssas_contains lst s =
+  List.exists (fun x -> x = s) lst
 
 let qbe fp =
   output_asm := fp^".s";
@@ -57,7 +57,6 @@ let cc () =
     exit 1
 
 let rec compile input_filepath =
-  (* Printf.printf "[ scr ] %s" input_filepath; *)
   let src_code = Utils.file_to_str input_filepath in
 
   let tokens = Lexer.lex_file input_filepath (String.to_seq src_code |> List.of_seq) 1 1 in
@@ -65,7 +64,9 @@ let rec compile input_filepath =
   let tree = Parser.produce_ast tokens in
 
   let imports = Proc.populate_proc_tbl tree in
-  List.iter (fun imp -> compile imp) imports;
+  List.iter (fun imp ->
+      compile imp
+    ) imports;
 
   let ircode = Ir.generate_ir tree in
 
