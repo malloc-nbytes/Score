@@ -268,16 +268,28 @@ module Ir = struct
            Emit.proc_call_woassign "exit" args;
            "", TokenType.Void
         | _ -> (* user-defined proc *)
-           (* TODO: assert proc params match *)
-           Scope.assert_proc_in_tbl pc.id.lexeme;
-           let proc_rettype = Scope.get_proc_rettype_from_tbl pc.id.lexeme in
-           let reg = lm#new_reg false in
-           if proc_rettype = TokenType.Void then
-             let _ = Emit.proc_call_woassign pc.id.lexeme args in
-             reg, proc_rettype (* NOTE: remove `reg` here if issues are caused *)
+           (* let proc_rettype = ref TokenType.Void *)
+           (* and reg = lm#new_reg false *)
+           if Scope.check_def_proc_in_tbl pc.id.lexeme then
+             let def_proc = Scope.get_def_proc_from_tbl pc.id.lexeme in
+             let proc_rettype = def_proc.rettype in
+             let reg = lm#new_reg false in
+             if proc_rettype = TokenType.Void then
+               let _ = Emit.proc_call_woassign pc.id.lexeme args in
+               reg, proc_rettype (* NOTE: remove `reg` here if issues are caused *)
+             else
+               let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
+               reg, proc_rettype
            else
-             let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
-             reg, proc_rettype)
+             let _ = Scope.assert_proc_in_tbl pc.id.lexeme in
+             let proc_rettype = Scope.get_proc_rettype_from_tbl pc.id.lexeme in
+             let reg = lm#new_reg false in
+             if proc_rettype = TokenType.Void then
+               let _ = Emit.proc_call_woassign pc.id.lexeme args in
+               reg, proc_rettype (* NOTE: remove `reg` here if issues are caused *)
+             else
+               let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
+               reg, proc_rettype)
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
@@ -518,6 +530,7 @@ module Ir = struct
     | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
     | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
     | Ast.Import i -> evaluate_import_stmt i
+    | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
 
   (* --- Entrypoint --- *)
 

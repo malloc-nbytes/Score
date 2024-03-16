@@ -84,6 +84,7 @@ module TokenType : sig
     | Ampersand
     | Import
     | Export
+    | Def
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

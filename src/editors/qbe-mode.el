@@ -1,3 +1,7 @@
+;; QBE mode for Emacs
+;; Stolen from https://gitlab.com/tsoding/porth/-/blob/master/editor/porth-mode.el?ref_type=heads
+;; and slightly edited to fit QBE.
+
 ;; qbe mode
 (defconst qbe-mode-syntax-table
   (with-syntax-table (copy-syntax-table)
@@ -9,6 +13,8 @@
     (syntax-table))
   "Syntax table for `qbe-mode'.")
 
+;; Function taken from:
+;;  https://www.omarpolo.com/post/writing-a-major-mode.html
 (defun qbe-indent-line ()
   "Indent current line."
   (let (indent
