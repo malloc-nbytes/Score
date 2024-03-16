@@ -12,7 +12,9 @@ proc modify_str_arr(arr: str[..], s: str): void {
     arr[1] = s;
 }
 
-export proc run_arrays_str(void): i32 {
+export proc test_arrays_str(void): i32 {
+    printf("test_arrays_str... ");
+
     if arr_str_decl() != 1 {
         printf("arr_str_decl failed\n");
         return 1;
@@ -25,6 +27,8 @@ export proc run_arrays_str(void): i32 {
         printf("modify_str_arr failed\n");
         return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

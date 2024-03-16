@@ -1,3 +1,6 @@
+-- This is the Score test program. Run this with scr ./test.scr to
+-- build then run the executable to run the tests.
+
 import "std/std.scr";
 import "tests/arrays-char.test.scr";
 import "tests/arrays-i32.test.scr";
@@ -10,18 +13,22 @@ import "tests/pass-by-copy.test.scr";
 import "tests/pass-by-ref.test.scr";
 import "tests/str.test.scr";
 import "tests/while-loops.test.scr";
+import "tests/cast.test.scr";
 
 export proc main(void): i32 {
-    assert_i32_eq(run_arrays_char(), 0);
-    assert_i32_eq(run_arrays_i32(), 0);
-    assert_i32_eq(run_arrays_str(), 0);
-    assert_i32_eq(run_arrays_usize(), 0);
-    assert_i32_eq(run_char(), 0);
-    assert_i32_eq(run_conditionals(), 0);
-    assert_i32_eq(run_for_loops(), 0);
-    assert_i32_eq(run_pass_by_copy(), 0);
-    assert_i32_eq(run_pass_by_ref(), 0);
-    assert_i32_eq(run_str(), 0);
-    assert_i32_eq(run_str(), 0);
+    printf("[ Running tests ]\n");
+    assert_i32_eq(test_arrays_char(), 0);
+    assert_i32_eq(test_arrays_i32(), 0);
+    assert_i32_eq(test_arrays_str(), 0);
+    assert_i32_eq(test_arrays_usize(), 0);
+    assert_i32_eq(test_char(), 0);
+    assert_i32_eq(test_conditionals(), 0);
+    assert_i32_eq(test_for_loops(), 0);
+    assert_i32_eq(test_pass_by_copy(), 0);
+    assert_i32_eq(test_pass_by_ref(), 0);
+    assert_i32_eq(test_str(), 0);
+    assert_i32_eq(test_while_loops(), 0);
+    assert_i32_eq(test_cast(), 0);
+    printf("[ Done ]\n");
     return 0;
 }

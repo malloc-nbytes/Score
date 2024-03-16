@@ -25,7 +25,9 @@ proc modify_arr(arr: char[..]): void {
     arr[1] = 'b';
 }
 
-export proc run_arrays_char(void): i32 {
+export proc test_arrays_char(void): i32 {
+    printf("test_arrays_char... ");
+
     if init_char_arr() != 1 {
         printf("init_char_arr failed\n");
         return 1;
@@ -42,6 +44,8 @@ export proc run_arrays_char(void): i32 {
         printf("modify_arr failed\n");
         return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

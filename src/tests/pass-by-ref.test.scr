@@ -47,7 +47,9 @@ proc mod_var_by_ref3(void): i32 {
     return a;
 }
 
-export proc run_pass_by_ref(void): i32 {
+export proc test_pass_by_ref(void): i32 {
+    printf("test_pass_by_ref... ");
+
     if basic() != 2 {
         printf("basic failed\n");
         return 1;
@@ -72,6 +74,8 @@ export proc run_pass_by_ref(void): i32 {
         printf("mod_var_by_ref3 failed\n");
         return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

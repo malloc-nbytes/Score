@@ -1,5 +1,11 @@
 #!/bin/python3
 
+# This was the original file that was used
+# for running the tests. However, Score is
+# mature enough to self-host the tests so
+# this file purely exists as a backup in
+# case the Score test file fails.
+
 import os
 import sys
 import subprocess

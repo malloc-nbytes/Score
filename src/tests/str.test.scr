@@ -27,7 +27,9 @@ proc str_ref_as_param(s: str ref): str {
 --     s[2] = 'c';
 -- }
 
-export proc run_str(void): i32 {
+export proc test_str(void): i32 {
+    printf("test_str... ");
+
     let strinit: str = strinit();
     if streq(strinit, "foo") != 1 {
         printf("strinit failed\n");
@@ -53,6 +55,8 @@ export proc run_str(void): i32 {
     --     printf("str_ref_as_param failed\n");
     --     exit(1);
     -- }
+
+    printf("ok\n");
 
     return 0;
 }

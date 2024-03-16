@@ -75,7 +75,9 @@ proc big_for(void): i32 {
     return res;
 }
 
-export proc run_for_loops(void): i32 {
+export proc test_for_loops(void): i32 {
+    printf("test_for_loops... ");
+
     if basic_for() != 10 {
         printf("basic_for failed\n");
         return 1;
@@ -105,6 +107,8 @@ export proc run_for_loops(void): i32 {
         printf("big_for failed\n");
         return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

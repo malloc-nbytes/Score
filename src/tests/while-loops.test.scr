@@ -110,7 +110,9 @@ proc big(void): i32 {
     return res;
 }
 
-export proc run_while_loops(void): i32 {
+export proc test_while_loops(void): i32 {
+    printf("test_while_loops... ");
+
     if while_basic() != 10 {
         printf("while_basic failed\n");
         return 1;
@@ -150,6 +152,8 @@ export proc run_while_loops(void): i32 {
         printf("big failed\n");
         return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

@@ -20,13 +20,15 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
-
-export proc streq(s1: str, s2: str): i32 {
-    return strcmp(s1, s2) == 0;
+export proc isalpha(c: char): i32 {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-export proc strlen(s: str): usize {
-    let i: usize = 0;
-    while s[i] { i += 1; }
-    return i;
+export proc isnum(c: char): i32 {
+    return c >= '0' && c <= '9';
 }
+
+export proc isalnum(c: char): i32 {
+    return isalpha(c) || isnum(c);
+}
+

@@ -65,7 +65,9 @@ proc modify_usize_arr(arr: usize[..]): void {
 }
 
 
-export proc run_arrays_usize(void): i32 {
+export proc test_arrays_usize(void): i32 {
+    printf("test_arrays_usize... ");
+
     if arr_usize_decl() != 1 {
         printf("arr_usize_decl failed\n");
         return 1;
@@ -102,6 +104,7 @@ export proc run_arrays_usize(void): i32 {
         return 1;
     }
 
+    printf("ok\n");
 
     return 0;
 }

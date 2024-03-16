@@ -41,7 +41,7 @@ let qbe () =
   output_asm := !input_filepath^".s";
   let ssa_files = (String.concat " " !ssas) in
   let cmd = Printf.sprintf "qbe -o %s %s" !output_asm ssa_files in
-  Printf.printf "\n[ qbe ] %s %s...\n" !output_asm ssa_files;
+  (* Printf.printf "\n[ qbe ] %s %s\n" !output_asm ssa_files; *)
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
@@ -50,14 +50,14 @@ let qbe () =
 let cc () =
   output_bin := !input_filepath^".out";
   let cmd = Printf.sprintf "cc -o %s %s" !output_bin !output_asm in
-  Printf.printf "[ cc ] %s %s ...\n" !output_bin !output_asm;
+  (* Printf.printf "[ cc ] %s %s\n" !output_bin !output_asm; *)
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
     exit 1
 
 let rec compile input_filepath =
-  Printf.printf "[ scr ] %s..." input_filepath;
+  (* Printf.printf "[ scr ] %s" input_filepath; *)
   let src_code = Utils.file_to_str input_filepath in
 
   let tokens = Lexer.lex_file input_filepath (String.to_seq src_code |> List.of_seq) 1 1 in
@@ -65,7 +65,7 @@ let rec compile input_filepath =
   let tree = Parser.produce_ast tokens in
 
   let imports = Proc.populate_proc_tbl tree in
-  List.iter (fun imp -> print_endline ""; compile imp) imports;
+  List.iter (fun imp -> compile imp) imports;
 
   let ircode = Ir.generate_ir tree in
 
