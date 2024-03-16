@@ -1,14 +1,14 @@
-proc ret_passed(a: i32): i32 {
+export proc ret_passed(a: i32): i32 {
     printf("ret_passed\n");
     return a;
 }
 
-proc add_5(a: i32): i32 {
+export proc add_5(a: i32): i32 {
     printf("add_5\n");
     return a+5;
 }
 
-export proc main(void): i32 {
+export proc run_tests(void): i32 {
     if ret_passed(101) != 101 {
         printf("ret_passed failed\n");
         exit(1);
@@ -21,3 +21,17 @@ export proc main(void): i32 {
 
     return 0;
 }
+
+-- export proc main(void): i32 {
+--     if ret_passed(101) != 101 {
+--         printf("ret_passed failed\n");
+--         exit(1);
+--     }
+
+--     if add_5(100) != 105 {
+--         printf("add_5 failed\n");
+--         exit(1);
+--     }
+
+--     return 0;
+-- }

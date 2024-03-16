@@ -1,3 +1,4 @@
-export proc streq(s1: str ref, s2: str ref): i32 {
-    return strcmp(s1, s2) == 0;
+export proc public(i: i32): i32 {
+    printf("hello from public!\n");
+    return i;
 }

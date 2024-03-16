@@ -25,5 +25,5 @@ module Ir : sig
   open Ast
   open Scope
 
-  val generate_inter_lang : Ast.program -> string * (string list)
+  val generate_ir : Ast.program -> string
 end

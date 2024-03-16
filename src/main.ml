@@ -25,6 +25,7 @@ open Token
 open Lexer
 open Parser
 open Ast
+open Proc
 open Ir
 
 let input_filepath = ref ""
@@ -64,15 +65,17 @@ let rec compile input_filepath =
   Printf.printf " parsing ...";
   let tree = Parser.produce_ast tokens in
 
+  let imports = Proc.populate_proc_tbl tree in
+
   Printf.printf " generating IR ...";
-  let ircode, imports = Ir.generate_inter_lang tree in
+  let ircode = Ir.generate_ir tree in
 
   print_endline " ok";
 
-  List.iter (fun imp -> compile imp) imports;
+  (* List.iter (fun imp -> compile imp) imports; *)
 
   output_ssa := input_filepath^".ssa";
-  ssas := !output_ssa::!ssas;
+  ssas := !output_ssa :: !ssas;
   Utils.write_to_file !output_ssa ircode
 
 let () =

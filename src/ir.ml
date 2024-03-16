@@ -285,7 +285,6 @@ module Ir = struct
              let _ = Emit.proc_call_wassign reg pc.id.lexeme args !proc_rettype in
              reg, !proc_rettype)
 
-
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
     and id_lexeme = stmt.id.lexeme
@@ -516,27 +515,21 @@ module Ir = struct
     | Ast.Break stmt -> failwith "evaluate_stmt: Ast.Break unimplemented"
     | Ast.For stmt -> evaluate_for_stmt stmt
 
-  let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
-    Scope.state.imports <- stmt.path.lexeme :: Scope.state.imports
-
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
+    | Ast.Import i -> ()
     | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
     | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
-    | Ast.Import i -> evaluate_import_stmt i
     | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
 
   (* --- Entrypoint --- *)
-
-  let generate_inter_lang (program : Ast.program) : string * (string list) =
+  let generate_ir (program : Ast.program) : string =
     List.iter evaluate_toplvl_stmt program;
-    let ret = Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section,
-              Scope.state.imports in
+    let ret = Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section in
     Scope.state.func_section <- "";
     Scope.state.data_section <- "";
     Scope.state.type_section <- "";
-    Scope.state.imports <- [];
     ret
 
 end
