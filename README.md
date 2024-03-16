@@ -28,7 +28,7 @@ cd ./Score/src/
 ```
 cd ./Score/src/
 ./test.sh
-``
+```
 
 # TODO
 - Integer Types [X]
