@@ -2,21 +2,23 @@ module Proc = struct
   open Ast
   open Scope
   open Token
+  open Printf
 
   (* TODO: only do this with export procs *)
   let evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
-    Scope.assert_def_proc_not_in_tbl pd.id.lexeme;
-    (* Scope.assert_id_not_in_scope pd.id.lexeme; *)
-    (* Scope.add_proc_to_tbl pd; *)
+    if pd.export then
+      let _ = Scope.assert_def_proc_not_in_tbl pd.id.lexeme in
 
-    let params : (TokenType.id_type list) ref = ref [] in
+      let params : (TokenType.id_type list) ref = ref [] in
 
-    List.iter (fun param ->
-        let param_type = (snd param) in
-        params := !params @ [param_type]
-      ) pd.params;
+      let _ = List.iter (fun param ->
+          let param_type = (snd param) in
+          params := !params @ [param_type]
+        ) pd.params in
 
-    Scope.def_proc_tbl_add pd.id.lexeme !params pd.rettype
+      Scope.def_proc_tbl_add pd.id.lexeme !params pd.rettype
+    else
+      ()
 
   let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
     Scope.state.imports <- stmt.path.lexeme :: Scope.state.imports

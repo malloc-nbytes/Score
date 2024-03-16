@@ -33,15 +33,16 @@ let output_ssa = ref ""
 let output_asm = ref ""
 let output_bin = ref ""
 let ssas : string list ref = ref []
+let asms : string list ref = ref []
 
 let ssas_contains s =
   List.exists (fun x -> x = s) !ssas
 
-let qbe () =
-  output_asm := !input_filepath^".s";
-  let ssa_files = (String.concat " " !ssas) in
-  let cmd = Printf.sprintf "qbe -o %s %s" !output_asm ssa_files in
-  (* Printf.printf "\n[ qbe ] %s %s\n" !output_asm ssa_files; *)
+let qbe fp =
+  output_asm := fp^".s";
+  asms := !asms @ [!output_asm];
+  (* let ssa_files = (String.concat " " !ssas) in *)
+  let cmd = Printf.sprintf "qbe -o %s %s" !output_asm fp in
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
@@ -49,8 +50,7 @@ let qbe () =
 
 let cc () =
   output_bin := !input_filepath^".out";
-  let cmd = Printf.sprintf "cc -o %s %s" !output_bin !output_asm in
-  (* Printf.printf "[ cc ] %s %s\n" !output_bin !output_asm; *)
+  let cmd = Printf.sprintf "cc -o %s %s" !output_bin (String.concat " " !asms) in
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
@@ -88,7 +88,9 @@ let () =
 
   compile !input_filepath;
 
-  qbe ();
+  List.iter qbe !ssas;
+  List.iter print_endline !asms;
+
   cc ();
 
   print_endline "[ Done ]"
