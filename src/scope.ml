@@ -178,4 +178,10 @@ module Scope = struct
   let get_def_proc_from_tbl (id : string) : def_proc =
     Hashtbl.find !def_proc_tbl id
 
+  let assert_def_proc_not_in_tbl (id : string) : unit =
+    if Hashtbl.mem !def_proc_tbl id then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared function `%s`" id)
+                None in exit 1
+
 end

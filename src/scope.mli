@@ -74,4 +74,5 @@ module Scope : sig
   val def_proc_tbl_add : string -> TokenType.id_type list -> TokenType.id_type -> unit
   val check_def_proc_in_tbl : string -> bool
   val get_def_proc_from_tbl : string -> def_proc
+  val assert_def_proc_not_in_tbl : string -> unit
 end

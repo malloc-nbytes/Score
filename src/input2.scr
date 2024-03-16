@@ -1,4 +1,0 @@
-export proc public(i: i32): i32 {
-    printf("hello from public!\n");
-    return i;
-}

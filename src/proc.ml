@@ -3,20 +3,20 @@ module Proc = struct
   open Scope
   open Token
 
+  (* TODO: only do this with export procs *)
   let evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
-    Scope.assert_id_not_in_scope pd.id.lexeme;
-    Scope.add_proc_to_tbl pd;
+    Scope.assert_def_proc_not_in_tbl pd.id.lexeme;
+    (* Scope.assert_id_not_in_scope pd.id.lexeme; *)
+    (* Scope.add_proc_to_tbl pd; *)
+
+    let params : (TokenType.id_type list) ref = ref [] in
 
     List.iter (fun param ->
-        let id = (fst param)
-        and param_type = (snd param)
-        and id_lexeme = (fst param).Token.lexeme in
-        ignore id;
-        ignore param_type;
-        ignore id_lexeme;
-        ()
+        let param_type = (snd param) in
+        params := !params @ [param_type]
       ) pd.params;
-    ()
+
+    Scope.def_proc_tbl_add pd.id.lexeme !params pd.rettype
 
   let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
     Scope.state.imports <- stmt.path.lexeme :: Scope.state.imports
@@ -30,6 +30,8 @@ module Proc = struct
 
   let populate_proc_tbl (program : Ast.program) : string list =
     List.iter evaluate_toplvl_stmt program;
-    Scope.state.imports
+    let imports = Scope.state.imports in
+    Scope.state.imports <- [];
+    imports
 
 end

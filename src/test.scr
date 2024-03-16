@@ -1,0 +1,8 @@
+import "std/std.scr";
+import "tests/arrays-char.test.scr";
+
+export proc main(void): i32 {
+    assert_i32_eq(run_arrays_char(), 0);
+
+    return 0;
+}

@@ -25,22 +25,22 @@ proc modify_arr(arr: char[..]): void {
     arr[1] = 'b';
 }
 
-export proc main(void): i32 {
+export proc run_arrays_char(void): i32 {
     if init_char_arr() != 1 {
         printf("init_char_arr failed\n");
-        exit(1);
+        return 1;
     }
 
     if char_arr_in_loop() != 1 {
         printf("char_arr_in_loop failed\n");
-        exit(1);
+        return 1;
     }
 
     let modify_arr: char[..] = {'x', 'y', 'z'};
     modify_arr(modify_arr);
     if modify_arr[1] != 'b' {
         printf("modify_arr failed\n");
-        exit(1);
+        return 1;
     }
 
     return 0;
