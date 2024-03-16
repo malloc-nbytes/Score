@@ -1,0 +1,3 @@
+export proc streq(s1: str, s2: str): i32 {
+    return strcmp(s1, s2) == 0;
+}

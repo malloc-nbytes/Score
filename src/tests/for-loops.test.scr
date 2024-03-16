@@ -1,5 +1,5 @@
 proc basic_for(void): i32 {
-    printf("basic_for\n");
+    -- printf("basic_for\n");
 
     let res: i32 = 0;
     for let i: i32 = 0; i < 10; i += 1; {
@@ -9,7 +9,7 @@ proc basic_for(void): i32 {
 }
 
 proc double_for(void): i32 {
-    printf("double_for\n");
+    -- printf("double_for\n");
 
     let res: i32 = 0;
     for let i: i32 = 0; i < 10; i += 1; {
@@ -21,7 +21,7 @@ proc double_for(void): i32 {
 }
 
 proc return_in_for(void): i32 {
-    printf("return_in_for\n");
+    -- printf("return_in_for\n");
 
     let res: i32 = 0;
     for let i: i32 = 0; i < 10; i += 1; {
@@ -35,7 +35,7 @@ proc return_in_for(void): i32 {
 }
 
 proc return_in_double_for(void): i32 {
-    printf("return_in_double_for\n");
+    -- printf("return_in_double_for\n");
 
     let res: i32 = 0;
     for let i: i32 = 0; i < 10; i += 1; {
@@ -51,7 +51,7 @@ proc return_in_double_for(void): i32 {
 }
 
 proc for_wparam(stop: i32): i32 {
-    printf("for_wparam\n");
+    -- printf("for_wparam\n");
 
     let res: i32 = 0;
     let i: i32 = 0;
@@ -62,8 +62,8 @@ proc for_wparam(stop: i32): i32 {
     return res == stop;
 }
 
-proc big(void): i32 {
-    printf("big\n");
+proc big_for(void): i32 {
+    -- printf("big_for\n");
 
     let res: i32 = 0;
     for let i: i32 = 0; i < 30000; i += 1; {
@@ -75,35 +75,35 @@ proc big(void): i32 {
     return res;
 }
 
-export proc main(void): i32 {
+export proc run_for_loops(void): i32 {
     if basic_for() != 10 {
         printf("basic_for failed\n");
-        exit(1);
+        return 1;
     }
 
     if double_for() != 100 {
         printf("double_for failed\n");
-        exit(1);
+        return 1;
     }
 
     if return_in_for() != 5 {
         printf("return_in_for failed\n");
-        exit(1);
+        return 1;
     }
 
     if return_in_double_for() != 50 {
         printf("return_in_double_for failed\n");
-        exit(1);
+        return 1;
     }
 
     if for_wparam(10) != 1 {
         printf("for_wparam failed\n");
-        exit(1);
+        return 1;
     }
 
-    if big(10) != 467788672 {
-        printf("big failed\n");
-        exit(1);
+    if big_for(10) != 467788672 {
+        printf("big_for failed\n");
+        return 1;
     }
 
     return 0;

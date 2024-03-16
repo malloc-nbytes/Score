@@ -34,6 +34,9 @@ let output_asm = ref ""
 let output_bin = ref ""
 let ssas : string list ref = ref []
 
+let ssas_contains s =
+  List.exists (fun x -> x = s) !ssas
+
 let qbe () =
   output_asm := !input_filepath^".s";
   let ssa_files = (String.concat " " !ssas) in
@@ -65,8 +68,6 @@ let rec compile input_filepath =
   List.iter (fun imp -> print_endline ""; compile imp) imports;
 
   let ircode = Ir.generate_ir tree in
-
-  (* Printf.printf "\n[ ok ]"; *)
 
   output_ssa := input_filepath^".ssa";
   ssas := !output_ssa :: !ssas;

@@ -1,12 +1,12 @@
 proc init_char_arr(void): i32 {
-    printf("init_char_arr\n");
+    -- printf("init_char_arr\n");
 
     let arr: char[..] = {'a', 'b', 'c'};
     return arr[0] == 'a' && arr[1] == 'b' && arr[2] == 'c';
 }
 
 proc char_arr_in_loop(void): i32 {
-    printf("char_arr_in_loop\n");
+    -- printf("char_arr_in_loop\n");
 
     let arr: char[..] = {'a', 'b', 'c'};
     let ans: char[..] = {'a', 'b', 'c'};
@@ -21,7 +21,7 @@ proc char_arr_in_loop(void): i32 {
 }
 
 proc modify_arr(arr: char[..]): void {
-    printf("modify_arr\n");
+    -- printf("modify_arr\n");
     arr[1] = 'b';
 }
 

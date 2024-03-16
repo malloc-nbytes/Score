@@ -2,5 +2,5 @@
 
 set -xe
 
-rm -f ./tests/*.out ./tests/*.ssa ./tests/*.s
+rm -f ./std/*.s ./std/*.ssa ./tests/*.out ./tests/*.ssa ./tests/*.s
 rm -rf *.cmo *.cmi *.annot *.ssa *.s out* main scr *.out
