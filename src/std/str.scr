@@ -20,9 +20,21 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
-
 export proc streq(s1: str, s2: str): i32 {
-    return strcmp(s1, s2) == 0;
+    let i: usize = 0;
+    let j: usize = 0;
+
+    while s1[i] && s2[i] {
+        if s1[i] != s2[i] {
+            return 0;
+        }
+    }
+
+    if s1[i] || s2[i] {
+        return 0;
+    }
+
+    return 1;
 }
 
 export proc strlen(s: str): usize {
