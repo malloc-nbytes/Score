@@ -2,7 +2,7 @@
 
 Score is a compiled language written in OCaml with the QBE backend.
 
-See `example.scr` or `./src/tests/` for what is currently possible.
+See `./src/examples` for what is currently possible.
 
 # Requirements
 - OCaml https://ocaml.org/
@@ -20,13 +20,15 @@ cd ./Score/src/
 
 ## Running
 ```
+cd ./Score/src/
 ./scr <input filepath>
 ```
-or
+
+## Tests
 ```
-./scr -o <output filepath> <input filepath>
-```
-See `./scr --help` for more options
+cd ./Score/src/
+./test.sh
+``
 
 # TODO
 - Integer Types [X]
@@ -39,10 +41,8 @@ See `./scr --help` for more options
 - `for` loops [X]
 - Arrays [X]
 - Turing complete [X]
+- Self-hosted tests [X]
 - unary operators [ ]
+- break statements [ ]
 - structs [ ]
 - Self-hosted [ ]
-
-# Current Bugs
-- Having a `break` statement inside of multiple `while` loops does not function correctly.
-
