@@ -1,5 +1,5 @@
 proc basic(void): i32 {
-    printf("basic\n");
+    -- printf("basic\n");
 
     let a: i32 = 1;
     let p: i32 ref = &a;
@@ -8,7 +8,7 @@ proc basic(void): i32 {
 }
 
 proc basic2(void): i32 {
-    printf("basic2\n");
+    -- printf("basic2\n");
 
     let a: i32 = 1;
     let p: i32 ref = &a;
@@ -22,7 +22,7 @@ proc mod_var_by_ref'(a: i32 ref): void {
 }
 
 proc mod_var_by_ref(void): i32 {
-    printf("mod_var_by_ref\n");
+    -- printf("mod_var_by_ref\n");
 
     let a: i32 = 0;
     mod_var_by_ref'(&a);
@@ -30,7 +30,7 @@ proc mod_var_by_ref(void): i32 {
 }
 
 proc mod_var_by_ref2(void): i32 {
-    printf("mod_var_by_ref2\n");
+    -- printf("mod_var_by_ref2\n");
 
     let a: i32 = 0;
     let p: i32 ref = &a;
@@ -39,7 +39,7 @@ proc mod_var_by_ref2(void): i32 {
 }
 
 proc mod_var_by_ref3(void): i32 {
-    printf("mod_var_by_ref3\n");
+    -- printf("mod_var_by_ref3\n");
 
     let a: i32 = 0;
     let p: i32 ref = &a;
@@ -47,31 +47,35 @@ proc mod_var_by_ref3(void): i32 {
     return a;
 }
 
-export proc main(void): i32 {
+export proc test_pass_by_ref(void): i32 {
+    printf("test_pass_by_ref... ");
+
     if basic() != 2 {
         printf("basic failed\n");
-        exit(1);
+        return 1;
     }
 
     if basic2() != 2 {
         printf("basic2 failed\n");
-        exit(1);
+        return 1;
     }
 
     if mod_var_by_ref() != 101 {
         printf("mod_var_by_ref failed\n");
-        exit(1);
+        return 1;
     }
 
     if mod_var_by_ref2() != 101 {
         printf("mod_var_by_ref2 failed\n");
-        exit(1);
+        return 1;
     }
 
     if mod_var_by_ref3() != 101 {
         printf("mod_var_by_ref3 failed\n");
-        exit(1);
+        return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

@@ -1,5 +1,11 @@
 #!/bin/python3
 
+# This was the original file that was used
+# for running the tests. However, Score is
+# mature enough to self-host the tests so
+# this file purely exists as a backup in
+# case the Score test file fails.
+
 import os
 import sys
 import subprocess
@@ -20,12 +26,10 @@ def process_files(file_paths, directory_path, show):
     passed, failed = 0, 0
     for file_path in file_paths:
         exe = f'{file_path}.out'
-        compile_ = f"./scr -s -o {exe} {file_path}"
-        print(f'[COMPILE] {compile_} ...', end='')
+        compile_ = f"./scr {file_path}"
+        # print(f'[COMPILE] {compile_} ...', end='')
         result = subprocess.run(compile_, shell=True, check=False)
-        if result.returncode == 0:
-            print(' ok')
-        elif result.returncode == 1:
+        if result.returncode == 1:
             print(f'\n=== COMPILATION FAILED {file_path} ===\n(return code: {result.returncode})')
             exit(1)
 
@@ -34,7 +38,7 @@ def process_files(file_paths, directory_path, show):
         run = f'{exe}'
         try:
             newline = '\n' if show else ''
-            print(f'[RUN] {exe} ...{newline}', flush=True, end='')
+            print(f'[TEST RUN] {exe} ...{newline}', flush=True, end='')
             if show:
                 result = subprocess.run(run, shell=True, check=False)
             else:

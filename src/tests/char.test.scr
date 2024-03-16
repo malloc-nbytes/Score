@@ -1,21 +1,23 @@
 proc init_char(void): char {
-    printf("init_char\n");
+    -- printf("init_char\n");
 
     let c: char = 'a';
     return c;
 }
 
 proc take_char(c: char): char {
-    printf("take_char\n");
+    -- printf("take_char\n");
     return c;
 }
 
 proc take_char_ref(c: char ref): void {
-    printf("take_char_ref\n");
+    -- printf("take_char_ref\n");
     *c = 'z';
 }
 
-export proc main(void): i32 {
+export proc test_char(void): i32 {
+    printf("test_char... ");
+
     if init_char() != 'a' {
         printf("init_char failed\n");
         exit(1);
@@ -32,6 +34,8 @@ export proc main(void): i32 {
         printf("take_char_ref failed\n");
         exit(1);
     }
+
+    printf("ok\n");
 
     return 0;
 }

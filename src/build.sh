@@ -1,32 +1,26 @@
 #!/bin/bash
 
-set -e
+set -xe
 
-green="\033[0;32m"
-nc="\033[0m"
-
-echo -e "Building Score"
-
-files=("token.mli" "token.ml"
-       "token.mli" "token.ml"
-       "utils.mli" "utils.ml"
-       "err.mli" "err.ml"
-       "lexer.mli" "lexer.ml"
-       "ast.mli" "ast.ml"
-       "parser.mli" "parser.ml"
-       "scope.mli" "scope.ml"
-       "emit.mli" "emit.ml"
-       "ir.mli" "ir.ml")
-
-for ((i = 0; i < ${#files[@]}; i+=2)); do
-    mli_file="${files[i]}"
-    ml_file="${files[i+1]}"
-    echo -e "${green}[OCAMLC]${nc} $mli_file $ml_file"
-    ocamlc -annot -c "$mli_file" "$ml_file"
-done
-
-echo -e "${green}[OCAMLC]${nc} main.ml" && ocamlc -annot -c main.ml
-
-cmos="token.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo ir.cmo lexer.cmo parser.cmo main.cmo"
-
-echo -e "${green}[OCAMLC]${nc} $cmos" && ocamlc -o scr $cmos
+ocamlc -annot -c token.mli
+ocamlc -annot -c token.ml
+ocamlc -annot -c utils.mli
+ocamlc -annot -c utils.ml
+ocamlc -annot -c err.mli
+ocamlc -annot -c err.ml
+ocamlc -annot -c lexer.mli
+ocamlc -annot -c lexer.ml
+ocamlc -annot -c ast.mli
+ocamlc -annot -c ast.ml
+ocamlc -annot -c parser.mli
+ocamlc -annot -c parser.ml
+ocamlc -annot -c scope.mli
+ocamlc -annot -c scope.ml
+ocamlc -annot -c emit.mli
+ocamlc -annot -c emit.ml
+ocamlc -annot -c proc.mli
+ocamlc -annot -c proc.ml
+ocamlc -annot -c ir.mli
+ocamlc -annot -c ir.ml
+ocamlc -annot -c main.ml
+ocamlc -o scr token.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo proc.cmo ir.cmo lexer.cmo parser.cmo main.cmo

@@ -1,3 +1,7 @@
+;; Score mode for Emacs
+;; Stolen from https://gitlab.com/tsoding/porth/-/blob/master/editor/porth-mode.el?ref_type=heads
+;; and slightly edited to fit Score.
+
 ;; Score mode
 (defconst score-mode-syntax-table
   (with-syntax-table (copy-syntax-table)
@@ -9,6 +13,8 @@
     (syntax-table))
   "Syntax table for `score-mode'.")
 
+;; Function taken from:
+;;  https://www.omarpolo.com/post/writing-a-major-mode.html
 (defun score-indent-line ()
   "Indent current line."
   (let (indent
@@ -37,7 +43,8 @@
   (defconst score-keywords
     '("if" "else" "while" "let" "void" "i32"
       "str" "for" "proc" "return" "mut" "break" "macro" "done"
-      "usize" "struct" "char" "import" "ref" "end" "export")))
+      "usize" "struct" "char" "import" "ref" "end" "export"
+      "def")))
 
 (defconst score-highlights
   `((,(regexp-opt score-keywords 'symbols) . font-lock-keyword-face)

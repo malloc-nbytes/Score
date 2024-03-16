@@ -28,6 +28,7 @@ module Scope : sig
     { mutable func_section : string
     ; mutable data_section : string
     ; mutable type_section : string
+    ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
     }
 
@@ -44,10 +45,17 @@ module Scope : sig
     ; rettype : TokenType.id_type
     }
 
+  type def_proc =
+    { id : string
+    ; params : TokenType.id_type list
+    ; rettype : TokenType.id_type
+    }
+
   val state : state
 
   val id_tbl : (((string, var) Hashtbl.t) list) ref
   val proc_tbl : (string, proc) Hashtbl.t ref
+  val def_proc_tbl : (string, def_proc) Hashtbl.t ref
 
   val push : unit -> unit
   val pop : unit -> unit
@@ -63,4 +71,8 @@ module Scope : sig
   val assert_proc_in_tbl : string -> unit
   val get_proc_rettype_from_tbl : string -> TokenType.id_type
   val assert_proc_args_match : string -> (Token.t * TokenType.id_type) list -> unit
+  val def_proc_tbl_add : string -> TokenType.id_type list -> TokenType.id_type -> unit
+  val check_def_proc_in_tbl : string -> bool
+  val get_def_proc_from_tbl : string -> def_proc
+  val assert_def_proc_not_in_tbl : string -> unit
 end

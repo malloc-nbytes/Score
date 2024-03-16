@@ -268,16 +268,22 @@ module Ir = struct
            Emit.proc_call_woassign "exit" args;
            "", TokenType.Void
         | _ -> (* user-defined proc *)
-           (* TODO: assert proc params match *)
-           Scope.assert_proc_in_tbl pc.id.lexeme;
-           let proc_rettype = Scope.get_proc_rettype_from_tbl pc.id.lexeme in
-           let reg = lm#new_reg false in
-           if proc_rettype = TokenType.Void then
-             let _ = Emit.proc_call_woassign pc.id.lexeme args in
-             reg, proc_rettype (* NOTE: remove `reg` here if issues are caused *)
+           let proc_rettype = ref TokenType.Void
+           and reg = lm#new_reg false in
+
+           (if Scope.check_def_proc_in_tbl pc.id.lexeme then
+             let def_proc = Scope.get_def_proc_from_tbl pc.id.lexeme in
+             proc_rettype := def_proc.rettype
            else
-             let _ = Emit.proc_call_wassign reg pc.id.lexeme args proc_rettype in
-             reg, proc_rettype)
+             let _ = Scope.assert_proc_in_tbl pc.id.lexeme in
+             proc_rettype := Scope.get_proc_rettype_from_tbl pc.id.lexeme);
+
+           if !proc_rettype = TokenType.Void then
+             let _ = Emit.proc_call_woassign pc.id.lexeme args in
+             reg, !proc_rettype (* NOTE: remove `reg` here if issues are caused *)
+           else
+             let _ = Emit.proc_call_wassign reg pc.id.lexeme args !proc_rettype in
+             reg, !proc_rettype)
 
   let evaluate_let_stmt (stmt : Ast.let_stmt) : unit =
     let id = stmt.id
@@ -316,6 +322,7 @@ module Ir = struct
 
   and evaluate_proc_def_stmt (pd : Ast.proc_def_stmt) : unit =
     Scope.state.cur_proc_id <- pd.id.lexeme, pd.rettype;
+    Scope.assert_id_not_in_scope pd.id.lexeme;
     Scope.add_proc_to_tbl pd;
 
     Scope.push ();
@@ -508,21 +515,22 @@ module Ir = struct
     | Ast.Break stmt -> failwith "evaluate_stmt: Ast.Break unimplemented"
     | Ast.For stmt -> evaluate_for_stmt stmt
 
-  let evaluate_import_stmt (stmt : Ast.import_stmt) : unit =
-    failwith "todo"
-
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
+    | Ast.Import i -> ()
     | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
     | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
-    | Ast.Import i -> evaluate_import_stmt i
+    | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
 
   (* --- Entrypoint --- *)
-
-  let generate_inter_lang (program : Ast.program) : string =
+  let generate_ir (program : Ast.program) : string =
     List.iter evaluate_toplvl_stmt program;
-    Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section
+    let ret = Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section in
+    Scope.state.func_section <- "";
+    Scope.state.data_section <- "";
+    Scope.state.type_section <- "";
+    ret
 
 end
 

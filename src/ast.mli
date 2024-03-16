@@ -30,6 +30,7 @@ module Ast : sig
     | Let of let_stmt
     | Struct of struct_stmt
     | Import of import_stmt
+    | Def_func of def_func_stmt
 
   and stmt =
     | Proc_def of proc_def_stmt
@@ -42,6 +43,12 @@ module Ast : sig
     | Ret of ret_stmt
     | Break of Token.t
     | For of for_stmt
+
+  and def_func_stmt =
+    { id : Token.t
+    ; params : TokenType.id_type list
+    ; rettype : TokenType.id_type
+    }
 
   and import_stmt =
     { path : Token.t

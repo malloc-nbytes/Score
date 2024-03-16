@@ -1,12 +1,12 @@
 proc arr_i32_decl(void): i32 {
-    printf("arr_i32_decl\n");
+    -- printf("arr_i32_decl\n");
 
     let arr: i32[..] = {1,2,3};
     return arr[0] == 1 && arr[1] == 2 && arr[2] == 3;
 }
 
 proc zero_init(void): i32 {
-    printf("zero_init\n");
+    -- printf("zero_init\n");
 
     let arr: i32[10] = {0};
     for let i: usize = 0; i < 10; i += 1; {
@@ -17,8 +17,8 @@ proc zero_init(void): i32 {
     return 1;
 }
 
-proc arr_sum(void): i32 {
-    printf("arr_sum\n");
+proc arr_i32_sum(void): i32 {
+    -- printf("arr_i32_sum\n");
 
     let arr: i32[5] = {1,2,3,4,5};
     let res: i32 = 0;
@@ -28,8 +28,8 @@ proc arr_sum(void): i32 {
     return res;
 }
 
-proc find_largest(arr: i32[..], n: usize): i32 {
-    printf("find_largest\n");
+proc find_i32_largest(arr: i32[..], n: usize): i32 {
+    -- printf("find_i32_largest\n");
 
     let m: i32 = 0;
     for let i: usize = 0; i < n; i += 1; {
@@ -40,8 +40,8 @@ proc find_largest(arr: i32[..], n: usize): i32 {
     return m;
 }
 
-proc most_freq(arr: i32[..], n: usize): i32 {
-    printf("most_freq\n");
+proc most_i32_freq(arr: i32[..], n: usize): i32 {
+    -- printf("most_i32_freq\n");
 
     let freqs: i32[10] = {0};
     for let i: usize = 0; i < n; i += 1; {
@@ -59,47 +59,51 @@ proc most_freq(arr: i32[..], n: usize): i32 {
 }
 
 proc modify_i32_arr(arr: i32[..]): void {
-    printf("modify_arr\n");
+    -- printf("modify_arr\n");
 
     arr[1] = 100;
 }
 
-export proc main(void): i32 {
+export proc test_arrays_i32(void): i32 {
+    printf("test_arrays_i32... ");
+
     if arr_i32_decl() != 1 {
         printf("arr_i32_decl failed\n");
-        exit(1);
+        return 1;
     }
 
     if zero_init() != 1 {
         printf("zero_init failed\n");
-        exit(1);
+        return 1;
     }
 
-    if arr_sum() != 15 {
-        printf("arr_sum failed\n");
-        exit(1);
+    if arr_i32_sum() != 15 {
+        printf("arr_i32_sum failed\n");
+        return 1;
     }
 
-    let find_largest_arr: i32[..] = {1,5,2,3,4};
-    let find_largest_arr_len: usize = 5;
-    if find_largest(find_largest_arr, find_largest_arr_len) != 5 {
-        printf("find_largest failed\n");
-        exit(1);
+    let find_i32_largest_arr: i32[..] = {1,5,2,3,4};
+    let find_i32_largest_arr_len: usize = 5;
+    if find_i32_largest(find_i32_largest_arr, find_i32_largest_arr_len) != 5 {
+        printf("find_i32_largest failed\n");
+        return 1;
     }
 
-    let most_freq_arr: i32[..] = {1,1,5,5,1};
-    let most_freq_arr_len: usize = 5;
-    if most_freq(most_freq_arr, most_freq_arr_len) != 1 {
-        printf("most_freq failed\n");
-        exit(1);
+    let most_i32_freq_arr: i32[..] = {1,1,5,5,1};
+    let most_i32_freq_arr_len: usize = 5;
+    if most_i32_freq(most_i32_freq_arr, most_i32_freq_arr_len) != 1 {
+        printf("most_i32_freq failed\n");
+        return 1;
     }
 
     let modify_i32_arr: i32[..] = {1,2,3};
     modify_i32_arr(modify_i32_arr);
     if modify_i32_arr[1] != 100 {
         printf("modify_i32_arr failed\n");
-        exit(1);
+        return 1;
     }
+
+    printf("ok\n");
 
     return 0;
 }

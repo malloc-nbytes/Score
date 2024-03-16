@@ -328,7 +328,6 @@ module Parser = struct
          | _ ->
             (let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                       ~msg:"array decl must either be an integer or `..`" (peek tokens 0) in exit 1) in
-            (* None, tokens in *)
        let _, tokens = expect tokens TokenType.RBracket in
        TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
     | Some {ttype = TokenType.Ref; _} ->
@@ -514,6 +513,27 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{path}, tokens
 
+  let parse_def_func_stmt (tokens : Token.t list) : Ast.def_func_stmt * Token.t list =
+    let rec gather_def_func_params
+              (tokens : Token.t list)
+              (acc : TokenType.id_type list)
+            : (TokenType.id_type list) * (Token.t list) =
+      let type_, tokens = parse_type tokens in
+      let acc = acc @ [type_] in
+      match tokens with
+      | {ttype = TokenType.Equals; _} :: tl -> acc, tl
+      | {ttype = TokenType.RightArrow; _} :: tl -> gather_def_func_params tl acc
+      | _ ->
+         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid def statement" @@ (peek tokens 0) in
+         exit 1 in
+
+    let id, tokens = expect tokens TokenType.Identifier in
+    let _, tokens = expect tokens TokenType.DoubleColon in
+    let params, tokens = gather_def_func_params tokens [] in
+    let rettype, tokens = expect_primitive_type tokens in
+    let _, tokens = expect tokens TokenType.Semicolon in
+    Ast.{id; params; rettype}, tokens
+
   (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
@@ -533,6 +553,9 @@ module Parser = struct
     | {ttype = TokenType.Import; _} :: tl ->
        let stmt, tokens = parse_import_stmt tl in
        Ast.Import stmt, tokens
+    | {ttype = TokenType.Def; _} :: tl ->
+       let stmt, tokens = parse_def_func_stmt tl in
+       Ast.Def_func stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
        exit 1

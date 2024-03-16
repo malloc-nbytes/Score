@@ -29,14 +29,16 @@ module Scope = struct
     { mutable func_section : string
     ; mutable data_section : string
     ; mutable type_section : string
+    ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
     }
 
   let state =
-    {func_section = "";
-     data_section = "";
-     type_section = "";
-     cur_proc_id = "", TokenType.Void
+    { func_section = "";
+      data_section = "";
+      type_section = "";
+      imports = [];
+      cur_proc_id = "", TokenType.Void
     }
 
   type var =
@@ -52,10 +54,18 @@ module Scope = struct
     ; rettype : TokenType.id_type
     }
 
+  type def_proc =
+    { id : string
+    ; params : TokenType.id_type list
+    ; rettype : TokenType.id_type
+    }
+
   let id_tbl : (((string, var) Hashtbl.t) list) ref
     = ref @@ Hashtbl.create 20 :: []
 
   let proc_tbl : (string, proc) Hashtbl.t ref = ref @@ Hashtbl.create 20
+
+  let def_proc_tbl : (string, def_proc) Hashtbl.t ref = ref @@ Hashtbl.create 20
 
   let push () : unit = id_tbl := Hashtbl.create 20 :: !id_tbl
 
@@ -153,5 +163,25 @@ module Scope = struct
 
   let assert_proc_args_match (id : string) (args : (Token.t * TokenType.id_type) list) : unit =
     failwith "assert_proc_args_match: unimplemented"
+
+  let def_proc_tbl_add (id : string) (params : TokenType.id_type list) (rettype : TokenType.id_type) : unit =
+    if Hashtbl.mem !def_proc_tbl id then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared function `%s`" id)
+                None in exit 1
+    else
+      Hashtbl.add !def_proc_tbl id {id; params; rettype}
+
+  let check_def_proc_in_tbl (id : string) : bool =
+    Hashtbl.mem !def_proc_tbl id
+
+  let get_def_proc_from_tbl (id : string) : def_proc =
+    Hashtbl.find !def_proc_tbl id
+
+  let assert_def_proc_not_in_tbl (id : string) : unit =
+    if Hashtbl.mem !def_proc_tbl id then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared function `%s`" id)
+                None in exit 1
 
 end
