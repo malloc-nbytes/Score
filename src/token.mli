@@ -85,6 +85,8 @@ module TokenType : sig
     | Import
     | Export
     | Def
+    | Macro
+    | End
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

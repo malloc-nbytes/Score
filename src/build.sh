@@ -12,6 +12,8 @@ ocamlc -annot -c lexer.mli
 ocamlc -annot -c lexer.ml
 ocamlc -annot -c ast.mli
 ocamlc -annot -c ast.ml
+ocamlc -annot -c preprocessor.mli
+ocamlc -annot -c preprocessor.ml
 ocamlc -annot -c parser.mli
 ocamlc -annot -c parser.ml
 ocamlc -annot -c scope.mli
@@ -23,4 +25,4 @@ ocamlc -annot -c proc.ml
 ocamlc -annot -c ir.mli
 ocamlc -annot -c ir.ml
 ocamlc -annot -c main.ml
-ocamlc -o scr token.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo proc.cmo ir.cmo lexer.cmo parser.cmo main.cmo
+ocamlc -o scr token.cmo preprocessor.cmo utils.cmo err.cmo ast.cmo scope.cmo emit.cmo proc.cmo ir.cmo lexer.cmo parser.cmo main.cmo

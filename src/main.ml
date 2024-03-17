@@ -23,6 +23,7 @@
 open Utils
 open Token
 open Lexer
+open Preprocessor
 open Parser
 open Ast
 open Proc
@@ -60,6 +61,8 @@ let rec compile input_filepath =
   let src_code = Utils.file_to_str input_filepath in
 
   let tokens = Lexer.lex_file input_filepath (String.to_seq src_code |> List.of_seq) 1 1 in
+
+  let tokens = Preprocessor.insert_macros tokens in
 
   let tree = Parser.produce_ast tokens in
 
