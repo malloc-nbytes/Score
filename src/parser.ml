@@ -143,9 +143,14 @@ module Parser = struct
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
     | {ttype = TokenType.LBrace; _} :: tl ->
-       let exprs, tokens = parse_comma_sep_exprs tl [] in
-       let _, tokens = expect tokens TokenType.RBrace in
-       Ast.Term (Ast.IntCompoundLit (exprs, Some (List.length exprs))), tokens
+      (match peek tl 0 with
+      | Some {ttype = TokenType.RBrace; _} -> (* Empty compound literal *)
+         let _, tokens = expect tl TokenType.RBrace in
+         Ast.Term (Ast.IntCompoundLit ([], None)), tokens
+      | _ ->
+         let exprs, tokens = parse_comma_sep_exprs tl [] in
+         let _, tokens = expect tokens TokenType.RBrace in
+         Ast.Term (Ast.IntCompoundLit (exprs, Some (List.length exprs))), tokens)
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | hd :: _ ->
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
@@ -349,11 +354,12 @@ module Parser = struct
     | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len <> len' && len <> -1 ->
        (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
         | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
-           let exprs = exprs @ (List.init (len - len')
-                                  (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""; macro=None}))) in
-           let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, (Some len))) in
-           let _, tokens = expect tokens TokenType.Semicolon in
-           Ast.{id; type_; expr}, tokens
+           (* let exprs = exprs @ (List.init (len - len') *)
+           (*                        (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""; macro=None}))) in *)
+           (* let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, (Some len))) in *)
+           (* let _, tokens = expect tokens TokenType.Semicolon in *)
+           (* Ast.{id; type_; expr}, tokens *)
+           failwith "0 initialization for arrays is unimplemented"
         | _ -> (* The initialization is not 0 *)
            let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                      ~msg:"array sizes do not match or it is not zero initialized" (Some (List.hd tokens)) in
@@ -363,6 +369,11 @@ module Parser = struct
        let _, tokens = expect tokens TokenType.Semicolon in
        (* Array of id_type * (int option) *)
        let type_ = TokenType.Array (t, Some (List.length exprs)) in
+       Ast.{id; type_; expr}, tokens
+    | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, None)) -> (* empty array init *)
+       let _, tokens = expect tokens TokenType.Semicolon in
+       let type_ = TokenType.Array (t, Some len) in
+       let expr = Ast.Term (Ast.IntCompoundLit (exprs, Some len)) in
        Ast.{id; type_; expr}, tokens
     | _ ->
        let _, tokens = expect tokens TokenType.Semicolon in

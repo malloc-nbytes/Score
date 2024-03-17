@@ -42,3 +42,12 @@ export proc strlen(s: str): usize {
     while s[i] { i += 1; }
     return i;
 }
+
+export proc strcpy(src: str, dest: str, bytes: usize): void {
+    let len1: usize = strlen(src);
+    let len2: usize = strlen(dest);
+    for let i: usize = 0; i < len1 && i < len2 && i < bytes; i += 1; {
+        dest[i] = src[i];
+    }
+}
+

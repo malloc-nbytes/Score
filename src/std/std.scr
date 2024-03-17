@@ -29,6 +29,12 @@ export proc panic(s: str ref): void {
     halt(1);
 }
 
+export proc memset(arr: i32[..], n: usize, k: i32): void {
+    for let i: usize = 0; i < n; i += 1; {
+        arr[i] = k;
+    }
+}
+
 export proc i32assert(cond: i32): void {
     if cond == 0 {
         printf("assert failure. cond = %d\n", cond);

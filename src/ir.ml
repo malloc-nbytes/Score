@@ -234,12 +234,17 @@ module Ir = struct
        reg, TokenType.Str
 
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
-       let len = match len with | Some len -> len | None -> failwith "evaluate_expr: IntCompoundLit: unreachable" in
+       (* (match len with *)
+       (* | None -> *)
+       (*    let array_reg = lm#new_reg false in *)
+       (*    Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) "0"; *)
+       (*    array_reg, TokenType.Array (TokenType.I32, None) *)
+        (* | Some len -> *)
+       let len = match len with | Some len -> len | None -> 0 in
        let array_reg = lm#new_reg false in
        let stride = if force_long then 8 else (int_of_string (Utils.scr_type_to_bytes callee_type)) in
        Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
-
-       for i = 0 to len - 1 do
+       for i = 0 to (List.length exprs) - 1 do
          let added_reg = lm#new_reg false in
          Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
          let expr, expr_type = evaluate_expr (List.nth exprs i) force_long callee_type in
