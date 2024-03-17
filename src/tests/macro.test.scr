@@ -1,0 +1,35 @@
+macro OUTSIDE 1 in
+macro CALL_HELPER helper'(x) in
+
+proc helper'(x: i32): i32 {
+    return x+1;
+}
+
+export proc test_macro(void): i32 {
+    if OUTSIDE != 1 {
+        return 1;
+    }
+
+    macro INSIDE 2 in
+
+    if INSIDE != 2 {
+        return 1;
+    }
+
+    macro CONDITIONAL
+    if x == 2 {
+        return 1;
+    } else if x == 3 {
+        return 1;
+    } in
+
+    let x: i32 = 4;
+    CONDITIONAL
+
+
+    if CALL_HELPER != 5 {
+        return 1;
+    }
+
+    return 0;
+}

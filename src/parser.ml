@@ -324,7 +324,7 @@ module Parser = struct
          | Some {ttype = TokenType.Period; _} ->
             let _, tokens = expect tokens TokenType.Period in
             let _, tokens = expect tokens TokenType.Period in
-            Some Token.{ttype = IntegerLiteral; lexeme = "-1"; r=0; c=0; fp=""}, tokens
+            Some Token.{ttype = IntegerLiteral; lexeme = "-1"; r=0; c=0; fp=""; macro=None}, tokens
          | _ ->
             (let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
                       ~msg:"array decl must either be an integer or `..`" (peek tokens 0) in exit 1) in
@@ -350,7 +350,7 @@ module Parser = struct
        (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
         | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
            let exprs = exprs @ (List.init (len - len')
-                                  (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""}))) in
+                                  (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""; macro=None}))) in
            let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, (Some len))) in
            let _, tokens = expect tokens TokenType.Semicolon in
            Ast.{id; type_; expr}, tokens

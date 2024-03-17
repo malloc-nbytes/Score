@@ -87,6 +87,7 @@ module TokenType : sig
     | Def
     | Macro
     | End
+    | In
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string
@@ -99,6 +100,7 @@ module Token : sig
     ; r : int
     ; c : int
     ; fp : string
+    ; macro : string option
     }
 
   val to_string : t -> string

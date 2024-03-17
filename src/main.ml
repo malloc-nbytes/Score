@@ -93,7 +93,6 @@ let () =
   compile !input_filepath;
 
   List.iter qbe !ssas;
-  List.iter print_endline !asms;
 
   cc ();
 

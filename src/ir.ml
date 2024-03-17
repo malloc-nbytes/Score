@@ -146,8 +146,8 @@ module Ir = struct
         | TokenType.Str | TokenType.Char ->
            let multiplicative = "1" in
            let index = Ast.Binary {lhs = ar.index;
-                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""; macro=None};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}))} in
            let index, index_type = evaluate_expr index true callee_type in
            let reg = lm#new_reg false in
 
@@ -160,8 +160,8 @@ module Ir = struct
         | _ ->
            let multiplicative = Utils.scr_type_to_bytes inner_type in
            let index = Ast.Binary {lhs = ar.index;
-                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""; macro=None};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}))} in
            let index, index_type = evaluate_expr index true callee_type in
            let reg = lm#new_reg false in
 
@@ -425,8 +425,8 @@ module Ir = struct
         | TokenType.Str ->
            let multiplicative = "1" in
            let index = Ast.Binary {lhs = ar.index;
-                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""; macro=None};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}))} in
            let index, index_type = evaluate_expr index true stored_type in
            let reg = lm#new_reg false in
 
@@ -437,8 +437,8 @@ module Ir = struct
         | _ ->
            let multiplicative = Utils.scr_type_to_bytes inner_type in
            let index = Ast.Binary {lhs = ar.index;
-                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""};
-                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""}))} in
+                                   op = Token.{lexeme = "*"; ttype = TokenType.Asterisk; r=0; c=0; fp=""; macro=None};
+                                   rhs = Ast.Term (Ast.Intlit (Token.{lexeme = multiplicative; ttype = TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}))} in
            let index, index_type = evaluate_expr index true stored_type in
            let expr, expr_type = evaluate_expr stmt.right false stored_type in
            let array_reg = "%"^ar.id.lexeme in

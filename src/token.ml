@@ -87,6 +87,7 @@ module TokenType = struct
     | Def
     | Macro
     | End
+    | In
 
   let rec id_type_to_string = function
     | I32 -> "I32"
@@ -163,6 +164,7 @@ module TokenType = struct
     | Def -> "Def"
     | Macro -> "Macro"
     | End -> "End"
+    | In -> "In"
 end
 
 module Token = struct
@@ -172,6 +174,7 @@ module Token = struct
     ; r : int
     ; c : int
     ; fp : string
+    ; macro : string option
     }
 
   (* Convert a Token to a string *)

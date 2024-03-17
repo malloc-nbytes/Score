@@ -42,9 +42,9 @@
 (eval-and-compile
   (defconst score-keywords
     '("if" "else" "while" "let" "void" "i32"
-      "str" "for" "proc" "return" "mut" "break" "macro" "done"
+      "str" "for" "proc" "return" "mut" "break" "macro"
       "usize" "struct" "char" "import" "ref" "end" "export"
-      "def")))
+      "def" "in")))
 
 (defconst score-highlights
   `((,(regexp-opt score-keywords 'symbols) . font-lock-keyword-face)

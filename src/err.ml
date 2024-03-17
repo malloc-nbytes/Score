@@ -64,7 +64,12 @@ module Err = struct
     let reason = if msg = "" then "N/A" else msg in
     let at, where = match token with
       | Some token ->
-         (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
+         (match token.macro with
+         | Some id ->
+            "in macro expansion " ^ id ^ " with " ^
+              (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c
+         | None ->
+            (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:\n" token.fp token.r token.c)
       | None -> "N/A", "N/A" in
     Printf.eprintf " ERR\n%s\nReason: %s\nAt: %s\n%s" failure reason at where
 
