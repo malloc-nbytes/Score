@@ -7,7 +7,8 @@ import "std/std.scr";
 macro BUF_CAP 10 in
 
 export proc main(void): i32 {
-    let arr: i32[BUF_CAP] = {0};
+    let arr: i32[BUF_CAP] = {};
+    memset(arr, BUF_CAP, 0);
 
     for let i: usize = 0; i < BUF_CAP; i += 1; {
         i32assert(arr[i] == 0);

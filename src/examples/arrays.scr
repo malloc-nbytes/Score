@@ -23,10 +23,8 @@ proc print_strs(strs: str[..], strs_len: usize): void {
         "world",
         "!"
     };
-
     for let i: usize = 0; i < strs_len; i += 1; {
         i32assert(streq(strs[i], should_be[i]));
-        printf("%s\n", strs[i]);
     }
 }
 
@@ -36,10 +34,8 @@ export proc main(void): i32 {
     let arr1: usize[5] = {1, 2, 3, 4, 5};
     let n1: usize = 5;
 
-    -- If a len is specified, you
-    -- can initialize all elements
-    -- to zero.
-    let zeros: i32[5] = {0};
+    let zeros: i32[5] = {};
+    memset(zeros, 5, 0);
 
     -- You can even use strings
     let strs: str[..] = {
