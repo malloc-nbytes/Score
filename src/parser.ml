@@ -137,6 +137,7 @@ module Parser = struct
         | _ -> failwith "TODO FIX ERR: Dereferences must take the address of an identifier")
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
+    | {ttype = TokenType.Null; _} :: tl -> Ast.Term (Ast.Intlit Token.{lexeme="0"; ttype=TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in

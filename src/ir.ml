@@ -91,9 +91,16 @@ module Ir = struct
     | TokenType.Usize, TokenType.Usize -> true
     | TokenType.Usize, TokenType.Number -> true
     | TokenType.Number, TokenType.Usize -> true
+    (* Char *)
+    | TokenType.Char, TokenType.I32 -> true
+    | TokenType.Char, TokenType.Usize -> true
+    | TokenType.Char, TokenType.Number -> true
+    | TokenType.I32, TokenType.Char -> true
+    | TokenType.Usize, TokenType.Char -> true
+    | TokenType.Number, TokenType.Char -> true
     (* Str *)
-    | TokenType.Str, TokenType.Char -> true
-    | TokenType.Char, TokenType.Str -> true
+    (* | TokenType.Str, TokenType.Char -> true *)
+    (* | TokenType.Char, TokenType.Str -> true *)
     (* Number *)
     | TokenType.Number, TokenType.Number -> true
     | _ -> false

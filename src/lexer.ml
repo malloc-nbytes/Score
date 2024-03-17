@@ -48,7 +48,8 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "export"    TokenType.Export in
     let _ = Hashtbl.add keywords "def"       TokenType.Def in
     let _ = Hashtbl.add keywords "macro"     TokenType.Macro in
-    let _ = Hashtbl.add keywords "in"       TokenType.In in
+    let _ = Hashtbl.add keywords "in"        TokenType.In in
+    let _ = Hashtbl.add keywords "null"      TokenType.Null in
     ()
 
   let rec repl_quote (lst : char list) : string =

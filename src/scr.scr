@@ -13,35 +13,9 @@ macro SRC_CODE
 "export proc main(void): i32 { return 0; }"
 in
 
-proc lex_code(
-    src: str,
-    src_len: usize,
-    token_types: i32[..],
-    token_lexeme_s: usize[..],
-    token_lexeme_len: usize[..]
-) : usize {
-
-    for let i: usize = 0; i < src_len; i += 1; {
-        let c: char = src[i];
-        if c == 'c' {
-            printf("");
-        }
-        else if isalpha(c) {
-            printf("");
-        }
-    }
-
-    return 1;
-}
-
 export proc main(void): i32 {
     let src: str = SRC_CODE;
     let src_len: usize = strlen(src);
-
-    let token_types: i32[TOKEN_CAP] = {0};
-    let token_lexeme_s: usize[TOKEN_CAP] = {0};
-    let token_lexeme_len: usize[TOKEN_CAP] = {0};
-    let tokens: usize = lex_code(src, src_len, token_types, token_lexeme_s, token_lexeme_len);
 
     return 0;
 }

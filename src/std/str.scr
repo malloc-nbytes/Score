@@ -20,7 +20,7 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
-export proc streq(s1: str, s2: str): i32 {
+export proc streq(s1: char[..], s2: char[..]): i32 {
     let i: usize = 0;
 
     while s1[i] && s2[i] {
@@ -37,16 +37,14 @@ export proc streq(s1: str, s2: str): i32 {
     return 1;
 }
 
-export proc strlen(s: str): usize {
+export proc strlen(s: char[..]): usize {
     let i: usize = 0;
     while s[i] { i += 1; }
     return i;
 }
 
-export proc strcpy(src: str, dest: str, bytes: usize): void {
-    let len1: usize = strlen(src);
-    let len2: usize = strlen(dest);
-    for let i: usize = 0; i < len1 && i < len2 && i < bytes; i += 1; {
+export proc strcpy(src: char[..], dest: char[..], bytes: usize): void {
+    for let i: usize = 0; src[i] != null && dest[i] != null && i < bytes; i += 1; {
         dest[i] = src[i];
     }
 }
