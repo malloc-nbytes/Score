@@ -98,6 +98,8 @@ module Ir = struct
     | TokenType.I32, TokenType.Char -> true
     | TokenType.Usize, TokenType.Char -> true
     | TokenType.Number, TokenType.Char -> true
+    (* Structs *)
+    | Custom (_), Array (_, _) -> true
     (* Str *)
     (* | TokenType.Str, TokenType.Char -> true *)
     (* | TokenType.Char, TokenType.Str -> true *)
@@ -164,7 +166,9 @@ module Ir = struct
        let offset, type_ = match member with | _, t, offset -> offset, t in
        let reg = lm#new_reg false in
        Emit.binop reg TokenType.Usize ("%"^id) (string_of_int offset) "add";
-       reg, type_
+       let reg2 = lm#new_reg false in
+       Emit.load reg2 TokenType.I32 reg;
+       reg2, type_
 
     | Ast.Array_retrieval ar ->
        Scope.assert_token_in_scope ar.id;
@@ -335,6 +339,7 @@ module Ir = struct
       | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true TokenType.Str
       | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
       | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
+      | TokenType.Custom (_) -> evaluate_expr stmt.expr false TokenType.I32
       | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
       | _ -> evaluate_expr stmt.expr false stmt_type in
 
@@ -342,6 +347,9 @@ module Ir = struct
 
     match stmt_type with
     | TokenType.Array (inner_type, len) ->
+       Emit.copy ("%" ^ id_lexeme) stmt_type expr;
+       Scope.add_id_to_scope id_lexeme id stmt_type true
+    | TokenType.Custom (_) ->
        Emit.copy ("%" ^ id_lexeme) stmt_type expr;
        Scope.add_id_to_scope id_lexeme id stmt_type true
     | _ ->
@@ -388,6 +396,8 @@ module Ir = struct
 
         match param_type with
         | TokenType.Array (_, _) -> ()
+        | TokenType.Custom (_) -> ()
+        (* TODO: maybe put structs here *)
         | _ ->
            let reg = lm#new_reg false in
            Emit.copy reg param_type ("%" ^ id_lexeme);
