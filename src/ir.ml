@@ -164,10 +164,12 @@ module Ir = struct
        let structure = Scope.get_struct_from_tbl struct_name in
        let member = List.find (fun (id, _, _) -> id.Token.lexeme = member_id) structure.members in
        let offset, type_ = match member with | _, t, offset -> offset, t in
+
        let reg = lm#new_reg false in
        Emit.binop reg TokenType.Usize ("%"^id) (string_of_int offset) "add";
+
        let reg2 = lm#new_reg false in
-       Emit.load reg2 TokenType.I32 reg;
+       Emit.load reg2 type_ reg;
        reg2, type_
 
     | Ast.Array_retrieval ar ->
@@ -220,6 +222,8 @@ module Ir = struct
         | TokenType.Array (_, _) ->
            (* We want to avoid loading with an array *)
            "%"^stored_var.id, TokenType.Usize
+        | TokenType.Custom (_) ->
+           "%"^stored_var.id, stored_var.type_
         | _ ->
            if stored_var.stack_allocd then Emit.load reg stored_type ("%" ^ ident.lexeme);
            reg, stored_type)
@@ -268,31 +272,47 @@ module Ir = struct
        reg, TokenType.Str
 
     | Ast.Term (Ast.IntCompoundLit (exprs, len)) -> (* Stack allocated arrays *)
-       (* (match len with *)
-       (* | None -> *)
-       (*    let array_reg = lm#new_reg false in *)
-       (*    Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) "0"; *)
-       (*    array_reg, TokenType.Array (TokenType.I32, None) *)
-        (* | Some len -> *)
        let len = match len with | Some len -> len | None -> 0 in
        let array_reg = lm#new_reg false in
        let stride = if force_long then 8 else (int_of_string (Utils.scr_type_to_bytes callee_type)) in
-       Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
-       for i = 0 to (List.length exprs) - 1 do
-         let added_reg = lm#new_reg false in
-         Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
-         let expr, expr_type = evaluate_expr (List.nth exprs i) force_long callee_type in
-         Emit.store expr added_reg expr_type
-       done;
 
-       array_reg, TokenType.Array (TokenType.I32, Some len)
+       (match callee_type with
+        | TokenType.Custom struct_name -> (* dealing w/ a struct *)
+           let structure = Scope.get_struct_from_tbl struct_name in
+           let structure_members = structure.members in
+
+           Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (stride));
+
+           for i = 0 to (List.length exprs) - 1 do
+             let cur_member = List.nth structure_members i in
+             let member_tok, member_type, member_offset = match cur_member with
+               | t, ty, off -> t, ty, off in
+             let added_reg = lm#new_reg false in
+             Emit.binop added_reg TokenType.Usize array_reg (string_of_int (member_offset)) "add";
+             let expr, expr_type = evaluate_expr (List.nth exprs i) force_long member_type in
+             Emit.store expr added_reg member_type
+           done;
+           array_reg, TokenType.Array (TokenType.I32, Some len) (* TODO: fix this *)
+
+        | _ -> (* dealing w/ an array *)
+           Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*stride));
+           for i = 0 to (List.length exprs) - 1 do
+             let added_reg = lm#new_reg false in
+             Emit.binop added_reg TokenType.Usize array_reg (string_of_int (i*stride)) "add";
+             let expr, expr_type = evaluate_expr (List.nth exprs i) force_long callee_type in
+             Emit.store expr added_reg expr_type
+           done;
+           array_reg, TokenType.Array (TokenType.I32, Some len))
 
     | Ast.Proc_call pc ->
        (* TODO: verify proc params match *)
        let args = List.fold_left (fun acc e ->
-                      let arg, arg_type = evaluate_expr e force_long callee_type in
-                      let arg_type = Utils.scr_to_qbe_type arg_type in
-                      let arg_type = if arg_type = "b" then "w" else arg_type in
+                      let arg, arg_type = match evaluate_expr e force_long callee_type with
+                        | a, TokenType.Custom (name) -> a, ":"^name
+                        | a, at ->
+                           let arg_type = Utils.scr_to_qbe_type at in
+                           let arg_type = if arg_type = "b" then "w" else arg_type in
+                           a, arg_type in
                       acc ^ arg_type ^ " " ^ arg ^ ", "
                     ) "" pc.args in
        (match pc.id.lexeme with
@@ -339,7 +359,8 @@ module Ir = struct
       | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true TokenType.Str
       | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
       | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
-      | TokenType.Custom (_) -> evaluate_expr stmt.expr false TokenType.I32
+      | (TokenType.Custom (struct_name)) as structure_type ->
+         evaluate_expr stmt.expr false structure_type
       | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
       | _ -> evaluate_expr stmt.expr false stmt_type in
 
