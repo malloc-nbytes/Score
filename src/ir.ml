@@ -353,7 +353,9 @@ module Ir = struct
       | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true TokenType.Str
       | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
       | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
-      | TokenType.Array (TokenType.Custom (name), _) -> evaluate_expr stmt.expr false (TokenType.Custom name)
+      | TokenType.Array (TokenType.Custom (name), len) ->
+         failwith "TokenType.Array (TokenType.Custom (name), len) unimplemented"
+         (* evaluate_expr stmt.expr true (TokenType.Array (TokenType.Custom (name), len)) *)
       | (TokenType.Custom (struct_name)) as structure_type ->
          evaluate_expr stmt.expr false structure_type
       | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
@@ -395,10 +397,6 @@ module Ir = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
-        (* printf "idtype: %s\n" (TokenType.id_type_to_string param_type); *)
-        (* match param_type with *)
-        (* | Custom struct_name -> Scope.add_id_to_scope id_lexeme id param_type true *)
-        (* | _ ->  *)
         Scope.add_id_to_scope id_lexeme id param_type true
       ) pd.params;
 
@@ -413,7 +411,7 @@ module Ir = struct
         match param_type with
         | TokenType.Array (_, _) -> ()
         | TokenType.Custom (_) -> ()
-        (* TODO: maybe put structs here *)
+        | TokenType.Pointer TokenType.Custom (_) -> ()
         | _ ->
            let reg = lm#new_reg false in
            Emit.copy reg param_type ("%" ^ id_lexeme);

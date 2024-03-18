@@ -207,8 +207,10 @@ module Scope = struct
              | TokenType.I32 -> 4
              | TokenType.Char -> 1
              | TokenType.Usize -> 8
+             | TokenType.Str -> 8
+             | TokenType.Array _ -> 8
              | TokenType.Pointer _ -> 8
-             | _ -> failwith "unreachable" in
+             | _ -> failwith "add_struct_to_tbl': unreachable" in
            let new_offset = offset + size in
            (tok, type_, offset) :: add_struct_to_tbl' ms new_offset in
       let members = add_struct_to_tbl' members 0 in

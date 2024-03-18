@@ -1,23 +1,83 @@
 import "std/std.scr";
-import "std/str.scr";
 import "std/char.scr";
+import "std/str.scr";
 
-macro TOKENTYPE_EOF 1 in
-macro TOKENTYPE_INTLIT 2 in
-macro TOKENTYPE_STRLIT 3 in
-macro TOKENTYPE_IDENT 4 in
+-- BEGIN TOKEN --
 
-macro TOKEN_CAP 32 in
+macro TTYPE_EOF 0 in
+macro TTYPE_INTLIT 1 in
+macro TTYPE_STRLIT 2 in
+macro TTYPE_IDENT 3 in
+macro TTYPE_EXPORT 4 in
+macro TTYPE_VOID 5 in
+macro TTYPE_I32 6 in
+macro TTYPE_RETURN 7 in
+macro TTYPE_SEMICOLON 8 in
+macro TTYPE_PROC 9 in
+macro TTYPE_LPAREN 10 in
+macro TTYPE_RPAREN 11 in
+macro TTYPE_LBRACE 12 in
+macro TTYPE_RBRACE 12 in
+
+macro NEWLINE 10 in
+macro SPACE 32 in
+macro TAB 9 in
+
+struct Token = (
+    lexeme: char[..],
+    type: usize,
+    r: usize,
+    c: usize
+);
 
 macro SRC_CODE
 "export proc main(void): i32 { return 0; }"
 in
 
-export proc main(void): i32 {
-    let src: str = SRC_CODE;
+-- BEGIN LEXING --
+
+-- Procedure: is_ignorable
+-- Params:
+--   c: the character to check
+-- Return:
+--   whether or not `c` is a char that we can ignore
+proc is_ignorable(c: char): i32 {
+    return c == NEWLINE || c == SPACE || c == TAB;
+}
+
+-- Procedure: lex_file
+-- Params:
+--   src: the source code to lex
+--   tokens: the token array to push new tokens into
+-- Return:
+--   the number of tokens created
+proc lex_file(src: char[..], tokens: Token[..]): usize {
+    let tokens_len: usize = 0;
     let src_len: usize = strlen(src);
 
-    let arr: i32[5][5] = {};
+    for let i: usize = 0; i < src_len; i += 1; {
+        printf("%d\n", is_ignorable(src[i]));
+    }
 
     return 0;
 }
+
+-- Procedure: usage
+-- Params: None
+-- Return: None
+proc usage(void): void {
+    panic("usage unimplemented");
+}
+
+export proc main(void): i32 {
+    let src: char[..] = SRC_CODE;
+    let tokens: Token[256] = {};
+    lex_file(src, tokens);
+
+    -- panic("unimplimented");
+
+    return 0;
+}
+
+
+
