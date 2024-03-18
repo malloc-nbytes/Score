@@ -271,6 +271,22 @@ module Ir = struct
        let stride = if force_long then 8 else (int_of_string (Utils.scr_type_to_bytes callee_type)) in
 
        (match callee_type with
+        | TokenType.Array ((TokenType.Custom struct_name), Some len) ->
+           let structure = Scope.get_struct_from_tbl struct_name in
+           let structure_members = structure.members in
+
+           Emit.stack_alloc4 (String.sub array_reg 1 (String.length array_reg - 1)) (string_of_int (len*structure.size));
+           for i = 0 to (List.length exprs) - 1 do
+             let cur_member = List.nth structure_members i in
+             let member_tok, member_type, member_offset = match cur_member with
+               | t, ty, off -> t, ty, off in
+             let added_reg = lm#new_reg false in
+             Emit.binop added_reg TokenType.Usize array_reg (string_of_int (member_offset)) "add";
+             let expr, expr_type = evaluate_expr (List.nth exprs i) force_long member_type in
+             Emit.store expr added_reg member_type
+           done;
+           array_reg, TokenType.Array (TokenType.I32, Some len) (* TODO: fix this *)
+
         | TokenType.Custom struct_name -> (* dealing w/ a struct *)
            let structure = Scope.get_struct_from_tbl struct_name in
            let structure_members = structure.members in
@@ -319,6 +335,11 @@ module Ir = struct
            let reg = lm#new_reg false in
            Emit.proc_call_wassign reg "strcmp" args TokenType.I32;
            reg, TokenType.I32
+        | "malloc" -> (* INTRINSIC *)
+           assert (List.length pc.args = 1);
+           let reg = lm#new_reg false in
+           Emit.proc_call_wassign reg "malloc" args TokenType.Usize;
+           reg, TokenType.Usize
         | "exit" -> (* INTRINSIC *)
            assert (List.length pc.args = 1);
            Emit.proc_call_woassign "exit" args;
@@ -354,8 +375,7 @@ module Ir = struct
       | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
       | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
       | TokenType.Array (TokenType.Custom (name), len) ->
-         failwith "TokenType.Array (TokenType.Custom (name), len) unimplemented"
-         (* evaluate_expr stmt.expr true (TokenType.Array (TokenType.Custom (name), len)) *)
+         evaluate_expr stmt.expr true (TokenType.Array (TokenType.Custom (name), len))
       | (TokenType.Custom (struct_name)) as structure_type ->
          evaluate_expr stmt.expr false structure_type
       | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
