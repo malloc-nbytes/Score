@@ -518,6 +518,28 @@ module Ir = struct
     Emit.lbl loop_end_lbl;
     Scope.pop ()
 
+  and evaluate_struct_stmt (stmt : Ast.struct_stmt) : unit =
+    (* TODO: assert id not in scope *)
+
+    let id = stmt.id.lexeme in
+
+    let fields = stmt.fields in
+
+    let qbe_types = List.fold_left (fun acc f ->
+                        let type_ = Utils.scr_to_qbe_type (snd f) in
+                        let type_ = if type_ = "b" then "w" else type_ in
+                        acc ^ type_ ^ ", "
+                      ) "" fields in
+
+    let rec find_size lst =
+      match lst with
+      | [] -> 0
+      | hd :: tl -> int_of_string (Utils.scr_type_to_bytes (snd hd)) + find_size tl in
+
+    Scope.add_struct_to_tbl id fields (find_size fields);
+
+    Emit.new_type id qbe_types
+
   and evaluate_stmt = function
     | Ast.Proc_def stmt -> failwith "evaluate_stmt: Ast.Proc_def unimplemented"
     | Ast.Block stmt -> failwith "evaluate_stmt: Ast.Block unimplemented"
@@ -534,14 +556,14 @@ module Ir = struct
     match stmt with
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
     | Ast.Import i -> ()
-    | Ast.Struct s -> failwith "ir.ml: structs are unimplemented"
-    | Ast.Let l -> failwith "ir.ml: let statements are unimplemented at the top-level"
+    | Ast.Struct s -> evaluate_struct_stmt s
+    | Ast.Let l -> evaluate_let_stmt l
     | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
 
   (* --- Entrypoint --- *)
   let generate_ir (program : Ast.program) : string =
     List.iter evaluate_toplvl_stmt program;
-    let ret = Scope.state.func_section ^ Scope.state.data_section ^ Scope.state.type_section in
+    let ret = Scope.state.type_section ^ Scope.state.func_section ^ Scope.state.data_section in
     Scope.state.func_section <- "";
     Scope.state.data_section <- "";
     Scope.state.type_section <- "";

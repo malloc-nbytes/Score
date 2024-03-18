@@ -73,6 +73,8 @@ module Parser = struct
     | {ttype = TokenType.Type (TokenType.Usize as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Char as hd)} :: tl -> hd, tl
     | {ttype = TokenType.Type (TokenType.Str as hd)} :: tl -> hd, tl
+    (* Custom Types *)
+    | {ttype = TokenType.Identifier; _} as hd :: tl -> TokenType.Custom (hd.lexeme), tl
     | _ ->
        let t = List.hd tokens in
        let _ = Err.err Err.Missing_type __FILE__ __FUNCTION__
@@ -323,7 +325,7 @@ module Parser = struct
     match peek tokens 0 with (* Check for tokens after primitive type ie `[` *)
     | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
        let _, tokens = expect tokens TokenType.LBracket in
-       let len, tokens = match peek tokens 0 with (* Allows for `[]` to be empty *)
+       let len, tokens = match peek tokens 0 with (* parsing [] *)
          | Some {ttype = TokenType.IntegerLiteral; _} ->
             let len, tokens = expect tokens TokenType.IntegerLiteral in
             Some len, tokens

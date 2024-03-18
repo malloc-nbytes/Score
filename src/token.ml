@@ -89,6 +89,7 @@ module TokenType = struct
     | End
     | In
     | Null
+    | StructIdentifier
 
   let rec id_type_to_string = function
     | I32 -> "I32"
@@ -167,6 +168,7 @@ module TokenType = struct
     | End -> "End"
     | In -> "In"
     | Null -> "Null"
+    | StructIdentifier -> "StructIdentifier"
 end
 
 module Token = struct

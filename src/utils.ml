@@ -22,6 +22,7 @@
 
 module Utils = struct
   open Token
+  open Scope
 
   let unwrap = function
     | Some k -> k
@@ -51,6 +52,7 @@ module Utils = struct
     | TokenType.Array (TokenType.Char, Some len) -> Printf.sprintf "%d" (1 * len)
     | TokenType.Array (_, Some len) -> Printf.sprintf "%d" (8 * len)
     | TokenType.Array (_, None) -> "8"
+    | TokenType.Custom (id) -> string_of_int ((Scope.get_struct_from_tbl id).size)
     | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
 
   let scr_to_qbe_type (type_: TokenType.id_type) =
@@ -66,6 +68,8 @@ module Utils = struct
     | TokenType.Pointer TokenType.Char -> "l"
     | TokenType.Void -> ""
     | TokenType.Array (t, _) -> "l"
+    | TokenType.Custom _ -> "l"
+    | TokenType.Pointer TokenType.Custom _ -> "l"
     | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.id_type_to_string type_)
 
   let unwrap_array (type_: TokenType.id_type) =

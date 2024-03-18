@@ -17,5 +17,7 @@ export proc main(void): i32 {
     let src: str = SRC_CODE;
     let src_len: usize = strlen(src);
 
+    let arr: i32[5][5] = {};
+
     return 0;
 }

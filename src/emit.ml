@@ -35,11 +35,14 @@ module Emit = struct
     let emitted_procname = procname
     and emitted_params = List.fold_left (fun acc param ->
                              let id = (fst param).Token.lexeme in
-                             let type_ = Utils.scr_to_qbe_type @@ snd param in
-                             let type_ = if type_ = "b" then "w" else type_ in
-                             ignore type_;
-                             (* acc ^ type_ ^ " %" ^ id ^ ", " *)
-                             acc ^ "l" ^ " %" ^ id ^ ", "
+                             match snd param with
+                             | TokenType.Custom struct_name ->
+                                let structure = Scope.get_struct_from_tbl struct_name in
+                                acc ^ ":" ^ structure.Scope.id ^ " %" ^ id ^ ", "
+                             | _ ->
+                                (* let type_ = Utils.scr_to_qbe_type @@ snd param in *)
+                                (* let type_ = if type_ = "b" then "w" else type_ in *)
+                                acc ^ "l" ^ " %" ^ id ^ ", "
                            ) "" params
 
     and emitted_export = if export then "export" else ""
@@ -150,5 +153,9 @@ module Emit = struct
 
   let jmp (lbl : string) : unit =
     Scope.state.func_section <- sprintf "%s    jmp @%s\n" Scope.state.func_section lbl
+
+  let new_type (type_name : string) (types : string) : unit =
+    Scope.state.type_section <-
+      sprintf "%stype :%s = { %s }\n" Scope.state.type_section type_name types
 
 end

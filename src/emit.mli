@@ -44,4 +44,5 @@ module Emit : sig
   val jnz : string -> string -> string -> unit
   val lbl : string -> unit
   val jmp : string -> unit
+  val new_type : string -> string -> unit
 end

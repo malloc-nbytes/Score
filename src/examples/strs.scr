@@ -3,11 +3,11 @@ import "std/str.scr"; -- streq, strlen
 
 -- Strs passed as params are
 -- taken as a reference.
-proc modify_str(s: str): void {
+proc modify_str(s: char[..]): void {
     s[0] = 'a';
 }
 
-proc iter_str(s: str): void {
+proc iter_str(s: char[..]): void {
     for let i: usize = 0; s[i]; i += 1; {
         let c: char = s[i];
         if c == 'l' {
@@ -18,7 +18,7 @@ proc iter_str(s: str): void {
 
 export proc main(void): i32 {
     let s1: str = "hello";
-    let s2: str = "hello";
+    let s2: char[..] = "hello";
 
     i32assert(streq(s1, s2));
 

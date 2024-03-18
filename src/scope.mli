@@ -51,11 +51,18 @@ module Scope : sig
     ; rettype : TokenType.id_type
     }
 
+  type structure =
+    { id : string
+    ; pararms : (Token.t * TokenType.id_type) list
+    ; size : int
+    }
+
   val state : state
 
   val id_tbl : (((string, var) Hashtbl.t) list) ref
   val proc_tbl : (string, proc) Hashtbl.t ref
   val def_proc_tbl : (string, def_proc) Hashtbl.t ref
+  val struct_tbl : (string, structure) Hashtbl.t ref
 
   val push : unit -> unit
   val pop : unit -> unit
@@ -75,4 +82,6 @@ module Scope : sig
   val check_def_proc_in_tbl : string -> bool
   val get_def_proc_from_tbl : string -> def_proc
   val assert_def_proc_not_in_tbl : string -> unit
+  val add_struct_to_tbl : string -> (Token.t * TokenType.id_type) list -> int -> unit
+  val get_struct_from_tbl : string -> structure
 end

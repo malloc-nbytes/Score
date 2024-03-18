@@ -89,6 +89,7 @@ module TokenType : sig
     | End
     | In
     | Null
+    | StructIdentifier
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

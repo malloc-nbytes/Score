@@ -60,12 +60,20 @@ module Scope = struct
     ; rettype : TokenType.id_type
     }
 
+  type structure =
+    { id : string
+    ; pararms : (Token.t * TokenType.id_type) list
+    ; size : int
+    }
+
   let id_tbl : (((string, var) Hashtbl.t) list) ref
     = ref @@ Hashtbl.create 20 :: []
 
   let proc_tbl : (string, proc) Hashtbl.t ref = ref @@ Hashtbl.create 20
 
   let def_proc_tbl : (string, def_proc) Hashtbl.t ref = ref @@ Hashtbl.create 20
+
+  let struct_tbl : (string, structure) Hashtbl.t ref = ref @@ Hashtbl.create 20
 
   let push () : unit = id_tbl := Hashtbl.create 20 :: !id_tbl
 
@@ -183,5 +191,16 @@ module Scope = struct
       let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
                 ~msg:(Printf.sprintf "redeclared function `%s`" id)
                 None in exit 1
+
+  let add_struct_to_tbl (id : string) (params : (Token.t * TokenType.id_type) list) (size : int) : unit =
+    if Hashtbl.mem !struct_tbl id then
+      let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "redeclared struct `%s`" id)
+                None in exit 1
+    else
+      Hashtbl.add !struct_tbl id {id; pararms = params; size}
+
+  let get_struct_from_tbl (id : string) : structure =
+    Hashtbl.find !struct_tbl id
 
 end
