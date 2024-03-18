@@ -340,6 +340,11 @@ module Ir = struct
            let reg = lm#new_reg false in
            Emit.proc_call_wassign reg "malloc" args TokenType.Usize;
            reg, TokenType.Usize
+        | "free" -> (* INTRINSIC *)
+           assert (List.length pc.args = 1);
+           let reg = lm#new_reg false in
+           Emit.proc_call_woassign "free" args;
+           reg, TokenType.Usize
         | "exit" -> (* INTRINSIC *)
            assert (List.length pc.args = 1);
            Emit.proc_call_woassign "exit" args;
