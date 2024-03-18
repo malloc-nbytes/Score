@@ -146,18 +146,12 @@ module Ir = struct
          exit 1
 
     | Ast.Term Ast.Struct_access sa ->
-       (* type structure =
-          { id : string
-          (* name * type * offset *)
-          ; members : (Token.t * TokenType.id_type * int) list
-          ; size : int
-          }
-        *)
        let id = sa.id.lexeme in
 
        let struct_name =
          match (Scope.get_token_from_scope id).type_ with
          | Custom name -> name
+         | Pointer Custom name -> name
          | _ -> failwith "undeclared struct" in
 
        let member_id = sa.member.lexeme in
@@ -359,6 +353,7 @@ module Ir = struct
       | TokenType.Array (TokenType.Str, _) -> evaluate_expr stmt.expr true TokenType.Str
       | TokenType.Array (TokenType.Char, _) -> evaluate_expr stmt.expr false TokenType.Char
       | TokenType.Array (TokenType.I32, _) -> evaluate_expr stmt.expr false TokenType.I32
+      | TokenType.Array (TokenType.Custom (name), _) -> evaluate_expr stmt.expr false (TokenType.Custom name)
       | (TokenType.Custom (struct_name)) as structure_type ->
          evaluate_expr stmt.expr false structure_type
       | TokenType.Array (_,_) -> failwith "evaluate_let_stmt: unimplemented"
@@ -515,6 +510,25 @@ module Ir = struct
            let added_reg = lm#new_reg false in
            Emit.binop added_reg TokenType.Usize array_reg index "add";
            Emit.store expr added_reg expr_type)
+    | Ast.Term Ast.Struct_access sa ->
+        let id = sa.id.lexeme in
+
+        let struct_name =
+          match (Scope.get_token_from_scope id).type_ with
+          | Custom name -> name
+          | Pointer Custom name -> name
+          | _ -> failwith "undeclared struct" in
+
+        let member_id = sa.member.lexeme in
+        let structure = Scope.get_struct_from_tbl struct_name in
+        let member = List.find (fun (id, _, _) -> id.Token.lexeme = member_id) structure.members in
+        let offset, type_ = match member with | _, t, offset -> offset, t in
+
+        let reg = lm#new_reg false in
+        Emit.binop reg TokenType.Usize ("%"^id) (string_of_int offset) "add";
+
+        let expr, expr_type = evaluate_expr stmt.right false type_ in
+        Emit.store expr reg expr_type
     | _ -> failwith "evaluate_mut_stmt: unimplemented mut_stmt"
 
   and evaluate_if_stmt (stmt : Ast.if_stmt) : unit =
