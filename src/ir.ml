@@ -143,6 +143,29 @@ module Ir = struct
          let _ = Err.err_type_mismatch !last_tok lhs_type rhs_type in
          exit 1
 
+    | Ast.Term Ast.Struct_access sa ->
+       (* type structure =
+          { id : string
+          (* name * type * offset *)
+          ; members : (Token.t * TokenType.id_type * int) list
+          ; size : int
+          }
+        *)
+       let id = sa.id.lexeme in
+
+       let struct_name =
+         match (Scope.get_token_from_scope id).type_ with
+         | Custom name -> name
+         | _ -> failwith "undeclared struct" in
+
+       let member_id = sa.member.lexeme in
+       let structure = Scope.get_struct_from_tbl struct_name in
+       let member = List.find (fun (id, _, _) -> id.Token.lexeme = member_id) structure.members in
+       let offset, type_ = match member with | _, t, offset -> offset, t in
+       let reg = lm#new_reg false in
+       Emit.binop reg TokenType.Usize ("%"^id) (string_of_int offset) "add";
+       reg, type_
+
     | Ast.Array_retrieval ar ->
        Scope.assert_token_in_scope ar.id;
        let stored_var = Scope.get_token_from_scope ar.id.lexeme in
@@ -348,6 +371,10 @@ module Ir = struct
         and param_type = (snd param)
         and id_lexeme = (fst param).Token.lexeme in
         Scope.assert_token_not_in_scope id;
+        (* printf "idtype: %s\n" (TokenType.id_type_to_string param_type); *)
+        (* match param_type with *)
+        (* | Custom struct_name -> Scope.add_id_to_scope id_lexeme id param_type true *)
+        (* | _ ->  *)
         Scope.add_id_to_scope id_lexeme id param_type true
       ) pd.params;
 

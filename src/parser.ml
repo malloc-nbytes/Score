@@ -123,28 +123,38 @@ module Parser = struct
            let index, tokens = parse_expr tokens in
            let _, tokens = expect tokens TokenType.RBracket in
            Ast.Array_retrieval {id; index}, tokens
+        | Some {ttype = TokenType.Period; _} -> (* Struct access *)
+           let _, tokens = expect tl TokenType.Period in
+           let member, tokens = expect tokens TokenType.Identifier in
+           Ast.Term (Ast.Struct_access {id; member}), tokens
         | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
+
     | {ttype = TokenType.Type casted_type; _} :: tl ->
        let expr, tokens = parse_expr tl in
        Ast.Cast (casted_type, expr), tokens
+
     | {ttype = TokenType.Ampersand; _} :: tl -> (* Taking the address of an ident *)
        let expr, tokens = parse_primary_expr tl in
        (match expr with
         | (Ast.Term Ast.Ident ident) as term -> Ast.Reference term, tokens
         | _ -> failwith "References must take the address of an identifier")
+
     | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing an ident *)
        let expr, tokens = parse_primary_expr tl in
        (match expr with
         | (Ast.Term Ast.Ident ident) as term -> Ast.Dereference term, tokens
-        | _ -> failwith "TODO FIX ERR: Dereferences must take the address of an identifier")
+        | _ -> failwith "FIXME: Dereferences must take the address of an identifier")
+
     | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
     | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
     | {ttype = TokenType.Null; _} :: tl -> Ast.Term (Ast.Intlit Token.{lexeme="0"; ttype=TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}), tl
     | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
+
     | {ttype = TokenType.LParen; _} :: tl ->
        let expr, tokens = parse_expr tl in
        let _, tokens = expect tokens TokenType.RParen in
        expr, tokens
+
     | {ttype = TokenType.LBrace; _} :: tl ->
       (match peek tl 0 with
       | Some {ttype = TokenType.RBrace; _} -> (* Empty compound literal *)
@@ -154,6 +164,7 @@ module Parser = struct
          let exprs, tokens = parse_comma_sep_exprs tl [] in
          let _, tokens = expect tokens TokenType.RBrace in
          Ast.Term (Ast.IntCompoundLit (exprs, Some (List.length exprs))), tokens)
+
     | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
     | hd :: _ ->
        let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in

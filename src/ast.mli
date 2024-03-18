@@ -128,6 +128,12 @@ module Ast : sig
     | Strlit of Token.t
     | Char of Token.t
     | IntCompoundLit of expr list * (int option)
+    | Struct_access of struct_access_expr
+
+  and struct_access_expr =
+    { id : Token.t
+    ; member : Token.t
+    }
 
   and proc_call_expr =
     { id : Token.t

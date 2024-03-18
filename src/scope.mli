@@ -53,7 +53,8 @@ module Scope : sig
 
   type structure =
     { id : string
-    ; pararms : (Token.t * TokenType.id_type) list
+    (* name * type * offset *)
+    ; members : (Token.t * TokenType.id_type * int) list
     ; size : int
     }
 

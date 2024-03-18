@@ -62,7 +62,8 @@ module Scope = struct
 
   type structure =
     { id : string
-    ; pararms : (Token.t * TokenType.id_type) list
+    (* name * type * offset *)
+    ; members : (Token.t * TokenType.id_type * int) list
     ; size : int
     }
 
@@ -192,15 +193,33 @@ module Scope = struct
                 ~msg:(Printf.sprintf "redeclared function `%s`" id)
                 None in exit 1
 
-  let add_struct_to_tbl (id : string) (params : (Token.t * TokenType.id_type) list) (size : int) : unit =
+  let add_struct_to_tbl (id : string) (members : (Token.t * TokenType.id_type) list) (size : int) : unit =
     if Hashtbl.mem !struct_tbl id then
       let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__
                 ~msg:(Printf.sprintf "redeclared struct `%s`" id)
                 None in exit 1
     else
-      Hashtbl.add !struct_tbl id {id; pararms = params; size}
+      let rec add_struct_to_tbl' (members : (Token.t * TokenType.id_type) list) (offset : int) : (Token.t * TokenType.id_type * int) list =
+        match members with
+        | [] -> []
+        | (tok, type_) :: ms ->
+           let size = match type_ with
+             | TokenType.I32 -> 4
+             | TokenType.Char -> 1
+             | TokenType.Usize -> 8
+             | TokenType.Pointer _ -> 8
+             | _ -> failwith "unreachable" in
+           let new_offset = offset + size in
+           (tok, type_, offset) :: add_struct_to_tbl' ms new_offset in
+      let members = add_struct_to_tbl' members 0 in
+      Hashtbl.add !struct_tbl id {id; members; size}
 
   let get_struct_from_tbl (id : string) : structure =
-    Hashtbl.find !struct_tbl id
+    if not (Hashtbl.mem !struct_tbl id) then
+      let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__
+                ~msg:(Printf.sprintf "undeclared struct `%s`" id)
+                None in exit 1
+    else
+      Hashtbl.find !struct_tbl id
 
 end
