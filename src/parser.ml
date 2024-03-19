@@ -297,7 +297,7 @@ module Parser = struct
     | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Type TokenType.Void; _} ->
        let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
        let _, tokens = expect tokens TokenType.Colon in
-       let rettype, tokens = expect_primitive_type tokens in
+       let rettype, tokens = parse_type tokens in
        let _, tokens = expect tokens TokenType.LBrace in
        let block, tokens = parse_block_stmt tokens in
        Ast.{id; params; block; rettype; export}, tokens
@@ -530,7 +530,7 @@ module Parser = struct
      * however, it takes an expression enclosed in parenthesis.
      * Eventually, we want to use braces instead. *)
     let fields, tokens = gather_params tokens [] in
-    let _, tokens = expect tokens TokenType.Semicolon in
+    let _, tokens = expect tokens TokenType.In in
     Ast.{id; fields}, tokens
 
   let parse_import_stmt (tokens : Token.t list) : Ast.import_stmt * Token.t list =

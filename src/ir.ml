@@ -99,7 +99,9 @@ module Ir = struct
     | TokenType.Usize, TokenType.Char -> true
     | TokenType.Number, TokenType.Char -> true
     (* Structs *)
-    | Custom (_), Array (_, _) -> true
+    | TokenType.Custom (_), TokenType.Array (_, _) -> true
+    (* Other *)
+    | TokenType.Pointer _, TokenType.Usize -> true
     (* Str *)
     (* | TokenType.Str, TokenType.Char -> true *)
     (* | TokenType.Char, TokenType.Str -> true *)

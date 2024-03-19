@@ -24,8 +24,8 @@ export proc halt(i: i32): void {
     exit(i);
 }
 
-export proc panic(s: str ref): void {
-    printf("panic: %s\n", s);
+export proc failwith(s: str ref): void {
+    printf("failwith: %s\n", s);
     halt(1);
 }
 
@@ -38,7 +38,7 @@ export proc memset(arr: i32[..], n: usize, k: i32): void {
 export proc i32assert(cond: i32): void {
     if cond == 0 {
         printf("assert failure. cond = %d\n", cond);
-        halt(1);
+        failwith("i32assert");
     }
 }
 

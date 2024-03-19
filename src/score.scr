@@ -1,81 +1,46 @@
 import "std/std.scr";
-import "std/char.scr";
-import "std/str.scr";
 
--- BEGIN TOKEN --
+-- // BEGIN TOKEN // --
 
 macro TTYPE_EOF 0 in
-macro TTYPE_INTLIT 1 in
-macro TTYPE_STRLIT 2 in
-macro TTYPE_IDENT 3 in
-macro TTYPE_EXPORT 4 in
-macro TTYPE_VOID 5 in
-macro TTYPE_I32 6 in
-macro TTYPE_RETURN 7 in
-macro TTYPE_SEMICOLON 8 in
-macro TTYPE_PROC 9 in
-macro TTYPE_LPAREN 10 in
-macro TTYPE_RPAREN 11 in
-macro TTYPE_LBRACE 12 in
-macro TTYPE_RBRACE 12 in
 
-macro NEWLINE 10 in
-macro SPACE 32 in
-macro TAB 9 in
+macro TTYPE_IDENT 1 in
+macro TTYPE_INTLIT 2 in
+macro TTYPE_STRLIT 3 in
+macro TTYPE_STRLIT 3 in
 
-struct Token = (
-    lexeme: char[..],
-    type: usize,
-    r: usize,
-    c: usize
-);
+-- Keywords --
+macro TTYPE_PROC 4 in
+macro TTYPE_EXPORT 5 in
+macro TTYPE_RETURN 6 in
+
+-- Types --
+macro TTYPE_VOID 7 in
+macro TTYPE_VOID 8 in
 
 macro SRC_CODE
 "export proc main(void): i32 { return 0; }"
 in
 
--- BEGIN LEXING --
+type Token = (
+    lexeme: char[..], -- the actual value
+    ttype: i32,       -- the tokentype
+    r: usize,         -- row the token is on
+    c: usize,         -- col the token is on
+    macro_: char[..]  -- if the token was gen'd from a macro
+) in
 
--- Procedure: is_ignorable
--- Params:
---   c: the character to check
--- Return:
---   whether or not `c` is a char that we can ignore
-proc is_ignorable(c: char): i32 {
-    return c == NEWLINE || c == SPACE || c == TAB;
+-- Description
+--   Takes the src code from a file and
+--   generates a list of tokens.
+proc lex_file(src: char[..]): Token[..] {
+    let src_len = strlen(src);
+    failwith("lex_file: unimplemented");
 }
 
--- Procedure: lex_file
--- Params:
---   src: the source code to lex
---   tokens: the token array to push new tokens into
--- Return:
---   the number of tokens created
-proc lex_file(src: char[..], tokens: Token[..]): usize {
-    let tokens_len: usize = 0;
-    let src_len: usize = strlen(src);
-
-    for let i: usize = 0; i < src_len; i += 1; {
-        printf("%d\n", is_ignorable(src[i]));
-    }
-
-    return 0;
-}
-
--- Procedure: usage
--- Params: None
--- Return: None
-proc usage(void): void {
-    panic("usage unimplemented");
-}
+-- // BEGIN MAIN // --
 
 export proc main(void): i32 {
-    let src: char[..] = SRC_CODE;
-    let tokens: Token[256] = {};
-    lex_file(src, tokens);
-
-    -- panic("unimplimented");
-
     return 0;
 }
 
