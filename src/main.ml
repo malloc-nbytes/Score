@@ -51,7 +51,7 @@ let qbe fp =
 
 let cc () =
   output_bin := !input_filepath^".out";
-  let cmd = Printf.sprintf "cc -o %s %s" !output_bin (String.concat " " !asms) in
+  let cmd = Printf.sprintf "cc -g -o %s %s" !output_bin (String.concat " " !asms) in
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
