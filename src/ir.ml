@@ -390,14 +390,18 @@ module Ir = struct
 
     let bytes = Utils.scr_type_to_bytes stmt_type in
 
-    match stmt_type with
-    | TokenType.Array (inner_type, len) ->
+    match stmt_type, expr_type with
+    | TokenType.Array (inner_type, len), _ ->
        Emit.copy ("%" ^ id_lexeme) stmt_type expr;
        Scope.add_id_to_scope id_lexeme id stmt_type true
-    | TokenType.Custom (_) ->
+    | TokenType.Custom (name1), TokenType.Custom (name2) when name1 = name2 ->
+       Emit.stack_alloc4 id_lexeme bytes;
+       Emit.store expr ("%" ^ id_lexeme) stmt_type;
+       Scope.add_id_to_scope id_lexeme id stmt_type true
+    | TokenType.Custom (_), _ ->
        Emit.copy ("%" ^ id_lexeme) stmt_type expr;
        Scope.add_id_to_scope id_lexeme id stmt_type true
-    | _ ->
+    | _, _ ->
        if types_compatable stmt_type expr_type then
          let _ = Scope.add_id_to_scope id_lexeme id stmt_type true in
          let _ = Emit.stack_alloc4 id_lexeme bytes in

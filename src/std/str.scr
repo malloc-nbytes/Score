@@ -48,20 +48,3 @@ export proc strcpy(src: char[..], dest: char[..], bytes: usize): void {
         dest[i] = src[i];
     }
 }
-
--- Description:
---   Finds the first occurrence of `sub` in `s`. will set the length
---   of the substring to `n`.
-export proc substr(s: char[..], sub: char[..], n: usize ref): char[..] {
-    let sub_len = strlen(sub);
-
-    for let i: usize = 0; s[i] != null && i < sub_len; i += 1; {
-        if s[i] == sub[i] {
-            for let j: usize = i+1; s[j] != null && j < sub_len; j += 1; {
-            }
-        }
-    }
-}
-
-
-

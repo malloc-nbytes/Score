@@ -46,7 +46,10 @@ module Emit = struct
                            ) "" params
 
     and emitted_export = if export then "export" else ""
-    and emitted_rettype = Utils.scr_to_qbe_type rettype in
+    and emitted_rettype = match rettype with
+      | TokenType.Custom (name) -> ":"^name
+      | _ -> Utils.scr_to_qbe_type rettype in
+
     let emitted_rettype = if emitted_rettype = "b" then "w" else emitted_rettype in
 
     Scope.state.func_section <-

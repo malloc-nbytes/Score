@@ -114,7 +114,7 @@ module Scope = struct
     let rec get_token_from_scope' (tbl : ((string, var) Hashtbl.t) list)
             : var =
       match tbl with
-      | [] -> failwith "unreachable"
+      | [] -> failwith @@ Printf.sprintf "get_token_from_scope: unreachable: %s" id
       | s :: ss ->
          if Hashtbl.mem s id then
            Hashtbl.find s id
