@@ -1,0 +1,58 @@
+type T1 = (x: i32, y: i32) in
+type T2 = (x: usize, y: i32) in
+type T3 = (x: usize, y: usize) in
+type T4 = (x: i32, s: str) in
+type T5 = (s1: str, s2: str, c: char) in
+
+proc t1_create(void): i32 {
+    let t: T1 = {1,2};
+    return t.x == 1 && t.y == 2;
+}
+
+proc t1_wparams(x: i32, y: i32): i32 {
+    let t: T1 = {x,y};
+    return t.x == x && t.y == y;
+}
+
+proc t1_init_wo_arr_init(x: i32, y: i32): i32 {
+    let t: T1 = {};
+    t.x = x;
+    t.y = y;
+    return t.x == x && t.y == y;
+}
+
+proc t1_ret(x: i32, y: i32): T1 {
+    let t: T1 = {x,y};
+    return t;
+}
+
+export proc test_types(void): i32 {
+    printf("test_types... ");
+
+    if t1_create() != 1 {
+        printf("t1_create failed\n");
+        return 1;
+    }
+
+    if t1_wparams() != 1 {
+        printf("t1_wparams failed\n");
+        return 1;
+    }
+
+    if t1_init_wo_arr_init() != 1 {
+        printf("t1_init_wo_arr_init failed\n");
+        return 1;
+    }
+
+    let __t1_ret: T1 = t1_ret(1,2);
+    if __t1_ret.x != 1 || __t1_ret.y != 2 {
+        printf("t1_ret failed\n");
+        return 1;
+    }
+
+
+
+
+    printf("ok\n");
+    return 0;
+}
