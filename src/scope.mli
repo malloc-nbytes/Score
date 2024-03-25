@@ -30,6 +30,7 @@ module Scope : sig
     ; mutable type_section : string
     ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
+    ; mutable compiled_files : string list
     }
 
   type var =

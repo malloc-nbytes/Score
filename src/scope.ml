@@ -31,6 +31,7 @@ module Scope = struct
     ; mutable type_section : string
     ; mutable imports      : string list
     ; mutable cur_proc_id  : string * TokenType.id_type
+    ; mutable compiled_files : string list
     }
 
   let state =
@@ -38,7 +39,8 @@ module Scope = struct
       data_section = "";
       type_section = "";
       imports = [];
-      cur_proc_id = "", TokenType.Void
+      cur_proc_id = "", TokenType.Void;
+      compiled_files = [];
     }
 
   type var =

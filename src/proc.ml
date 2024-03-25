@@ -26,7 +26,10 @@ module Proc = struct
   let evaluate_toplvl_stmt (stmt : Ast.toplvl_stmt) : unit =
     match stmt with
     | Ast.Proc_def pd -> evaluate_proc_def_stmt pd
-    | Ast.Import i -> evaluate_import_stmt i
+    | Ast.Import i ->
+       if not (List.exists (fun n -> n = i.path.lexeme) Scope.state.compiled_files) then
+         let _ = evaluate_import_stmt i in
+         Scope.state.compiled_files <- i.path.lexeme :: Scope.state.compiled_files
     | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
     | _ -> ()
 

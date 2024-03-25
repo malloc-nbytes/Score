@@ -36,13 +36,13 @@ let output_bin = ref ""
 let ssas : string list ref = ref []
 let asms : string list ref = ref []
 
-let ssas_contains lst s =
-  List.exists (fun x -> x = s) lst
-
 let qbe fp =
   output_asm := fp^".s";
   asms := !asms @ [!output_asm];
-  (* let ssa_files = (String.concat " " !ssas) in *)
+  let ssa_files = (String.concat " " !ssas) in
+
+  print_endline ssa_files;
+
   let cmd = Printf.sprintf "qbe -o %s %s" !output_asm fp in
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
@@ -51,7 +51,9 @@ let qbe fp =
 
 let cc () =
   output_bin := !input_filepath^".out";
-  let cmd = Printf.sprintf "cc -g -o %s %s" !output_bin (String.concat " " !asms) in
+  let asms = (String.concat " " !asms) in
+  print_endline asms;
+  let cmd = Printf.sprintf "cc -g -o %s %s" !output_bin asms in
   let exit_code = Sys.command cmd in
   if exit_code <> 0 then
     let _ = Printf.printf " ERR (exit: %d)\n" exit_code in
@@ -67,9 +69,7 @@ let rec compile input_filepath =
   let tree = Parser.produce_ast tokens in
 
   let imports = Proc.populate_proc_tbl tree in
-  List.iter (fun imp ->
-      compile imp
-    ) imports;
+  List.iter (fun imp -> compile imp) imports;
 
   let ircode = Ir.generate_ir tree in
 
