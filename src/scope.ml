@@ -206,7 +206,7 @@ module Scope = struct
            let size = match type_ with
              | TokenType.I32 -> 4
              | TokenType.Char -> 1
-             | TokenType.Usize -> 8
+             | TokenType.Usize -> 4 (* temporary *)
              | TokenType.Str -> 8
              | TokenType.Array _ -> 8
              | TokenType.Pointer _ -> 8
