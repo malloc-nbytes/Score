@@ -1,0 +1,72 @@
+import "std/std.scr";
+import "std/str.scr";
+
+-- Syntax for creating custom types (aka structs).
+type Point = (x: i32, y: i32) in
+
+-- And a more complex type.
+type ComplexType = (
+    c: char,
+    a: i32,
+    b: usize,
+    s: char[..])
+in
+
+-- Procedures can return a type.
+proc point_create(x: i32, y: i32): Point {
+    let p: Point = {x, y}; -- uses array init syntax
+    return p;
+}
+
+-- A type passed by copy will not be changed in the callee.
+proc copy_complex_type(ct: ComplexType): void {
+    ct.c = 'b';
+    ct.a = 99;
+    ct.b = 100;
+    ct.s = "foo";
+}
+
+-- A type passed by ref will be changed in the callee.
+proc ref_complex_type(ct: ComplexType ref): void {
+    ct.c = 'b';
+    ct.a = 99;
+    ct.b = 100;
+    ct.s = "foo";
+}
+
+export proc main(void): i32 {
+    let p: Point = point_create(1, 2);
+    i32assert(p.x == 1 && p.y == 2);
+
+    -- dot notation for member access
+    p.x = 99;
+    p.y = 100;
+    i32assert(p.x == 99 && p.y == 100);
+
+    let ct: ComplexType = {'a', 1, 2, "hello"}; -- array init syntax
+    i32assert(
+        ct.c == 'a' &&
+        ct.a == 1 &&
+        ct.b == 2 &&
+        streq(ct.s, "hello") == 1);
+
+    copy_complex_type(ct);
+
+    -- `ct` is unchanged
+    i32assert(
+        ct.c == 'a' &&
+        ct.a == 1 &&
+        ct.b == 2 &&
+        streq(ct.s, "hello") == 1);
+
+    ref_complex_type(&ct);
+
+    -- `ct` is now changed
+    i32assert(
+        ct.c == 'b' &&
+        ct.a == 99 &&
+        ct.b == 100 &&
+        streq(ct.s, "foo") == 1);
+
+    return 0;
+}
