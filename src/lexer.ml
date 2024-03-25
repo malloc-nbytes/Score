@@ -24,7 +24,7 @@ module Lexer = struct
   open Token
   open Err
 
-  let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 20
+  let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 30
 
   (* Fill the keywords hashtable with the correct words
    * and token type. Should be called before `lex_file ()` is called. *)
@@ -50,6 +50,8 @@ module Lexer = struct
     let _ = Hashtbl.add keywords "macro"     TokenType.Macro in
     let _ = Hashtbl.add keywords "in"        TokenType.In in
     let _ = Hashtbl.add keywords "null"      TokenType.Null in
+    let _ = Hashtbl.add keywords "module"    TokenType.Module in
+    let _ = Hashtbl.add keywords "where"     TokenType.Where in
     ()
 
   let rec repl_quote (lst : char list) : string =

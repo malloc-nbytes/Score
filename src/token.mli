@@ -90,6 +90,8 @@ module TokenType : sig
     | In
     | Null
     | StructIdentifier
+    | Module
+    | Where
 
   val to_string : t -> string
   val id_type_to_string : id_type -> string

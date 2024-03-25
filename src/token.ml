@@ -90,6 +90,8 @@ module TokenType = struct
     | In
     | Null
     | StructIdentifier
+    | Module
+    | Where
 
   let rec id_type_to_string = function
     | I32 -> "I32"
@@ -169,6 +171,9 @@ module TokenType = struct
     | In -> "In"
     | Null -> "Null"
     | StructIdentifier -> "StructIdentifier"
+    | Module -> "Module"
+    | Where -> "Where"
+
 end
 
 module Token = struct

@@ -31,6 +31,7 @@ module Ast = struct
     | Struct of struct_stmt
     | Import of import_stmt
     | Def_func of def_func_stmt
+    | Module of module_stmt
 
   and stmt =
     | Proc_def of proc_def_stmt
@@ -43,6 +44,10 @@ module Ast = struct
     | Ret of ret_stmt
     | Break of Token.t
     | For of for_stmt
+
+  and module_stmt =
+    { id : Token.t
+    }
 
   and def_func_stmt =
     { id : Token.t

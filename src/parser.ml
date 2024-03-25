@@ -559,6 +559,11 @@ module Parser = struct
     let _, tokens = expect tokens TokenType.Semicolon in
     Ast.{id; params; rettype}, tokens
 
+  let parse_module_stmt (tokens : Token.t list) : Ast.module_stmt * Token.t list =
+    let id, tokens = expect tokens TokenType.Identifier in
+    let _, tokens = expect tokens TokenType.Where in
+    Ast.{id}, tokens
+
   (* Parses the top-most statements (proc decls, global vars etc). *)
   let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
     match tokens with
@@ -581,6 +586,9 @@ module Parser = struct
     | {ttype = TokenType.Def; _} :: tl ->
        let stmt, tokens = parse_def_func_stmt tl in
        Ast.Def_func stmt, tokens
+    | {ttype = TokenType.Module; _} :: tl ->
+       let stmt, tokens = parse_module_stmt tl in
+       Ast.Module stmt, tokens
     | hd :: _ ->
        let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
        exit 1

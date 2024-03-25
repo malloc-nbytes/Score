@@ -660,6 +660,7 @@ module Ir = struct
     | Ast.Struct s -> evaluate_struct_stmt s
     | Ast.Let l -> evaluate_let_stmt l
     | Ast.Def_func df -> Scope.def_proc_tbl_add df.id.lexeme df.params df.rettype
+    | Ast.Module m -> failwith "evaluate_toplvl_stmt: Ast.Module unimplemented"
 
   (* --- Entrypoint --- *)
   let generate_ir (program : Ast.program) : string =

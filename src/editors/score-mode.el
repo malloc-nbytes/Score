@@ -44,7 +44,7 @@
     '("if" "else" "while" "let" "void" "i32"
       "str" "for" "proc" "return" "mut" "break" "macro"
       "usize" "struct" "char" "import" "ref" "end" "export"
-      "def" "in" "null" "type")))
+      "def" "in" "null" "type" "module" "where")))
 
 (defconst score-highlights
   `((,(regexp-opt score-keywords 'symbols) . font-lock-keyword-face)
