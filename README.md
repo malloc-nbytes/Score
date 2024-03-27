@@ -42,7 +42,7 @@ cd ./Score/src/
 - Turing complete [X]
 - Imports [X]
 - Self-hosted tests [X]
+- structs [X]
 - unary operators [ ]
 - break statements [ ]
-- structs [ ]
 - Self-hosted [ ]
