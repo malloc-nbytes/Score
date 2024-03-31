@@ -1,0 +1,36 @@
+opam-version: "2.0"
+name: "Score"
+version: "~dev"
+synopsis: "A short synopsis"
+description: "A longer description"
+maintainer: "Zachary Haskins"
+authors: "Zachary Haskins"
+license: "LICENSE"
+tags: ["topics" "to describe" "your" "project"]
+homepage: "https://github.com/username/reponame"
+doc: "https://url/to/documentation"
+bug-reports: "https://github.com/username/reponame/issues"
+depends: [
+  "base-bigarray" {= "base"}
+  "base-threads" {= "base"}
+  "base-unix" {= "base"}
+  "dune" {= "3.14.0"}
+  "ocaml" {= "4.13.1"}
+  "ocaml-config" {= "2"}
+  "ocaml-system" {= "4.13.1"}
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
+]
+dev-repo: "git+https://github.com/username/reponame.git"

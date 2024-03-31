@@ -1,9 +1,0 @@
-proc do_something(void): void {
-    printf("this can not be called from other file\n");
-}
-
-export proc custom_print_arr(arr: i32[..], n: usize): void {
-    for let i: usize = 0; i < n; i += 1; {
-        printf("%d\n", arr[i]);
-    }
-}
