@@ -17,9 +17,9 @@
 
 (package
  (name Score)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune)
+ (synopsis "A small C-like language written in OCaml")
+ (description "This is currrently in its infant stages of development. Eventually this language will be written in itself (self hosted).")
+ (depends ocaml dune llvm)
  (tags
   (topics "to describe" your project)))
 
