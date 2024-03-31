@@ -20,7 +20,11 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-open Lib
+open Utils
+open Preprocessor
+open Parser
+open Proc
+open Ir
 
 let input_filepath = ref ""
 let output_ssa = ref ""
@@ -53,22 +57,22 @@ let cc () =
     exit 1
 
 let rec compile input_filepath =
-  let src_code = Utils.Utils.file_to_str input_filepath in
+  let src_code = Utils.file_to_str input_filepath in
 
   let tokens = Lexer.lex_file input_filepath (String.to_seq src_code |> List.of_seq) 1 1 in
 
-  let tokens = Preprocessor.Preprocessor.insert_macros tokens in
+  let tokens = Preprocessor.insert_macros tokens in
 
-  let tree = Parser.Parser.produce_ast tokens in
+  let tree = Parser.produce_ast tokens in
 
-  let imports = Proc.Proc.populate_proc_tbl tree in
+  let imports = Proc.populate_proc_tbl tree in
   List.iter (fun imp -> compile imp) imports;
 
-  let ircode = Ir.Ir.generate_ir tree in
+  let ircode = Ir.generate_ir tree in
 
   output_ssa := input_filepath^".ssa";
   ssas := !output_ssa :: !ssas;
-  Utils.Utils.write_to_file !output_ssa ircode
+  Utils.write_to_file !output_ssa ircode
 
 let () =
 

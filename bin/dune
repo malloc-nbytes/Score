@@ -1,4 +1,4 @@
 (executable
  (public_name Score)
  (name main)
- (libraries Score))
+ (libraries Lib))
