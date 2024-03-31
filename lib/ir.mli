@@ -20,8 +20,4 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-module Ir : sig
-  open Ast
-
-  val generate_ir : Ast.program -> string
-end
+val generate_ir : Ast.program -> string

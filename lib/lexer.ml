@@ -21,7 +21,6 @@
    * SOFTWARE. *)
 
 open Token
-open Err
 
 let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 30
 

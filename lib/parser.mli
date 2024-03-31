@@ -20,9 +20,6 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-module Parser : sig
-  open Token
-  open Ast
+open Token
 
-  val produce_ast : Token.t list -> Ast.program
-end
+val produce_ast : Token.t list -> Ast.program
