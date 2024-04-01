@@ -1,0 +1,117 @@
+-- MIT License
+
+-- Copyright (c) 2023 malloc-nbytes
+
+-- Permission is hereby granted, free of charge, to any person obtaining a copy
+-- of this software and associated documentation files (the "Software"), to deal
+-- in the Software without restriction, including without limitation the rights
+-- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-- copies of the Software, and to permit persons to whom the Software is
+-- furnished to do so, subject to the following conditions:
+
+-- The above copyright notice and this permission notice shall be included in all
+-- copies or substantial portions of the Software.
+
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-- SOFTWARE.
+
+export proc halt(i: i32): void {
+    exit(i);
+}
+
+export proc failwith(s: str ref): void {
+    printf("failwith: %s\n", s);
+    halt(1);
+}
+
+export proc memset(arr: i32[..], n: usize, k: i32): void {
+    for let i: usize = 0; i < n; i += 1; {
+        arr[i] = k;
+    }
+}
+
+export proc i32assert(cond: i32): void {
+    if cond == 0 {
+        printf("assert failure. cond = %d\n", cond);
+        failwith("i32assert");
+    }
+}
+
+export proc assert_i32_eq(l: i32, r: i32): void {
+    if l != r {
+        printf("assert_i32_eq failure. left = %d, right = %d\n", l, r);
+        halt(1);
+    }
+}
+
+export proc assert_usize_eq(l: usize, r: usize): void {
+    if l != r {
+        printf("assert_usize_eq failure. left = %d, right = %d\n", l, r);
+        halt(1);
+    }
+}
+
+export proc arr_i32_cpy(src: i32[..], dest: i32[..], num: usize): void {
+    for let i: usize = 0; i < num; i += 1; {
+        dest[i] = src[i];
+    }
+}
+
+export proc arr_i32_print(arr: i32[..], n: usize, newline: i32): void {
+    for let i: usize = 0; i < n; i += 1; {
+        printf("%d", arr[i]);
+        if newline { printf("\n"); }
+    }
+}
+
+-- Fills `n` items in array `arr` with the value `k`.
+export proc arr_i32_fill(arr: i32[..], n: usize, k: i32): void {
+    for let i: usize = 0; i < n; i += 1; {
+        arr[i] = k;
+    }
+}
+
+-- Checks if a given array `arr` of length `n` contains
+-- value `k`. If true, returns the index of the value found.
+-- If it does not contain it, it returns -1. It has a return
+-- type of `i32` because usize must not be negative.
+export proc arr_i32_contains(arr: i32[..], n: usize, k: i32): i32 {
+    for let i: usize = 0; i < n; i += 1; {
+        if arr[i] == k {
+            return i;
+        }
+    }
+    return 0-1;
+}
+
+proc i32partition(arr: i32[..], low: usize, high: usize): usize {
+    let pivot: i32 = arr[high];
+    let i: usize = (low-1);
+    for let j: usize = low; j <= high; j += 1; {
+        if arr[j] < pivot {
+            i += 1;
+            let t: i32 = arr[i];
+            arr[i] = arr[j];
+            arr[j] = t;
+        }
+    }
+
+    let t: i32 = arr[i+1];
+    arr[i+1] = arr[high];
+    arr[high] = t;
+
+    return i+1;
+}
+
+export proc arr_i32_qsort(arr: i32[..], low: usize, high: usize): void {
+    if low < high {
+        let pi: usize = i32partition(arr, low, high);
+        arr_i32_qsort(arr, low, pi-1);
+        arr_i32_qsort(arr, pi+1, high);
+    }
+}

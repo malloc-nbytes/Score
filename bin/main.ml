@@ -22,23 +22,34 @@
 
 open Lib
 
-let filepath = "./input.scr"
+let get_module (program : Ast.program) =
+  ignore program;
+  failwith "todo"
 
-let get_module filepath =
+let get_ast (filepath : string) =
   let src_code = Utils.file_to_str filepath in
   let tokens = Lexer.lex_file filepath (String.to_seq src_code |> List.of_seq) 1 1 in
-  let tree = Parser.produce_ast tokens in
-  List.iter (fun s -> Printf.printf "import: %s\n" s) @@ Module.gather_imports tree;
-  failwith "todo"
-  (* let module_ : Module.t = Module.produce_module tree in *)
-  (* module_ *)
+  Parser.produce_ast tokens
+
+let rec make (filepath : string) : Ast.program list =
+  let ast = get_ast filepath in
+  let imports = Module.gather_imports ast in
+
+  let rec aux = function
+    | [] -> []
+    | hd :: tl -> make hd @ aux tl in
+
+  ast :: aux imports
 
 let () =
+  let filepath = "./input.scr" in
+
+  ignore get_module;
+
   Lexer.populate_keywords ();
   print_endline "[ Compiling ]";
 
-  let main_module = get_module filepath in
-
-  ignore main_module;
+  let asts = make filepath in
+  ignore asts;
 
   print_endline "[ Done ]"

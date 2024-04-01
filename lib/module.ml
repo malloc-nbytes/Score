@@ -2,15 +2,9 @@ type t =
   { modname : string
   ; ast : Ast.program
   ; depends : t list
-  ; exported_procs : Ast.proc_def_stmt
-  ; exported_types : Ast.struct_stmt
+  ; exported_procs : Ast.proc_def_stmt list
+  ; exported_types : Ast.struct_stmt list
   }
-
-let iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) (modname : string) (depends : string list) : t =
-  ignore stmts;
-  ignore modname;
-  ignore depends;
-  failwith "todo"
 
 let rec gather_imports = function
   | [] -> []
@@ -18,7 +12,15 @@ let rec gather_imports = function
   | _ :: tl -> gather_imports tl
 
 let produce_module (ast : Ast.program) : t =
-  ignore iter_toplvl_stmts;
-  ignore gather_imports;
-  ignore ast;
-  failwith "todo"
+  let modname = ref ""
+  and depends = ref []
+  and exported_procs = ref []
+  and exported_types = ref [] in
+
+  let iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) : unit =
+    ignore stmts;
+    failwith "todo"
+  in
+
+  iter_toplvl_stmts ast;
+  {modname = !modname; ast; depends = !depends; exported_procs = !exported_procs; exported_types = !exported_types }
