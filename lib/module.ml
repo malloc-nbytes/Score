@@ -17,10 +17,18 @@ let produce_module (ast : Ast.program) : t =
   and exported_procs = ref []
   and exported_types = ref [] in
 
-  let iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) : unit =
-    ignore stmts;
-    failwith "todo"
+  let rec iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) : unit =
+    match stmts with
+    | [] -> ()
+    | Ast.Proc_def _ :: _ -> failwith "Proc_def: todo"
+    | Ast.Struct _ :: _ -> failwith "Struct: todo"
+    | Ast.Import _ :: _ -> failwith "Import: todo"
+    | Ast.Module _ :: _ -> failwith "Module: todo"
+    | _ :: tl -> iter_toplvl_stmts tl
   in
 
   iter_toplvl_stmts ast;
-  {modname = !modname; ast; depends = !depends; exported_procs = !exported_procs; exported_types = !exported_types }
+
+  {modname = !modname; ast;
+   depends = !depends; exported_procs = !exported_procs;
+   exported_types = !exported_types }

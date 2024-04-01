@@ -29,7 +29,7 @@ and toplvl_stmt =
   | Let of let_stmt
   | Struct of struct_stmt
   | Import of import_stmt
-  | Def_func of def_func_stmt
+  | Def_func of def_func_stmt (* currently unused *)
   | Module of module_stmt
 
 and stmt =
