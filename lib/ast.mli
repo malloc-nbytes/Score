@@ -61,6 +61,7 @@ and import_stmt =
 and struct_stmt =
   { id : Token.t
   ; fields : (Token.t * TokenType.id_type) list
+  ; export : bool
   }
 
 and block_stmt = { stmts : stmt list }

@@ -511,7 +511,7 @@ let parse_struct_stmt (tokens : Token.t list) : Ast.struct_stmt * Token.t list =
    * Eventually, we want to use braces instead. *)
   let fields, tokens = gather_params tokens [] in
   let _, tokens = expect tokens TokenType.In in
-  Ast.{id; fields}, tokens
+  Ast.{id; fields; export = false}, tokens
 
 let parse_import_stmt (tokens : Token.t list) : Ast.import_stmt * Token.t list =
   let path, tokens = expect tokens TokenType.StringLiteral in

@@ -24,15 +24,19 @@ open Lib
 
 let filepath = "./input.scr"
 
-let compile input_filepath =
-  let src_code = Utils.file_to_str input_filepath in
-  let tokens = Lexer.lex_file input_filepath (String.to_seq src_code |> List.of_seq) 1 1 in
+let get_module filepath =
+  let src_code = Utils.file_to_str filepath in
+  let tokens = Lexer.lex_file filepath (String.to_seq src_code |> List.of_seq) 1 1 in
   let tree = Parser.produce_ast tokens in
-  let ircode = Ir.generate_ir tree in
-  Utils.write_to_file (filepath^".out") ircode
+  let module_ : Module.t = Module.produce_module tree in
+  module_
 
 let () =
   Lexer.populate_keywords ();
   print_endline "[ Compiling ]";
-  compile filepath;
+
+  let main_module = get_module filepath in
+
+  ignore main_module;
+
   print_endline "[ Done ]"

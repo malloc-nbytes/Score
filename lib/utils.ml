@@ -48,13 +48,10 @@ let scr_type_to_bytes (type_: TokenType.id_type) =
   | TokenType.Array (TokenType.Str, Some len) -> Printf.sprintf "%d" (8 * len)
   | TokenType.Array (TokenType.I32, Some len) -> Printf.sprintf "%d" (4 * len)
   | TokenType.Array (TokenType.Char, Some len) -> Printf.sprintf "%d" (1 * len)
-  | TokenType.Array (TokenType.Custom (id), Some len) ->
-     let sz = (Scope.get_struct_from_tbl id).size in
-     let sz = sz*len in
-     Printf.sprintf "%d" sz
+  | TokenType.Array (TokenType.Custom (id), Some len) -> ignore (id); ignore(len); failwith "todo"
   | TokenType.Array (_, Some len) -> Printf.sprintf "%d" (8 * len)
   | TokenType.Array (_, None) -> "8"
-  | TokenType.Custom (id) -> string_of_int ((Scope.get_struct_from_tbl id).size)
+  | TokenType.Custom (id) -> ignore (id); failwith "todo"
   | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
 
 let scr_to_qbe_type (type_: TokenType.id_type) =

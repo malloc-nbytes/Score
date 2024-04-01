@@ -71,10 +71,6 @@ let generate_ir (program : Ast.program) : string =
   ignore evaluate_binop;
   ignore evaluate_stmt;
   ignore evaluate_toplvl_stmt;
-  let ret = Scope.state.type_section ^ Scope.state.func_section ^ Scope.state.data_section in
-  Scope.state.func_section <- "";
-  Scope.state.data_section <- "";
-  Scope.state.type_section <- "";
-  ret
+  ""
 
 
