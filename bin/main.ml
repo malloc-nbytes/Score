@@ -28,8 +28,10 @@ let get_module filepath =
   let src_code = Utils.file_to_str filepath in
   let tokens = Lexer.lex_file filepath (String.to_seq src_code |> List.of_seq) 1 1 in
   let tree = Parser.produce_ast tokens in
-  let module_ : Module.t = Module.produce_module tree in
-  module_
+  List.iter (fun s -> Printf.printf "import: %s\n" s) @@ Module.gather_imports tree;
+  failwith "todo"
+  (* let module_ : Module.t = Module.produce_module tree in *)
+  (* module_ *)
 
 let () =
   Lexer.populate_keywords ();

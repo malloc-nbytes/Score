@@ -6,15 +6,19 @@ type t =
   ; exported_types : Ast.struct_stmt
   }
 
-let iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) (modname : string) (depends : string list) () : t =
-  match stmts with
-  | 
+let iter_toplvl_stmts (stmts : Ast.toplvl_stmt list) (modname : string) (depends : string list) : t =
+  ignore stmts;
+  ignore modname;
+  ignore depends;
+  failwith "todo"
+
+let rec gather_imports = function
+  | [] -> []
+  | (Ast.Import is) :: tl -> [is.path.lexeme] @ gather_imports tl
+  | _ :: tl -> gather_imports tl
 
 let produce_module (ast : Ast.program) : t =
-  let modname = "" in
-  let depends = [] in
-  let exported_procs = [] in
-  let exported_types = [] in
-  
-
-
+  ignore iter_toplvl_stmts;
+  ignore gather_imports;
+  ignore ast;
+  failwith "todo"

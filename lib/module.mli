@@ -6,5 +6,5 @@ type t =
   ; exported_types : Ast.struct_stmt
   }
 
+val gather_imports : Ast.toplvl_stmt list -> string list
 val produce_module : Ast.program -> t
-
