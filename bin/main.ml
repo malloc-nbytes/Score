@@ -22,34 +22,45 @@
 
 open Lib
 
+let import_deps : ((string, string list) Hashtbl.t) = Hashtbl.create 20
+
 let get_module (program : Ast.program) =
   ignore program;
   failwith "todo"
 
 let get_ast (filepath : string) =
+  (* Printf.printf "ast for: %s\n" filepath; *)
   let src_code = Utils.file_to_str filepath in
   let tokens = Lexer.lex_file filepath (String.to_seq src_code |> List.of_seq) 1 1 in
   Parser.produce_ast tokens
 
-let rec make (filepath : string) : Ast.program list =
-  let ast = get_ast filepath in
-  let imports = Module.gather_imports ast in
+let rec make (filepath : string) (compiled_files : string list) : Ast.program list =
+  if List.mem filepath compiled_files then let _ = Printf.printf "skipping: %s\n" filepath in []
+  else
+    let ast = get_ast filepath in
+    let imports = Module.gather_imports ast in
+    let compiled_files = [filepath] @ compiled_files in
 
-  let rec aux = function
-    | [] -> []
-    | hd :: tl -> make hd @ aux tl in
+    Hashtbl.add import_deps filepath imports;
+    let rec aux = function
+      | [] -> []
+      | hd :: tl -> make hd compiled_files @ aux tl in
 
-  ast :: aux imports
+    ast :: aux imports
 
 let () =
-  let filepath = "./input.scr" in
+  let filepath = "input.scr" in
 
   ignore get_module;
 
   Lexer.populate_keywords ();
   print_endline "[ Compiling ]";
 
-  let asts = make filepath in
+  let asts = make filepath [] in
   ignore asts;
+
+  Hashtbl.iter (fun key value ->
+      Printf.printf "%s ->\n" key;
+      List.iter (fun s -> Printf.printf "  %s\n" s) value) import_deps;
 
   print_endline "[ Done ]"
