@@ -145,3 +145,23 @@ and proc_call_expr =
   ; args : expr list
   }
 
+let rec dump_toplvl_stmts = function
+  | [] -> ()
+  | Proc_def pd :: tl ->
+     Printf.printf "  Proc_def: %s\n" pd.id.lexeme;
+     dump_toplvl_stmts tl
+  | Let ls :: tl ->
+     Printf.printf "  Let: %s\n" ls.id.lexeme;
+     dump_toplvl_stmts tl
+  | Struct ss :: tl ->
+     Printf.printf "  Struct: %s\n" ss.id.lexeme;
+     dump_toplvl_stmts tl
+  | Import is :: tl ->
+     Printf.printf "  Import: %s\n" is.path.lexeme;
+     dump_toplvl_stmts tl
+  | Module ms :: tl ->
+     Printf.printf "  Module: %s\n" ms.id.lexeme;
+     dump_toplvl_stmts tl
+  | _ :: tl -> dump_toplvl_stmts tl
+
+

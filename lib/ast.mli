@@ -145,3 +145,5 @@ and proc_call_expr =
   ; args : expr list
   }
 
+val dump_toplvl_stmts : toplvl_stmt list -> unit
+

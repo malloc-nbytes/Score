@@ -22,6 +22,8 @@
 
 import "std/std.scr";
 
+module Str where
+
 export proc streq(s1: char[..], s2: char[..]): i32 {
     let i: usize = 0;
 

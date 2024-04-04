@@ -52,8 +52,22 @@ let () =
   print_endline "[ Compiling ]";
 
   let asts = make filepath in
-	let ast_tbl : (string, Ast.program) Hashtbl.t = Hashtbl.create 5 in
-	List.iter (fun t -> Hashtbl.add ast_tbl (fst t) (snd t)) asts;
+  let ast_tbl : (string, Ast.program) Hashtbl.t = Hashtbl.create 5 in
+  List.iter (fun t -> Hashtbl.add ast_tbl (fst t) (snd t)) asts;
+  let modules : Module.t list = Module.produce_modules ast_tbl import_deps in
+
+  List.iter (fun m ->
+      Printf.printf "modname: %s\n" m.Module.modname;
+      Printf.printf "depends:\n";
+
+      List.iter (fun d ->
+          Printf.printf "  %s\n" d.Module.modname
+        ) m.Module.depends;
+
+      Printf.printf "ast:\n";
+      Ast.dump_toplvl_stmts m.Module.ast;
+      print_endline ""
+    ) modules;
 
   print_endline "[ Done ]"
 
