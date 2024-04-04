@@ -7,4 +7,4 @@ type t =
   }
 
 val gather_imports : Ast.toplvl_stmt list -> string list
-val produce_modules : Ast.program list -> (string, string list) Hashtbl.t -> t list
+val produce_modules : (string, Ast.program) Hashtbl.t -> (string, string list) Hashtbl.t -> t list

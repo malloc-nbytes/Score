@@ -1,23 +1,33 @@
 opam-version: "2.0"
 name: "Score"
 version: "~dev"
-synopsis: "A short synopsis"
-description: "A longer description"
+synopsis: "A small C-like language written in OCaml"
+description:
+  "This is currrently in its infant stages of development. Eventually this language will be written in itself (self hosted)."
 maintainer: "Zachary Haskins"
 authors: "Zachary Haskins"
-license: "LICENSE"
+license: "MIT"
 tags: ["topics" "to describe" "your" "project"]
-homepage: "https://github.com/username/reponame"
+homepage: "https://github.com/malloc-nbytes/Score"
 doc: "https://url/to/documentation"
-bug-reports: "https://github.com/username/reponame/issues"
+bug-reports: "https://github.com/malloc-nbytes/Score/issues"
 depends: [
   "base-bigarray" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
-  "dune" {= "3.14.0"}
+  "bigarray-compat" {= "1.1.0"}
+  "conf-bash" {= "1"}
+  "conf-llvm" {= "16"}
+  "csexp" {= "1.5.2"}
+  "ctypes" {= "0.22.0"}
+  "dune" {= "3.14.2"}
+  "dune-configurator" {= "3.14.2"}
+  "integers" {= "0.7.0"}
+  "llvm" {= "16.0.6+nnp"}
   "ocaml" {= "4.13.1"}
   "ocaml-config" {= "2"}
   "ocaml-system" {= "4.13.1"}
+  "stdlib-shims" {= "0.3.0"}
 ]
 build: [
   ["dune" "subst"] {dev}
@@ -33,4 +43,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/username/reponame.git"
+dev-repo: "git+https://github.com/malloc-nbytes/Score.git"

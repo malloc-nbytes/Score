@@ -55,9 +55,5 @@ let () =
 	let ast_tbl : (string, Ast.program) Hashtbl.t = Hashtbl.create 5 in
 	List.iter (fun t -> Hashtbl.add ast_tbl (fst t) (snd t)) asts;
 
-  (* Hashtbl.iter (fun key value ->
-      Printf.printf "%s ->\n" key;
-      List.iter (fun s -> Printf.printf "  %s\n" s) value) import_deps; *)
-
   print_endline "[ Done ]"
 
