@@ -14,6 +14,14 @@ type procedure =
 type structure =
   { id : Token.t
   (* name * type * offset *)
-  ; members : (Token.t * TokenType.id_type * int) list
+  ; fields : (Token.t * TokenType.id_type * int) list
   ; size : int
   }
+
+type t =
+  { variables : ((string, variable) Hashtbl.t) list
+  ; procedures : (string, procedure) Hashtbl.t
+  ; structures : (string, structure) Hashtbl.t
+  }
+
+val create : Module.t -> t
