@@ -24,4 +24,5 @@ type t =
   ; structures : (string, structure) Hashtbl.t
   }
 
+val dump : t -> unit
 val create : Module.t -> t
