@@ -94,7 +94,7 @@ module TokenType : sig
     | Where
 
   val to_string : t -> string
-  val id_type_to_string : id_type -> string
+  val string_of_id_type : id_type -> string
 end
 
 module Token : sig

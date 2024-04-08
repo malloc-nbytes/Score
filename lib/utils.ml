@@ -52,7 +52,7 @@ let scr_type_to_bytes (type_: TokenType.id_type) =
   | TokenType.Array (_, Some len) -> Printf.sprintf "%d" (8 * len)
   | TokenType.Array (_, None) -> "8"
   | TokenType.Custom (id) -> ignore (id); failwith "todo"
-  | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.id_type_to_string type_)
+  | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.string_of_id_type type_)
 
 let scr_to_qbe_type (type_: TokenType.id_type) =
   match type_ with
@@ -69,16 +69,16 @@ let scr_to_qbe_type (type_: TokenType.id_type) =
   | TokenType.Array (_, _) -> "l"
   | TokenType.Custom _ -> "l"
   | TokenType.Pointer TokenType.Custom _ -> "l"
-  | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.id_type_to_string type_)
+  | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.string_of_id_type type_)
 
 let unwrap_array (type_: TokenType.id_type) =
   match type_ with
   | TokenType.Array (t, _) -> t
   | TokenType.Str -> type_
-  | _ -> failwith @@ Printf.sprintf "unwrap_array: %s not an array" (TokenType.id_type_to_string type_)
+  | _ -> failwith @@ Printf.sprintf "unwrap_array: %s not an array" (TokenType.string_of_id_type type_)
 
 let unwrap_ptr (type_: TokenType.id_type) =
   match type_ with
   | TokenType.Pointer t -> t
-  | _ -> failwith @@ Printf.sprintf "unwrap_ptr: %s not a pointer" (TokenType.id_type_to_string type_)
+  | _ -> failwith @@ Printf.sprintf "unwrap_ptr: %s not a pointer" (TokenType.string_of_id_type type_)
 

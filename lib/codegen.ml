@@ -1,10 +1,13 @@
 module Codegen = struct
   open Token
 
-  (* let scorety_to_llvmty (type_: TokenType.id_type) (ctx : Llvm.llcontext) = *)
-  (*     match type_ with *)
-  (*     | TokenType.I32 -> Llvm.i32_type ctx *)
-  (*     | _ -> failwith "todo" *)
+  let scorety_to_llvmty (type_: TokenType.id_type) (ctx : Llvm.llcontext) =
+      match type_ with
+      | TokenType.I32 -> Llvm.i32_type ctx
+      | TokenType.Usize -> Llvm.i64_type ctx
+      | _ -> failwith @@
+               Printf.sprintf "scorety_to_llvmty: unimplemented type: %s"
+                 (TokenType.string_of_id_type type_)
 
   let rec compile_expr expr ctx md nv builder : Llvm.llvalue =
     match expr with
@@ -17,7 +20,9 @@ module Codegen = struct
        (if Array.length (Llvm.params callee) <> List.length (pce.args) then
           failwith @@ Printf.sprintf "compile_expr: number of params past to procedure %s is incorrect" pce.id.lexeme);
        let args = List.map (fun a -> compile_expr a ctx md nv builder) pce.args in
-       Llvm.build_call (Llvm.i32_type ctx) callee (Array.of_list args) "calltmp" builder (* TODO: change i32_type *)
+
+       (* TODO: change i32_type *)
+       Llvm.build_call (Llvm.i32_type ctx) callee (Array.of_list args) "calltmp" builder
     | Ast.Binary be ->
        let lhs = compile_expr be.lhs ctx md nv builder
        and rhs = compile_expr be.rhs ctx md nv builder in
@@ -31,21 +36,21 @@ module Codegen = struct
         | _ -> failwith @@ Printf.sprintf "invalid binop: %s" be.op.lexeme)
     | _ -> failwith "todo"
 
-  (* let compile_procedure (stmt : Ast.proc_def_stmt) ctx md builder nv : unit = *)
-  (*   ignore nv; *)
-  (*   ignore ctx; *)
-  (*   ignore md; *)
-  (*   ignore stmt; *)
-  (*   ignore builder; *)
+  let compile_procedure (stmt : Ast.proc_def_stmt) ctx md builder nv : unit =
+    ignore nv;
+    ignore ctx;
+    ignore md;
+    ignore stmt;
+    ignore builder;
 
-  (*   let i32 = scorety_to_llvmty stmt.rettype ctx in *)
-  (*   let func_ty = Llvm.function_type i32 (Array.init (List.length stmt.params) (Fun.const i32)) in *)
-  (*   let func_def = Llvm.define_function stmt.id.lexeme func_ty md in *)
+    let proc_rettype = scorety_to_llvmty stmt.rettype ctx in
+    let proc_type = Llvm.function_type proc_rettype
+                      (Array.init (List.length stmt.params) (Fun.const proc_rettype)) in
+    let proc_def = Llvm.define_function stmt.id.lexeme proc_type md in
 
-  (*   ignore func_ty; *)
-  (*   ignore func_def; *)
-  (*   ignore compile_expr; *)
-  (*   failwith "todo" *)
+    ignore proc_type;
+    ignore proc_def;
+    failwith "todo"
 
   let codegen (module_ : Module.t) : unit =
     let the_context = Llvm.create_context () in
@@ -59,6 +64,7 @@ module Codegen = struct
     ignore module_;
     ignore builder;
     ignore compile_expr;
+    ignore compile_procedure;
 
     failwith "todo"
 

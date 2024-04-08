@@ -79,7 +79,7 @@ let err_type_mismatch ?(msg="") (t1 : Token.t option) (left_type : TokenType.id_
     | Some token ->
        (TokenType.to_string token.ttype) ^ " " ^ token.lexeme, Printf.sprintf "%s:%d:%d:" token.fp token.r token.c
     | None -> "None", "None" in
-  let lt_str = TokenType.id_type_to_string left_type
-  and rt_str = TokenType.id_type_to_string right_type in
+  let lt_str = TokenType.string_of_id_type left_type
+  and rt_str = TokenType.string_of_id_type right_type in
   Printf.eprintf " ERR\n%s\nReason: %s\nAt: %s\nTypes: %s ::: %s\n%s\n" failure reason at lt_str rt_str where
 

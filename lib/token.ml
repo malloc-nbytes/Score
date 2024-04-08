@@ -93,15 +93,15 @@ module TokenType = struct
     | Module
     | Where
 
-  let rec id_type_to_string = function
+  let rec string_of_id_type = function
     | I32 -> "I32"
     | Str -> "Str"
     | Usize -> "Usize"
     | Char -> "Char"
     | Void -> "Void"
-    | Pointer t -> "Pointer " ^ id_type_to_string t
+    | Pointer t -> "Pointer " ^ string_of_id_type t
     | Number -> "Number"
-    | Array (a,len) -> "Array " ^ id_type_to_string a ^ " len " ^ (match len with Some l -> string_of_int l | None -> "None")
+    | Array (a,len) -> "Array " ^ string_of_id_type a ^ " len " ^ (match len with Some l -> string_of_int l | None -> "None")
     | Custom s -> "Custom " ^ s
 
   (* Convert a Token to a string *)
@@ -127,7 +127,7 @@ module TokenType = struct
     | Type Char -> "Type Char"
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
-    | Type Pointer t -> "Type Pointer " ^ id_type_to_string t
+    | Type Pointer t -> "Type Pointer " ^ string_of_id_type t
     | Type Number -> "Number (SHOULD NOT BE USED)"
     | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
     | Type (Custom s) -> "Type Custom " ^ s
