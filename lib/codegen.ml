@@ -6,12 +6,18 @@ module Codegen = struct
   (*     | TokenType.I32 -> Llvm.i32_type ctx *)
   (*     | _ -> failwith "todo" *)
 
-  (* module SM = Map.Make(String) *)
-
-  let rec compile_expr (expr : Ast.expr) ctx md nv builder : Llvm.llvalue =
+  let rec compile_expr expr ctx md nv builder : Llvm.llvalue =
     match expr with
     | Ast.Term Ast.Intlit i -> Llvm.const_int (Llvm.i32_type ctx) (int_of_string i.lexeme)
     | Ast.Term Ast.Ident ident -> Hashtbl.find nv ident.lexeme
+    | Ast.Proc_call pce ->
+       let callee : Llvm.llvalue = match Llvm.lookup_function pce.id.lexeme md with
+         | Some k -> k
+         | None -> failwith @@ Printf.sprintf "compile_expr: procedure %s is not in scope" pce.id.lexeme in
+       (if Array.length (Llvm.params callee) <> List.length (pce.args) then
+          failwith @@ Printf.sprintf "compile_expr: number of params past to procedure %s is incorrect" pce.id.lexeme);
+       let args = List.map (fun a -> compile_expr a ctx md nv builder) pce.args in
+       Llvm.build_call (Llvm.i32_type ctx) callee (Array.of_list args) "calltmp" builder (* TODO: change i32_type *)
     | Ast.Binary be ->
        let lhs = compile_expr be.lhs ctx md nv builder
        and rhs = compile_expr be.rhs ctx md nv builder in
@@ -20,7 +26,8 @@ module Codegen = struct
         | {ttype = TokenType.Minus; _} -> Llvm.build_sub lhs rhs "subtmp" builder
         | {ttype = TokenType.Asterisk; _} -> Llvm.build_mul lhs rhs "multmp" builder
         | {ttype = TokenType.ForwardSlash; _} -> Llvm.build_udiv lhs rhs "divtmp" builder
-        | {ttype = TokenType.LessThan; _} -> Llvm.build_icmp Llvm.Icmp.Sgt lhs rhs "gttmp" builder
+        | {ttype = TokenType.GreaterThan; _} -> Llvm.build_icmp Llvm.Icmp.Sgt lhs rhs "gttmp" builder
+        | {ttype = TokenType.LessThan; _} -> Llvm.build_icmp Llvm.Icmp.Slt lhs rhs "lttmp" builder
         | _ -> failwith @@ Printf.sprintf "invalid binop: %s" be.op.lexeme)
     | _ -> failwith "todo"
 
