@@ -25,4 +25,5 @@ type t =
   }
 
 val dump : t -> unit
+val find_var : t -> string -> variable option
 val create : Module.t -> t

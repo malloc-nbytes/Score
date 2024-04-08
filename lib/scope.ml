@@ -41,6 +41,17 @@ let dump (scope : t) : unit =
   printf "structures:\n";
   Hashtbl.iter (fun (key : string) (value : structure) -> printf "  %s -> structure(%s)\n" key value.id.lexeme) scope.structures
 
+let find_var (scope : t) (id : string) =
+  let rec aux (s : (string, variable) Hashtbl.t list) =
+    match s with
+    | [] -> None
+    | hd :: tl ->
+      if Hashtbl.mem hd id then
+        Some (Hashtbl.find hd id)
+      else
+        aux tl in
+  aux scope.variables
+
 let create (module_ : Module.t) : t =
   let variables = Hashtbl.create 20 :: [] (* to be filled when traversing AST *)
   and procedures = Hashtbl.create 20
