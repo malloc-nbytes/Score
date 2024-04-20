@@ -36,31 +36,26 @@ module Codegen = struct
         | _ -> failwith @@ Printf.sprintf "invalid binop: %s" be.op.lexeme)
     | _ -> failwith "todo"
 
-  let compile_procedure (stmt : Ast.proc_def_stmt) ctx md builder nv : unit =
+  let compile_procedure (stmt : Ast.proc_def_stmt) ctx md builder nv : Llvm.llvalue =
     ignore nv;
-    ignore ctx;
-    ignore md;
-    ignore stmt;
     ignore builder;
 
     let proc_rettype = scorety_to_llvmty stmt.rettype ctx in
-    let proc_type = Llvm.function_type proc_rettype
-                      (Array.init (List.length stmt.params) (Fun.const proc_rettype)) in
-    let proc_def = Llvm.define_function stmt.id.lexeme proc_type md in
+    let ptypes = List.map (fun t -> scorety_to_llvmty t ctx) (List.map snd stmt.params) in
+    let proc_ty = Llvm.function_type proc_rettype (Array.of_list ptypes) in
+    let proc_def = Llvm.define_function stmt.id.lexeme proc_ty md in
 
-    ignore proc_type;
-    ignore proc_def;
-    failwith "todo"
+    proc_def
 
   let codegen (module_ : Module.t) : unit =
-    let the_context = Llvm.create_context () in
-    let the_module = Llvm.create_module the_context module_.modname in
-    let builder = Llvm.builder the_context in
-    let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 20 in
+    let ctx = Llvm.create_context () in
+    let md = Llvm.create_module ctx module_.modname in
+    let builder = Llvm.builder ctx in
+    let nv : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 20 in
 
-    ignore the_context;
-    ignore named_values;
-    ignore the_module;
+    ignore ctx;
+    ignore nv;
+    ignore md;
     ignore module_;
     ignore builder;
     ignore compile_expr;
