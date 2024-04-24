@@ -42,13 +42,24 @@ module Codegen = struct
         | _ -> failwith @@ Printf.sprintf "invalid binop: %s" be.op.lexeme)
     | _ -> failwith "todo"
 
-  let compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : Llvm.llvalue =
+  let compile_stmt st = ignore st; failwith "todo"
+
+  let compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : context * Llvm.llvalue =
     let proc_rettype = scorety_to_llvmty stmt.rettype context in
     let ptypes = List.map (fun t -> scorety_to_llvmty t context) (List.map snd stmt.params) in
     let proc_ty = Llvm.function_type proc_rettype (Array.of_list ptypes) in
     let proc_def = Llvm.define_function stmt.id.lexeme proc_ty context.md in
 
-    proc_def
+    let bb : Llvm.llbasicblock = Llvm.append_block context.ctx "entry" proc_def in
+    Llvm.position_at_end bb context.builder;
+
+    (* TODO: use context.nv *)
+    (* Hashtbl.clear context.nv; *)
+
+    let value : Llvm.llvalue = compile_stmt stmt.block in
+    let ret : Llvm.llvalue = Llvm.build_ret value context.builder in
+
+    context, ret
 
   let codegen (module_ : Module.t) : unit =
     let ctx = Llvm.create_context () in
@@ -58,8 +69,6 @@ module Codegen = struct
 
     let context = {ctx; md; builder; nv} in
 
-
-    ignore context;
     ignore context.ctx;
     ignore context.md;
     ignore context.builder;
