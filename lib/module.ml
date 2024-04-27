@@ -23,7 +23,10 @@ let rec iter_toplvl_stmts (ast : Ast.program) (asts : (string, Ast.program) Hash
        if modname <> "" then
          let depends = List.map (fun dep -> iter_toplvl_stmts (Hashtbl.find asts dep) asts []) import_deps in
          {modname; ast; depends; exported_procs; exported_types}
-       else failwith @@ Printf.sprintf "%s: no module name found" __FILE__
+       else
+         let _ = Printf.printf "[WARN] file has no module name\n" in
+         {modname="changeme"; ast; depends; exported_procs; exported_types}
+         (* failwith @@ Printf.sprintf "%s: no module name found" __FILE__ *)
     | Ast.Module m :: tl -> aux tl m.id.lexeme depends exported_procs exported_types
     | (Ast.Proc_def pd :: tl) when pd.export -> aux tl modname depends (pd :: exported_procs) exported_types
     | Ast.Struct _ :: _ -> failwith "iter_toplvl_stmts: Ast.Struct is unimplemented"
