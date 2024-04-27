@@ -1,3 +1,3 @@
 module Codegen : sig
-  val codegen : Module.t -> unit
+  val compile_program : Module.t -> unit
 end

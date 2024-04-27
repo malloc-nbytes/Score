@@ -42,9 +42,11 @@ module Codegen = struct
         | _ -> failwith @@ Printf.sprintf "invalid binop: %s" be.op.lexeme)
     | _ -> failwith "todo"
 
-  let compile_stmt st = ignore st; failwith "todo"
+  and compile_block_stmt (s : Ast.block_stmt) : Llvm.llvalue =
+    ignore s;
+    failwith "todo"
 
-  let compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : context * Llvm.llvalue =
+  and compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : context * Llvm.llvalue =
     let proc_rettype = scorety_to_llvmty stmt.rettype context in
     let ptypes = List.map (fun t -> scorety_to_llvmty t context) (List.map snd stmt.params) in
     let proc_ty = Llvm.function_type proc_rettype (Array.of_list ptypes) in
@@ -56,12 +58,34 @@ module Codegen = struct
     (* TODO: use context.nv *)
     (* Hashtbl.clear context.nv; *)
 
-    let value : Llvm.llvalue = compile_stmt stmt.block in
+    let value : Llvm.llvalue = compile_block_stmt stmt.block in
     let ret : Llvm.llvalue = Llvm.build_ret value context.builder in
 
     context, ret
 
-  let codegen (module_ : Module.t) : unit =
+  let compile_stmt (s : Ast.stmt) : Llvm.llvalue =
+    match s with
+    | Ast.Proc_def _ -> failwith "todo"
+    | Ast.Block _ -> failwith "todo"
+    | Ast.Let _ -> failwith "todo"
+    | Ast.Mut _ -> failwith "todo"
+    | Ast.If _ -> failwith "todo"
+    | Ast.While _ -> failwith "todo"
+    | Ast.Stmt_expr _ -> failwith "todo"
+    | Ast.Ret _ -> failwith "todo"
+    | Ast.Break _ -> failwith "todo"
+    | Ast.For _ -> failwith "todo"
+
+  let rec compile_toplvl_stmts (stmts : Ast.toplvl_stmt list) (context : context) : context =
+    match stmts with
+    | [] -> context
+    | hd :: tl ->
+      let context', _ = match hd with
+        | Ast.Proc_def pd -> compile_procedure pd context
+        | _ -> failwith "compile_toplvl_stmts: unreachable" in
+      compile_toplvl_stmts tl context'
+
+  let compile_program (module_ : Module.t) : unit =
     let ctx = Llvm.create_context () in
     let md = Llvm.create_module ctx module_.modname in
     let builder = Llvm.builder ctx in
@@ -69,6 +93,8 @@ module Codegen = struct
 
     let context = {ctx; md; builder; nv} in
 
+    ignore compile_toplvl_stmts;
+    ignore compile_stmt;
     ignore context.ctx;
     ignore context.md;
     ignore context.builder;
@@ -76,7 +102,7 @@ module Codegen = struct
     ignore compile_expr;
     ignore compile_procedure;
 
-    failwith "todo"
+    failwith "compile_program: unimplemented"
 
 end
 

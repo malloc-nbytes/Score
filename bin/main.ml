@@ -72,7 +72,8 @@ let () =
   let ast_tbl : (string, Ast.program) Hashtbl.t = Hashtbl.create 5 in
   List.iter (fun t -> Hashtbl.add ast_tbl (fst t) (snd t)) asts;
   let modules : Module.t list = Module.produce_modules ast_tbl import_deps in
-  ignore modules;
+
+  Codegen.Codegen.compile_program (List.nth modules 0);
 
   print_endline "[ Done ]"
 
