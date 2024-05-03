@@ -57,8 +57,8 @@ and compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : context *
   let proc_def = Llvm.define_function stmt.id.lexeme proc_ty context.md in
   ignore proc_def;
 
-  let bb : Llvm.llbasicblock = Llvm.append_block context.ctx "entry" proc_def in
-  Llvm.position_at_end bb context.builder;
+  (* let bb : Llvm.llbasicblock = Llvm.append_block context.ctx "entry" proc_def in *)
+  (* Llvm.position_at_end bb context.builder; *)
 
   (* TODO: use context.nv *)
   (* Hashtbl.clear context.nv; *)
