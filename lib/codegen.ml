@@ -50,15 +50,22 @@ and compile_block_stmt (s : Ast.block_stmt) (context : context) : context * Llvm
     | hd :: tl -> let ctx, v = compile_stmt hd context in aux tl ctx (Some v) in
   aux s.stmts context None
 
-and compile_procedure (stmt : Ast.proc_def_stmt) (context : context) : context * Llvm.llvalue =
+and compile_procedure_def (stmt : Ast.proc_def_stmt) (context : context) : context * Llvm.llvalue =
   let proc_rettype = scorety_to_llvmty stmt.rettype context in
   let ptypes = List.map (fun t -> scorety_to_llvmty t context) (List.map snd stmt.params) in
+
   let proc_ty = Llvm.function_type proc_rettype (Array.of_list ptypes) in
   let proc_def = Llvm.define_function stmt.id.lexeme proc_ty context.md in
-  ignore proc_def;
 
-  (* let bb : Llvm.llbasicblock = Llvm.append_block context.ctx "entry" proc_def in *)
-  (* Llvm.position_at_end bb context.builder; *)
+  let bb : Llvm.llbasicblock = Llvm.append_block context.ctx "entry" proc_def in
+  Llvm.position_at_end bb context.builder;
+
+  List.iter2 (fun (param, param_type) llvm_param ->
+      ignore param_type;
+      let param_name = param.Token.lexeme in
+      let param_value = llvm_param in
+      Hashtbl.add context.nv param_name param_value
+    ) stmt.params (Array.to_list (Llvm.params proc_def));
 
   (* TODO: use context.nv *)
   (* Hashtbl.clear context.nv; *)
@@ -71,9 +78,12 @@ and compile_ret_stmt (s : Ast.ret_stmt) (context : context) : Llvm.llvalue =
   Llvm.build_ret value context.builder
 
 and compile_let_stmt (s : Ast.let_stmt) (context : context) : context * Llvm.llvalue =
-  ignore s;
-  ignore context;
-  failwith "todo"
+  let ty = scorety_to_llvmty s.type_ context in
+  let value = compile_expr s.expr context in
+  let alloca = Llvm.build_alloca ty s.id.lexeme context.builder in
+  ignore (Llvm.build_store value alloca context.builder);
+  Hashtbl.add context.nv s.id.lexeme alloca;
+  context, alloca
 
 and compile_stmt (s : Ast.stmt) (context : context) : context * Llvm.llvalue =
   match s with
@@ -95,8 +105,8 @@ let rec compile_toplvl_stmts (stmts : Ast.toplvl_stmt list) (context : context) 
   | [] -> context
   | hd :: tl ->
      let context', _ = match hd with
-       | Ast.Proc_def pd -> compile_procedure pd context
-       | _ -> failwith "compile_toplvl_stmts: unreachable" in
+       | Ast.Proc_def pd -> compile_procedure_def pd context
+       | _ -> failwith "compile_toplvl_stmts: unimplemented toplvl statement" in
      compile_toplvl_stmts tl context'
 
 let compile_program (module_ : Module.t) : Llvm.llmodule =
@@ -113,4 +123,5 @@ let compile_program (module_ : Module.t) : Llvm.llmodule =
   ignore compile_stmt;
 
   context.md
+
 

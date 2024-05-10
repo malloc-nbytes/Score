@@ -63,7 +63,7 @@ let dump_modules mods =
 let () =
   ignore dump_modules;
 
-  let filepath = "input.scr" in
+  let filepath = "llvm-testing/input.scr" in
 
   Lexer.populate_keywords ();
   print_endline "[ Compiling ]";
