@@ -1,14 +1,9 @@
 open Token
 
-type variable =
-  { tok : Token.t
-  ; type_ : TokenType.id_type
-  }
-
 let g_ctx : Llvm.llcontext = Llvm.global_context ()
 let g_md : Llvm.llmodule = Llvm.create_module g_ctx "global module"
 let g_builder : Llvm.llbuilder = Llvm.builder g_ctx
-let g_nv : (((variable, Llvm.llvalue) Hashtbl.t) list) ref = ref (Hashtbl.create 20 :: [])
+let g_nv : (((string, TokenType.id_type * Llvm.llvalue) Hashtbl.t) list) ref = ref (Hashtbl.create 20 :: [])
 
 let nvpush () = g_nv := (Hashtbl.create 20) :: !g_nv
 
@@ -17,16 +12,16 @@ let nvpop () =
   | [] -> failwith "scope_pop: empty scope"
   | _ :: tl -> g_nv := tl
 
-let addvar_to_nv (var : variable) (value : Llvm.llvalue) : unit =
+let addvar_to_nv (name : string) (ty : TokenType.id_type) (value : Llvm.llvalue) : unit =
   match !g_nv with
   | [] -> failwith "addvar_to_nv: empty scope"
-  | hd :: _ -> Hashtbl.add hd var value
+  | hd :: _ -> Hashtbl.add hd name (ty, value)
 
-let findvar_in_nv (var : variable) : Llvm.llvalue =
+let findvar_in_nv (name : string) : TokenType.id_type * Llvm.llvalue =
   let rec aux lst =
     match lst with
-    | [] -> failwith "findvar_in_nv: variable not found"
-    | hd :: tl -> (match Hashtbl.find_opt hd var with
+    | [] -> failwith @@ Printf.sprintf "findvar_in_nv: variable %s not found" name
+    | hd :: tl -> (match Hashtbl.find_opt hd name with
                    | Some v -> v
                    | None -> aux tl) in
   aux !g_nv
@@ -48,7 +43,9 @@ let emit_entry_alloca (fn : Llvm.llvalue) (var_name : string) (var_ty : TokenTyp
 let rec compile_expr (expr : Ast.expr) : Llvm.llvalue =
   match expr with
   | Ast.Term Ast.Intlit i -> Llvm.const_int (Llvm.i32_type g_ctx) (int_of_string i.lexeme)
-  | Ast.Term Ast.Ident ident -> ignore ident; failwith "Todo"
+  | Ast.Term Ast.Ident ident ->
+      let (ty, value) = findvar_in_nv ident.lexeme in
+      Llvm.build_load (scorety_to_llvmty ty) value ident.lexeme g_builder
   | Ast.Proc_call pce ->
      let callee : Llvm.llvalue = match Llvm.lookup_function pce.id.lexeme g_md with
        | Some k -> k
@@ -91,13 +88,13 @@ and compile_procedure_def (stmt : Ast.proc_def_stmt) : Llvm.llvalue =
   List.iter2 (fun ((param : Token.t), (param_type : TokenType.id_type)) (llvm_param : Llvm.llvalue) ->
       let alloca = emit_entry_alloca proc_def param.lexeme param_type in
       let _ = Llvm.build_store llvm_param alloca g_builder in
-      addvar_to_nv {tok = param; type_ = param_type} alloca
+      addvar_to_nv param.lexeme param_type alloca
     ) stmt.params (Array.to_list (Llvm.params proc_def));
 
-  let ret = compile_block_stmt stmt.block in
-  nvpop ();
+  let _ = compile_block_stmt stmt.block in
 
-  ret
+  nvpop ();
+  proc_def
 
 and compile_ret_stmt (s : Ast.ret_stmt) : Llvm.llvalue =
   let value = compile_expr (unwrap s.expr) in
