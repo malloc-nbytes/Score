@@ -22,61 +22,22 @@
 
 open Lib
 
-let import_deps : ((string, string list) Hashtbl.t) = Hashtbl.create 20
-let compiled_files : (string list) ref = ref []
-
-let get_ast (filepath : string) : Ast.program =
-  let src_code = Utils.file_to_str filepath in
-  let tokens = Lexer.lex_file filepath (String.to_seq src_code |> List.of_seq) 1 1 in
-  Parser.produce_ast tokens
-
-let rec make (filepath : string) : (string * Ast.program) list =
-  if List.mem filepath !compiled_files then []
-  else
-    let ast = get_ast filepath in
-    let imports = Module.gather_imports ast in
-
-    compiled_files := [filepath] @ !compiled_files;
-    Hashtbl.add import_deps filepath imports;
-
-    let rec aux = function
-      | [] -> []
-      | hd :: tl -> make hd @ aux tl in
-
-    (filepath, ast) :: aux imports
-
-(* debugging *)
-let dump_modules mods =
-  List.iter (fun m ->
-      let open Module in
-      Printf.printf "modname: %s\n" m.modname;
-      Printf.printf "depends:\n";
-
-      List.iter (fun d ->
-          Printf.printf "  %s\n" d.modname
-        ) m.Module.depends;
-
-      Printf.printf "ast:\n";
-      Ast.dump_toplvl_stmts m.ast;
-      print_endline "") mods
-
 let () =
-  ignore dump_modules;
-
-  let filepath = "llvm-testing/input.scr" in
+  let filepath = "src/input.scr" in
+  let src_code = Utils.file_to_str filepath
+                 |> String.to_seq
+                 |> List.of_seq in
 
   Lexer.populate_keywords ();
   print_endline "[ Compiling ]";
 
-  let asts = make filepath in
-  let ast_tbl : (string, Ast.program) Hashtbl.t = Hashtbl.create 5 in
-  List.iter (fun t -> Hashtbl.add ast_tbl (fst t) (snd t)) asts;
-  let modules : Module.t list = Module.produce_modules ast_tbl import_deps in
+  let tokens = Lexer.lex_file filepath src_code 1 1 in
 
-  let md : Llvm.llmodule = Codegen.compile_program (List.nth modules 0) in
-  Llvm.dump_module md;
+  print_int @@ List.length tokens;
 
-  ignore md;
+  Lexer.print_tokens tokens;
+
+  let ast = Parser.produce_ast tokens in
+  ignore ast;
 
   print_endline "[ Done ]"
-

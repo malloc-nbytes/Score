@@ -20,8 +20,6 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-open Token
-
 let unwrap = function
   | Some k -> k
   | None -> failwith "unwrap: tried to unwrap a None value"
@@ -36,49 +34,4 @@ let write_to_file filepath content =
   let oc = open_out filepath in
   let _ = Printf.fprintf oc "%s" content in
   close_out oc
-
-let scr_type_to_bytes (type_: TokenType.id_type) =
-  match type_ with
-  | TokenType.I32 -> "4"
-  | TokenType.Usize -> "8"
-  | TokenType.Str -> "8"
-  | TokenType.Char -> "1"
-  | TokenType.Pointer _ -> "8"
-  | TokenType.Number -> "4"
-  | TokenType.Array (TokenType.Str, Some len) -> Printf.sprintf "%d" (8 * len)
-  | TokenType.Array (TokenType.I32, Some len) -> Printf.sprintf "%d" (4 * len)
-  | TokenType.Array (TokenType.Char, Some len) -> Printf.sprintf "%d" (1 * len)
-  | TokenType.Array (TokenType.Custom (id), Some len) -> ignore (id); ignore(len); failwith "todo"
-  | TokenType.Array (_, Some len) -> Printf.sprintf "%d" (8 * len)
-  | TokenType.Array (_, None) -> "8"
-  | TokenType.Custom (id) -> ignore (id); failwith "todo"
-  | _ -> failwith @@ Printf.sprintf "scr_type_to_bytes: invalid type: %s" (TokenType.string_of_id_type type_)
-
-let scr_to_qbe_type (type_: TokenType.id_type) =
-  match type_ with
-  | TokenType.I32 -> "w"
-  | TokenType.Usize -> "l"
-  | TokenType.Str -> "l"
-  | TokenType.Char -> "b" (* NOTE: was originally `b` *)
-  | TokenType.Number -> "w"
-  | TokenType.Pointer TokenType.I32 -> "l"
-  | TokenType.Pointer TokenType.Usize -> "l"
-  | TokenType.Pointer TokenType.Str -> "l"
-  | TokenType.Pointer TokenType.Char -> "l"
-  | TokenType.Void -> ""
-  | TokenType.Array (_, _) -> "l"
-  | TokenType.Custom _ -> "l"
-  | TokenType.Pointer TokenType.Custom _ -> "l"
-  | _ -> failwith @@ Printf.sprintf "scr_to_qbe_type: invalid qbe type: %s" (TokenType.string_of_id_type type_)
-
-let unwrap_array (type_: TokenType.id_type) =
-  match type_ with
-  | TokenType.Array (t, _) -> t
-  | TokenType.Str -> type_
-  | _ -> failwith @@ Printf.sprintf "unwrap_array: %s not an array" (TokenType.string_of_id_type type_)
-
-let unwrap_ptr (type_: TokenType.id_type) =
-  match type_ with
-  | TokenType.Pointer t -> t
-  | _ -> failwith @@ Printf.sprintf "unwrap_ptr: %s not a pointer" (TokenType.string_of_id_type type_)
 

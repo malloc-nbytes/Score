@@ -27,7 +27,6 @@ module TokenType : sig
     | Usize
     | Char
     | Void
-    | Number (* NOT TO BE USED IN PARSING *)
     | Pointer of id_type
     | Array of id_type * (int option)
     | Custom of string
@@ -104,7 +103,6 @@ module Token : sig
     ; r : int
     ; c : int
     ; fp : string
-    ; macro : string option
     }
 
   val to_string : t -> string

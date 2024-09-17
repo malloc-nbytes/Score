@@ -23,551 +23,269 @@
 open Token
 open Ast
 
-(* Takes a list and splits the head from the tail
- * and returns both. Should be used when wanting to
- * consume the head, but still use it. *)
-let pop (lst : Token.t list) : Token.t * Token.t list =
-  match lst with
+let expect (tokens : Token.t list) (ty : TokenType.t) : Token.t * (Token.t list) =
+  match tokens with
   | [] ->
      let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
      exit 1
-  | hd :: tl -> hd, tl
-
-(* Takes a list of tokens and an expected token type.
- * If the type of the head of the list does not match `exp`,
- * it will fail. It will also fail if `lst` is empty. Will
- * return the head and tail split from each other. This function
- * should be used instead of `pop ()` when we want to assure a
- * specific type. *)
-let expect (lst : Token.t list) (exp : TokenType.t) : Token.t * Token.t list =
-  let open Printf in
-  match lst with
-  | [] ->
-     let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
-     exit 1
-  | hd :: _ when hd.ttype <> exp ->
-     let actual = TokenType.to_string hd.ttype
-     and expected = TokenType.to_string exp in
-     let _ = Err.err Err.Syntax __FILE__ __FUNCTION__
-               ~msg:(sprintf "expected %s but got %s" expected actual) @@ Some hd in exit 1
-  | hd :: tl -> hd, tl
-
-(* Helper function to expect a type and also retrive it as well
- * as the rest of the tokens. *)
-let expect_primitive_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-  match tokens with
-  | {ttype = TokenType.Type (TokenType.Void as hd); _} :: tl -> hd, tl
-  | {ttype = TokenType.Type (TokenType.I32 as hd); _} :: tl -> hd, tl
-  | {ttype = TokenType.Type (TokenType.Usize as hd); _} :: tl -> hd, tl
-  | {ttype = TokenType.Type (TokenType.Char as hd); _} :: tl -> hd, tl
-  | {ttype = TokenType.Type (TokenType.Str as hd); _} :: tl -> hd, tl
-  (* Custom Types *)
-  | {ttype = TokenType.Identifier; _} as hd :: tl -> TokenType.Custom (hd.lexeme), tl
-  | _ ->
-     let t = List.hd tokens in
-     let _ = Err.err Err.Missing_type __FILE__ __FUNCTION__
-               ~msg:(Printf.sprintf "expected Type but got %s" @@ TokenType.to_string t.ttype) @@ Some t in exit 1
-
-(* Takes a token list and will peek the top
- * token. If something exists, return Some (`hd`).
- * Otherwise, return None. *)
-let rec peek (lst : Token.t list) (i : int) : Token.t option =
-  match i, lst with
-  | 0, hd :: _ -> Some hd
-  | k, _ :: tl -> peek tl (k - 1)
-  | _ -> None
-
-let rec parse_comma_sep_exprs (tokens : Token.t list) (acc : Ast.expr list) : (Ast.expr list) * Token.t list =
-  let expr, tokens = parse_expr tokens in
-  match peek tokens 0 with
-  | Some {ttype = TokenType.Comma; _} ->
-     let _, tokens = pop tokens in
-     parse_comma_sep_exprs tokens @@ acc @ [expr]
-  | Some {ttype = TokenType.RBrace; _} -> acc @ [expr], tokens
-  | _ -> acc, tokens
-
-(* The last level of expression parsing. Checks for an
- * identifier, integer literal etc. If a left paren `(` is
- * encountered, it will recurse back to the first level of
- * expression parsing and work that sub-expression back up
- * to this level. *)
-and parse_primary_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  match tokens with
-  | {ttype = TokenType.Identifier; _} as id :: tl ->
-     (match peek tl 0 with
-      | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
-         let proc_call, tokens = parse_proc_call (id :: tl) in
-         Ast.Proc_call proc_call, tokens
-      | Some {ttype = TokenType.LBracket; _} -> (* Array indexing *)
-         let _, tokens = expect tl TokenType.LBracket in
-         let index, tokens = parse_expr tokens in
-         let _, tokens = expect tokens TokenType.RBracket in
-         Ast.Array_retrieval {id; index}, tokens
-      | Some {ttype = TokenType.Period; _} -> (* Struct access *)
-         let _, tokens = expect tl TokenType.Period in
-         let member, tokens = expect tokens TokenType.Identifier in
-         Ast.Term (Ast.Struct_access {id; member}), tokens
-      | _ -> Ast.Term (Ast.Ident id), tl) (* Variable *)
-
-  | {ttype = TokenType.Type casted_type; _} :: tl ->
-     let expr, tokens = parse_expr tl in
-     Ast.Cast (casted_type, expr), tokens
-
-  | {ttype = TokenType.Ampersand; _} :: tl -> (* Taking the address of an ident *)
-     let expr, tokens = parse_primary_expr tl in
-     (match expr with
-      | (Ast.Term Ast.Ident _) as term -> Ast.Reference term, tokens
-      | _ -> failwith "References must take the address of an identifier")
-
-  | {ttype = TokenType.Asterisk; _} :: tl -> (* Dereferencing an ident *)
-     let expr, tokens = parse_primary_expr tl in
-     (match expr with
-      | (Ast.Term Ast.Ident _) as term -> Ast.Dereference term, tokens
-      | _ -> failwith "FIXME: Dereferences must take the address of an identifier")
-
-  | {ttype = TokenType.IntegerLiteral; _} as intlit :: tl -> Ast.Term (Ast.Intlit intlit), tl
-  | {ttype = TokenType.StringLiteral; _} as strlit :: tl -> Ast.Term (Ast.Strlit strlit), tl
-  | {ttype = TokenType.Null; _} :: tl -> Ast.Term (Ast.Intlit Token.{lexeme="0"; ttype=TokenType.IntegerLiteral; r=0; c=0; fp=""; macro=None}), tl
-  | {ttype = TokenType.Character; _} as chara :: tl -> Ast.Term (Ast.Char chara), tl
-
-  | {ttype = TokenType.LParen; _} :: tl ->
-     let expr, tokens = parse_expr tl in
-     let _, tokens = expect tokens TokenType.RParen in
-     expr, tokens
-
-  | {ttype = TokenType.LBrace; _} :: tl ->
-     (match peek tl 0 with
-      | Some {ttype = TokenType.RBrace; _} -> (* Empty compound literal *)
-         let _, tokens = expect tl TokenType.RBrace in
-         Ast.Term (Ast.IntCompoundLit ([], None)), tokens
-      | _ ->
-         let exprs, tokens = parse_comma_sep_exprs tl [] in
-         let _, tokens = expect tokens TokenType.RBrace in
-         Ast.Term (Ast.IntCompoundLit (exprs, Some (List.length exprs))), tokens)
-
-  | [] -> let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in exit 1
+  | hd :: tl when hd.Token.ttype = ty -> hd, tl
   | hd :: _ ->
-     let _ = Err.err Err.Unknown_token __FILE__ __FUNCTION__ @@ Some hd in
+     let msg = Printf.sprintf "Expected token of type `%s` but got `%s`" (TokenType.to_string ty) (TokenType.to_string hd.ttype) in
+     let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:msg (Some hd) in
      exit 1
 
-(* The fifth level of expression parsing. Deals with multiplicative
- * operators `*`, `/` etc. *)
-and parse_mult_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
+let maybe_expect tokens ty =
+  match tokens with
+  | [] ->
+     let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
+     exit 1
+  | hd :: tl when hd.Token.ttype = ty -> Some hd, tl
+  | tokens -> None, tokens
+
+let rec expect_idtype (tokens : Token.t list) : TokenType.id_type * (Token.t list) =
+  match tokens with
+  | [] ->
+     let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
+     exit 1
+  | {ttype = _ as ty; _} as hd :: tl ->
+     (match ty with
+     | TokenType.Type k -> k, tl
+     | _ ->
+       let msg = Printf.sprintf "Expected token of type `Type` but got `%s`" (TokenType.to_string hd.ttype) in
+       let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:msg (Some hd) in
+       exit 1)
+
+and parse_comma_sep_exprs tokens =
+  let open Token in
+  let open TokenType in
+
+  let rec aux tokens acc =
     match tokens with
-    | {ttype = TokenType.Asterisk; _}
-      | {ttype = TokenType.ForwardSlash; _}
-      | {ttype = TokenType.Percent; _} as op :: tl ->
-       let (rhs : Ast.expr), tokens = parse_primary_expr tl in
-       aux tokens (Binary {lhs; rhs; op})
-    | _ -> lhs, tokens
-  in
-  let lhs, tokens = parse_primary_expr tokens in
-  aux tokens lhs
+    | ({ttype = RParen; _} | {ttype = RBracket; _}) :: tl -> acc, tl
+    | _ ->
+       let expr, tokens = parse_expr tokens in
+       (match tokens with
+        | {ttype = Comma; _} :: tl -> aux tl (acc @ [expr])
+        | _ -> acc, tokens) in
+  aux tokens []
 
-(* The fourth level of expression parsing. Deals with additive
- * operators `+`, `-` etc. *)
-and parse_add_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
-    match tokens with
-    | {ttype = TokenType.Plus; _}
-      | {ttype = TokenType.Minus; _} as op :: tl ->
-       let (rhs : Ast.expr), tokens = parse_mult_expr tl in
-       aux tokens (Binary {lhs; rhs; op})
-    | _ -> lhs, tokens
-  in
-  let lhs, tokens = parse_mult_expr tokens in
-  aux tokens lhs
+and parse_primary_expr tokens =
+  let open Token in
 
-(* The third level of expression parsing. Deals with equality
- * operators `==`, `<`, `>=` etc. *)
-and parse_eq_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
-    match tokens with
-    | {ttype = TokenType.DoubleEquals; _}
-      | {ttype = TokenType.GreaterThan; _}
-      | {ttype = TokenType.GreaterThanEqual; _}
-      | {ttype = TokenType.LessThanEqual; _}
-      | {ttype = TokenType.NotEqual; _}
-      | {ttype = TokenType.LessThan; _} as op :: tl ->
-       let (rhs : Ast.expr), tokens = parse_add_expr tl in
-       aux tokens (Binary {lhs; rhs; op})
-    | _ -> lhs, tokens
-  in
-  let lhs, tokens = parse_add_expr tokens in
-  aux tokens lhs
-
-(* The second level of expression parsing. Deals with logical
- * operators `&&`, `||` etc. *)
-and parse_logical_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  let rec aux (tokens : Token.t list) (lhs : Ast.expr) : Ast.expr * Token.t list =
-    match tokens with
-    | {ttype = TokenType.DoubleAmpersand; _}
-      | {ttype = TokenType.DoublePipe; _} as op :: tl ->
-       let (rhs : Ast.expr), tokens = parse_eq_expr tl in
-       aux tokens (Binary {lhs; rhs; op})
-    | _ -> lhs, tokens
-  in
-  let lhs, tokens = parse_eq_expr tokens in
-  aux tokens lhs
-
-(* The first level of expression parsing. All expressions
- * that need parsing will call this function. *)
-and parse_expr (tokens : Token.t list) : Ast.expr * Token.t list =
-  let expr, tokens = parse_logical_expr tokens in
-  expr, tokens
-
-(* Parses the block statement aka `{...}`. Does not consume
- * `{`, as it is the job of the caller. *)
-and parse_block_stmt (tokens : Token.t list) : Ast.block_stmt * Token.t list =
-  let rec aux (tokens : Token.t list) (acc : Ast.stmt list) : Ast.stmt list * Token.t list =
+  let rec aux tokens left =
     match tokens with
     | [] ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
-    | {ttype = TokenType.RBrace; _} :: tl -> acc, tl
-    | lst ->
-       let stmt, tokens = parse_stmt lst in
-       aux tokens @@ acc @ [stmt] in
-  let stmts, tokens = aux tokens [] in
-  Ast.{stmts}, tokens
+    | {ttype = Identifier; _} as id :: tl -> aux tl @@ Some (Ast.Term (Ast.Ident id))
+    | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
+    | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
+    | {ttype = LParen; _} :: tl ->
+       let args, tokens = parse_comma_sep_exprs tl in
+       let _, tokens = expect tokens RParen in
+       (match left with
+        (* Procedure call *)
+        | Some lhs -> aux tokens @@ Some (Ast.Term (Ast.Proc_Call Ast.{lhs; args}))
+        (* Tuple *)
+        | _ when List.length args > 1 -> failwith "tuples are unimplemented"
+        (* Math *)
+        | _ -> aux tokens @@ Some (List.hd args))
+    | _ -> left, tokens in
 
-(* TokenType.RParen *)
+  aux tokens None
 
-and gather_params (tokens : Token.t list) (acc : (Token.t * TokenType.id_type) list)
-    : (Token.t * TokenType.id_type) list * Token.t list =
-  match tokens with
-  | {ttype = TokenType.RParen; _} :: tl -> acc, tl
-  | {ttype = TokenType.Identifier; _} as id :: tl ->
-     let _, tokens = expect tl TokenType.Colon in
-     let type_, tokens = parse_type tokens in
-     let next, tokens = pop tokens in
-     let acc = acc @ [id, type_] in
-     (match next with
-      | {ttype = TokenType.RParen; _} -> acc, tokens
-      | {ttype = TokenType.Comma; _} -> gather_params tokens acc
-      | _ ->
-         let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ None in
-         exit 1)
-  | {ttype = TokenType.Type TokenType.Void; _} :: {ttype = TokenType.RParen; _} :: tl -> [], tl
-  | hd :: _ ->
-     let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__ @@ Some hd in
-     exit 1
-  | [] ->
-     let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
-               ~msg:"unterminated function definition" None in
-     exit 1
+and parse_multiplicative_expr tokens =
+  let open Token in
+  let open TokenType in
 
-(* Given a list of tokens, will parse a function definition
- * returning an Ast.node_stmt w/ constructor Ast.node_stmt_block.
- * Does not need to consume `proc` keyword as the caller
- * function `parse_stmt` or `parse_toplvl_stmt` already does. *)
-and parse_proc_def_stmt (tokens : Token.t list) : Ast.proc_def_stmt * Token.t list =
-  let export, tokens = match peek tokens 0 with
-    | Some {ttype = TokenType.Export; _} ->
-       let _, tokens = expect tokens TokenType.Export in
-       let _, tokens = expect tokens TokenType.Proc in
-       true, tokens
-    | _ -> false, tokens in
-
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.LParen in
-
-  match peek tokens 0 with
-  | Some {ttype = TokenType.Identifier; _} | Some {ttype = TokenType.Type TokenType.Void; _} ->
-     let params, tokens = gather_params tokens [] in  (* Consumes `)` *)
-     let _, tokens = expect tokens TokenType.Colon in
-     let rettype, tokens = parse_type tokens in
-     let _, tokens = expect tokens TokenType.LBrace in
-     let block, tokens = parse_block_stmt tokens in
-     Ast.{id; params; block; rettype; export}, tokens
-  | Some t ->
-     let _ = Err.err Err.Malformed_proc_def __FILE__ __FUNCTION__
-               ~msg:"procedure definitions must either have parameters or `void`" (Some t) in
-     exit 1
-  | None ->
-     let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
-     exit 1
-
-and parse_mut_stmt (tokens : Token.t list) : Ast.mut_stmt * Token.t list =
-  let left, tokens = parse_primary_expr tokens in
-  let op, tokens = pop tokens in
-  match op with
-  | {ttype = TokenType.Equals; _} ->
-     let right, tokens = parse_expr tokens in
-     let _, tokens = expect tokens TokenType.Semicolon in
-     Ast.{left; right}, tokens
-  | {ttype = TokenType.PlusEquals; _}
-    | {ttype = TokenType.MinusEquals; _}
-    | {ttype = TokenType.AsteriskEquals; _}
-    | {ttype = TokenType.ForwardSlashEquals; _}
-    | {ttype = TokenType.PercentEquals; _} as op ->
-     let right, tokens = parse_expr tokens in
-     let right = Ast.Binary {lhs = left; rhs = right; op} in
-     let _, tokens = expect tokens TokenType.Semicolon in
-     Ast.{left; right}, tokens
-  | _ ->
-     let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ @@ Some op in
-     exit 1
-
-(* Helper function to parse types *)
-and parse_type (tokens : Token.t list) : TokenType.id_type * Token.t list =
-  let type_, tokens = expect_primitive_type tokens in
-  match peek tokens 0 with (* Check for tokens after primitive type ie `[` *)
-  | Some {ttype = TokenType.LBracket; _} -> (* Parsing array type *)
-     let _, tokens = expect tokens TokenType.LBracket in
-     let len, tokens = match peek tokens 0 with (* parsing [] *)
-       | Some {ttype = TokenType.IntegerLiteral; _} ->
-          let len, tokens = expect tokens TokenType.IntegerLiteral in
-          Some len, tokens
-       | Some {ttype = TokenType.Period; _} ->
-          let _, tokens = expect tokens TokenType.Period in
-          let _, tokens = expect tokens TokenType.Period in
-          Some Token.{ttype = IntegerLiteral; lexeme = "-1"; r=0; c=0; fp=""; macro=None}, tokens
-       | _ ->
-          (let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                     ~msg:"array decl must either be an integer or `..`" (peek tokens 0) in exit 1) in
-     let _, tokens = expect tokens TokenType.RBracket in
-     TokenType.Array (type_, match len with | Some len -> Some (int_of_string len.lexeme) | _ -> None), tokens
-  | Some {ttype = TokenType.Ref; _} ->
-     let _, tokens = expect tokens TokenType.Ref in
-     TokenType.Pointer type_, tokens
-  | _ -> type_, tokens (* Not array *)
-
-(* Parses the statement of `let`. The `let` keyword
- * has already been consumed by higher order function `parse_stmt`. *)
-and parse_let_stmt (tokens : Token.t list) : Ast.let_stmt * Token.t list =
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.Colon in
-  let type_, tokens = parse_type tokens in
-  let _, tokens = expect tokens TokenType.Equals in
-  let expr, tokens = parse_expr tokens in
-
-  match type_, expr with
-  (* Array lens do not match *)
-  | TokenType.Array (_, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some len')) when len <> len' && len <> -1 ->
-     (match List.hd exprs with (* Only used when parsing `IntCompoundLit` *)
-      | Ast.Term (Ast.Intlit t) when t.lexeme = "0" -> (* Checks for 0 initialization *)
-         (* let exprs = exprs @ (List.init (len - len') *)
-         (*                        (fun _ -> Ast.Term (Ast.Intlit Token.{ttype = TokenType.IntegerLiteral; lexeme = "0"; r=0; c=0; fp=""; macro=None}))) in *)
-         (* let expr = Ast.Term (Ast.IntCompoundLit (exprs @ exprs, (Some len))) in *)
-         (* let _, tokens = expect tokens TokenType.Semicolon in *)
-         (* Ast.{id; type_; expr}, tokens *)
-         failwith "0 initialization for arrays is unimplemented"
-      | _ -> (* The initialization is not 0 *)
-         let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-                   ~msg:"array sizes do not match or it is not zero initialized" (Some (List.hd tokens)) in
-         exit 1)
-  (* Cases where `..` is in array type *)
-  | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, Some _)) when len = -1 ->
-     let _, tokens = expect tokens TokenType.Semicolon in
-     (* Array of id_type * (int option) *)
-     let type_ = TokenType.Array (t, Some (List.length exprs)) in
-     Ast.{id; type_; expr}, tokens
-  | TokenType.Array (t, Some len), Ast.Term (Ast.IntCompoundLit (exprs, None)) -> (* empty array init *)
-     let _, tokens = expect tokens TokenType.Semicolon in
-     let type_ = TokenType.Array (t, Some len) in
-     let expr = Ast.Term (Ast.IntCompoundLit (exprs, Some len)) in
-     Ast.{id; type_; expr}, tokens
-  | _ ->
-     let _, tokens = expect tokens TokenType.Semicolon in
-     Ast.{id; type_; expr}, tokens
-
-(* Parses the if statement. *)
-and parse_if_stmt (tokens : Token.t list) : Ast.if_stmt * Token.t list =
-  let expr, tokens = parse_expr tokens in
-  let _, tokens = expect tokens TokenType.LBrace in
-  let block, tokens = parse_block_stmt tokens in
-  (match tokens with
-   | {ttype = TokenType.Else; _} :: ({ttype = TokenType.If; _}) :: tl2 ->
-      let if_, tokens = parse_if_stmt tl2 in
-      let else_ = Ast.{stmts = [Ast.If if_]} in
-      Ast.{expr; block; else_ = Some else_}, tokens
-   | {ttype = TokenType.Else; _} :: tl ->
-      let _, tokens = expect tl TokenType.LBrace in
-      let else_, tokens = parse_block_stmt tokens in
-      Ast.{expr; block; else_ = Some else_}, tokens
-   | _ -> Ast.{expr; block; else_ = None}, tokens)
-
-(* Parses the while statement. *)
-and parse_while_stmt (tokens : Token.t list) : Ast.while_stmt * Token.t list =
-  let expr, tokens = parse_expr tokens in
-  let _, tokens = expect tokens TokenType.LBrace in
-  let block, tokens = parse_block_stmt tokens in
-  Ast.{expr; block}, tokens
-
-(* Parses the stmt_expr of a procedure call. *)
-and parse_proc_call (tokens : Token.t list) : Ast.proc_call_expr * Token.t list =
-  let rec parse_args (tokens : Token.t list) (acc : Ast.expr list) : Ast.expr list * Token.t list =
+  let rec aux tokens lhs =
     match tokens with
-    | {ttype = TokenType.RParen; _} :: _ -> acc, tokens (* Case for no args *)
-    | tokens ->
-       let expr, tokens = parse_expr tokens in
-       let acc = acc @ [expr] in
-       (match peek tokens 0 with
-        | Some {ttype = TokenType.Comma; _} -> parse_args (List.tl tokens) acc
-        | _ -> acc, tokens) in
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.LParen in
-  let args, tokens = parse_args tokens [] in
-  let _, tokens = expect tokens TokenType.RParen in
-  (* let _, tokens = expect tokens TokenType.Semicolon in *)
-  Ast.{id; args}, tokens
+    | {ttype = Asterisk; _} | {ttype = ForwardSlash; _} | {ttype = Percent; _} as op :: tl ->
+       let rhs, tokens = match parse_primary_expr tl with
+         | Some expr, tokens -> expr, tokens
+         | _ -> failwith "invalid expression" in
+       aux tokens (Ast.Binary {lhs; rhs; op})
+    | _ -> lhs, tokens in
 
-(* Parses the `return` statement. *)
-and parse_ret_stmt (tokens : Token.t list) : Ast.ret_stmt * Token.t list =
-  match peek tokens 0 with
-  | Some {ttype = TokenType.Semicolon; _} -> (* Allows for no expr after `return` *)
-     let _, tokens = expect tokens TokenType.Semicolon in
-     Ast.{expr = None}, tokens
-  | _ ->
-     let expr, tokens = parse_expr tokens in
-     let _, tokens = expect tokens TokenType.Semicolon in
-     Ast.{expr = Some expr}, tokens
+  let lhs, tokens = match parse_primary_expr tokens with
+    | Some expr, tokens -> expr, tokens
+    | _ -> failwith "invalid expression" in
+  aux tokens lhs
 
-(* Parses the `break` statement. *)
-and parse_break_stmt (tokens : Token.t list) : Token.t * Token.t list =
-  let b, tokens = expect tokens TokenType.Break in
-  let _, tokens = expect tokens TokenType.Semicolon in
-  b, tokens
+and parse_additive_expr tokens =
+  let open Token in
+  let open TokenType in
 
-(* Parses the `for` statement. *)
-and parse_for_stmt (tokens : Token.t list) : Ast.for_stmt * Token.t list =
-  let parse_for_stmt' (tokens : Token.t list) : Ast.stmt * Ast.expr * Ast.stmt * Token.t list =
-    let init, tokens = parse_stmt tokens in
-    let cond, tokens = parse_expr tokens in
-    let _, tokens = expect tokens TokenType.Semicolon in
-    let after, tokens = parse_stmt tokens in
-    init, cond, after, tokens in
+  let rec aux tokens lhs =
+    match tokens with
+    | {ttype = Plus; _} | {ttype = Minus; _} as op :: tl ->
+       let rhs, tokens = parse_multiplicative_expr tl in
+       aux tokens (Ast.Binary {lhs; rhs; op})
+    | _ -> lhs, tokens in
 
-  match peek tokens 0 with
-  | Some {ttype = TokenType.LParen; _} -> (* Allows for starting the loop with `(`. *)
-     let _, tokens = expect tokens TokenType.LParen in
-     let init, cond, after, tokens = parse_for_stmt' tokens in
-     let _, tokens = expect tokens TokenType.RParen in
-     let _, tokens = expect tokens TokenType.LBrace in
-     let block, tokens = parse_block_stmt tokens in
-     Ast.{init; cond; after; block}, tokens
-  | _ -> (* No parenthesis *)
-     let init, cond, after, tokens = parse_for_stmt' tokens in
-     let _, tokens = expect tokens TokenType.LBrace in
-     let block, tokens = parse_block_stmt tokens in
-     Ast.{init; cond; after; block}, tokens
+  let lhs, tokens = parse_multiplicative_expr tokens in
+  aux tokens lhs
 
-(* Given a list of tokens, will parse the "outer" statements
- * aka function defs, structs etc. *)
-and parse_stmt (tokens : Token.t list) : Ast.stmt * Token.t list =
+and parse_equalitative_expr tokens =
+  let open Token in
+  let open TokenType in
+
+  let rec aux tokens lhs =
+    match tokens with
+    | {ttype = DoubleEquals; _}
+      | {ttype = GreaterThan; _}
+      | {ttype = GreaterThanEqual; _}
+      | {ttype = LessThanEqual; _}
+      | {ttype = NotEqual; _}
+      | {ttype = LessThan; _} as op :: tl ->
+       let rhs, tokens = parse_additive_expr tl in
+       aux tokens (Ast.Binary {lhs; rhs; op})
+    | _ -> lhs, tokens in
+
+  let lhs, tokens = parse_additive_expr tokens in
+  aux tokens lhs
+
+and parse_logical_expr tokens =
+  let open Token in
+  let open TokenType in
+
+  let rec aux tokens lhs =
+    match tokens with
+    | {ttype = DoubleAmpersand; _} | {ttype = DoublePipe; _} as op :: tl ->
+       let rhs, tokens = parse_equalitative_expr tl in
+       aux tokens (Ast.Binary {lhs; rhs; op})
+    | _ -> lhs, tokens in
+
+  let lhs, tokens = parse_equalitative_expr tokens in
+  aux tokens lhs
+
+and parse_expr tokens =
+  let expr, tokens = parse_logical_expr tokens in
+  expr, tokens
+
+and parse_stmt_expr tokens =
+  let expr, tokens = parse_expr tokens in
+  let _, tokens = expect tokens Semicolon in
+  expr, tokens
+
+and parse_stmt_return tokens =
+  let expr, tokens = parse_expr tokens in
+  let _, tokens = expect tokens Semicolon in
+  expr, tokens
+
+let rec parse_stmt tokens : Ast.stmt * Token.t list =
+  let open Token in
+  let open TokenType in
+
   match tokens with
-  | {ttype = TokenType.Proc; _} :: tl ->
-     let stmt, tokens = parse_proc_def_stmt tl in
-     Proc_def stmt, tokens
-  | {ttype = TokenType.Let; _} :: tl ->
-     let stmt, tokens = parse_let_stmt tl in
+  | {ttype = Export; _} :: {ttype = Proc; _} :: tl ->
+     let stmt, tokens = parse_stmt_proc tl true in
+     Proc stmt, tokens
+  | {ttype = Proc; _} :: tl ->
+     let stmt, tokens = parse_stmt_proc tl false in
+     Proc stmt, tokens
+  | {ttype = Let; _} :: tl ->
+     let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
-  | {ttype = TokenType.Identifier; _} as hd :: tl ->
-     (match peek tl 0 with
-      | Some {ttype = TokenType.LParen; _} -> (* Procedure call *)
-         let stmt, tokens = parse_proc_call (hd :: tl) in
-         let _, tokens = expect tokens TokenType.Semicolon in
-         Ast.Stmt_expr (Ast.Proc_call stmt), tokens
-      | Some _ -> (* Mutating variable *)
-         let stmt, tokens = parse_mut_stmt (hd :: tl) in
-         Mut stmt, tokens
-      | _ ->
-         let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
-         exit 1)
-  | {ttype = TokenType.Asterisk; _} as hd :: tl -> (* Dereferencing *)
-     let stmt, tokens = parse_mut_stmt (hd :: tl) in
-     Mut stmt, tokens
-  | {ttype = TokenType.If; _} :: tl ->
-     let stmt, tokens = parse_if_stmt tl in
-     Ast.If stmt, tokens
-  | {ttype = TokenType.While; _} :: tl ->
-     let stmt, tokens = parse_while_stmt tl in
-     Ast.While stmt, tokens
-  | {ttype = TokenType.For; _} :: tl ->
-     let stmt, tokens = parse_for_stmt tl in
-     Ast.For stmt, tokens
-  | {ttype = TokenType.Return; _} :: tl ->
-     let stmt, tokens = parse_ret_stmt tl in
-     Ast.Ret stmt, tokens
-  | ({ttype = TokenType.Break; _} :: _) as tl ->
-     let stmt, tokens = parse_break_stmt tl in
-     Ast.Break stmt, tokens
+  | {ttype = Identifier; _} :: tl ->
+     let stmt, tokens = parse_stmt_expr tl in
+     Stmt_Expr stmt, tokens
+  | {ttype = Return; _} :: tl ->
+     let stmt, tokens = parse_stmt_return tl in
+     Return stmt, tokens
+  | [] ->
+     let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"no more tokens" @@ None in
+     exit 1
   | hd :: _ ->
-     let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-               ~msg:"unsupported token" @@ Some hd in exit 1
-  | _ ->
-     let _ = Err.err Err.Fatal __FILE__ __FUNCTION__
-               ~msg:"unsupported token" @@ None in exit 1
+     let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid stmt" @@ Some hd in
+     exit 1
 
-let parse_struct_stmt (tokens : Token.t list) : Ast.struct_stmt * Token.t list =
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.Equals in
-  let _, tokens = expect tokens TokenType.LParen in
-  (* TODO: Currently, we want to gather the identifiers and
-   * their types. We have a function that already does this,
-   * however, it takes an expression enclosed in parenthesis.
-   * Eventually, we want to use braces instead. *)
-  let fields, tokens = gather_params tokens [] in
-  let _, tokens = expect tokens TokenType.In in
-  Ast.{id; fields; export = false}, tokens
-
-let parse_import_stmt (tokens : Token.t list) : Ast.import_stmt * Token.t list =
-  let path, tokens = expect tokens TokenType.StringLiteral in
+and parse_stmt_import tokens =
+  let filepath, tokens = expect tokens TokenType.StringLiteral in
   let _, tokens = expect tokens TokenType.Semicolon in
-  Ast.{path}, tokens
+  Ast.{filepath}, tokens
 
-let parse_def_func_stmt (tokens : Token.t list) : Ast.def_func_stmt * Token.t list =
-  let rec gather_def_func_params
-            (tokens : Token.t list)
-            (acc : TokenType.id_type list)
-          : (TokenType.id_type list) * (Token.t list) =
-    let type_, tokens = parse_type tokens in
-    let acc = acc @ [type_] in
+and parse_stmt_block (tokens : Token.t list) : (Ast.stmt list) * Token.t list =
+  let open Token in
+  let open TokenType in
+
+  let rec aux tokens acc : (Ast.stmt list) * Token.t list =
     match tokens with
-    | {ttype = TokenType.Equals; _} :: tl -> acc, tl
-    | {ttype = TokenType.RightArrow; _} :: tl -> gather_def_func_params tl acc
-    | _ ->
-       let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid def statement" @@ (peek tokens 0) in
-       exit 1 in
+    | [] -> acc, []
+    | {ttype = RBrace; _} :: tl -> acc, tl
+    | tokens ->
+       let stmt, tokens = parse_stmt tokens in
+       aux tokens (acc @ [stmt]) in
 
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.DoubleColon in
-  let params, tokens = gather_def_func_params tokens [] in
-  let rettype, tokens = expect_primitive_type tokens in
-  let _, tokens = expect tokens TokenType.Semicolon in
-  Ast.{id; params; rettype}, tokens
+  let _, tokens = expect tokens LBrace in
+  aux tokens []
 
-let parse_module_stmt (tokens : Token.t list) : Ast.module_stmt * Token.t list =
+and parse_stmt_let tokens =
+  let open TokenType in
+
+  let id, tokens = expect tokens Identifier in
+  let _, tokens = expect tokens Colon in
+  let ty, tokens = expect_idtype tokens in
+  let _, tokens = expect tokens Equals in
+  let expr, tokens = parse_expr tokens in
+  let _, tokens = expect tokens Semicolon in
+  Ast.{id; ty; expr}, tokens
+
+and parse_stmt_proc tokens export =
+  let open Token in
+  let open TokenType in
+
+  let rec parse_parameters' tokens acc =
+    match tokens with
+    | [] -> acc, []
+    | {ttype = RParen; _} :: _ -> acc, tokens
+    | tokens ->
+       let id, tokens = expect tokens Identifier in
+       let _, tokens = expect tokens Colon in
+       let ty, tokens = expect_idtype tokens in
+       (match tokens with
+        | {ttype = Comma; _} :: tl -> parse_parameters' tl (acc @ [id, ty])
+        | _ -> acc, tokens) in
+
+  let parse_parameters = function
+    | {ttype = (Type Void); _} :: tl -> [], tl
+    | tokens -> parse_parameters' tokens [] in
+
+  let _, tokens = maybe_expect tokens Export in
+  let id, tokens = expect tokens Identifier in
+  let _, tokens = expect tokens LParen in
+  let params, tokens = parse_parameters tokens in
+  let _, tokens = expect tokens RParen in
+  let _, tokens = expect tokens Colon in
+  let rettype, tokens = expect_idtype tokens in
+  let block, tokens = parse_stmt_block tokens in
+  Ast.{id; params; rettype; block; export}, tokens
+
+let parse_stmt_module tokens =
   let id, tokens = expect tokens TokenType.Identifier in
   let _, tokens = expect tokens TokenType.Where in
   Ast.{id}, tokens
 
-(* Parses the top-most statements (proc decls, global vars etc). *)
-let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
+(* Parses the top-most statements (proc defs, global vars etc). *)
+let parse_toplvl_stmt tokens =
+  let open Token in
+  let open TokenType in
+
   match tokens with
-  | {ttype = TokenType.Proc; _} :: tl ->
-     let stmt, tokens = parse_proc_def_stmt tl in
+  | {ttype = Export; _} :: {ttype = Proc; _} :: tl ->
+     let stmt, tokens = parse_stmt_proc tl true in
      Ast.Proc_def stmt, tokens
-  | ({ttype = TokenType.Export; _} as e) :: tl ->
-     let tl = e :: tl in
-     let stmt, tokens = parse_proc_def_stmt tl in
+  | {ttype = Proc; _} :: tl ->
+     let stmt, tokens = parse_stmt_proc tl false in
      Ast.Proc_def stmt, tokens
-  | {ttype = TokenType.Let; _} :: tl ->
-     let stmt, tokens = parse_let_stmt tl in
+  | {ttype = Let; _} :: tl ->
+     let stmt, tokens = parse_stmt_let tl in
      Ast.Let stmt, tokens
-  | {ttype = TokenType.Struct; _} :: tl ->
-     let stmt, tokens = parse_struct_stmt tl in
-     Ast.Struct stmt, tokens
-  | {ttype = TokenType.Import; _} :: tl ->
-     let stmt, tokens = parse_import_stmt tl in
+  | {ttype = Import; _} :: tl ->
+     let stmt, tokens = parse_stmt_import tl in
      Ast.Import stmt, tokens
-  | {ttype = TokenType.Def; _} :: tl ->
-     let stmt, tokens = parse_def_func_stmt tl in
-     Ast.Def_func stmt, tokens
-  | {ttype = TokenType.Module; _} :: tl ->
-     let stmt, tokens = parse_module_stmt tl in
+  | {ttype = Module; _} :: tl ->
+     let stmt, tokens = parse_stmt_module tl in
      Ast.Module stmt, tokens
   | hd :: _ ->
      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid top level stmt" @@ Some hd in
@@ -579,9 +297,19 @@ let parse_toplvl_stmt (tokens : Token.t list) : Ast.toplvl_stmt * Token.t list =
 (* Entrypoint of the parser. Takes a list of tokens and produces
  * a program. *)
 let produce_ast (tokens : Token.t list) : Ast.program =
+  ignore parse_primary_expr;
+  ignore parse_multiplicative_expr;
+  ignore parse_additive_expr;
+  ignore parse_equalitative_expr;
+  ignore parse_logical_expr;
+  ignore parse_expr;
+
   let rec aux = function
     | [] -> []
     | hd :: _ when hd.Token.ttype = TokenType.Eof -> []
-    | tokens' -> let stmt, rest = parse_toplvl_stmt tokens' in [stmt] @ aux rest in
+    | tokens' ->
+       let stmt, rest = parse_toplvl_stmt tokens' in
+       [stmt] @ aux rest in
+
   aux tokens
 

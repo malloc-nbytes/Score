@@ -22,128 +22,72 @@
 
 open Token
 
-type program = toplvl_stmt list
+module Ast : sig
 
-and toplvl_stmt =
-  | Proc_def of proc_def_stmt
-  | Let of let_stmt
-  | Struct of struct_stmt
-  | Import of import_stmt
-  | Def_func of def_func_stmt (* currently unused *)
-  | Module of module_stmt
+  type program = toplvl_stmt list
 
-and stmt =
-  | Proc_def of proc_def_stmt
-  | Block of block_stmt
-  | Let of let_stmt
-  | Mut of mut_stmt
-  | If of if_stmt
-  | While of while_stmt
-  | Stmt_expr of stmt_expr
-  | Ret of ret_stmt
-  | Break of Token.t
-  | For of for_stmt
+  and toplvl_stmt =
+    | Proc_def of stmt_proc
+    | Let of stmt_let
+    | Module of stmt_module
+    | Import of stmt_import
 
-and module_stmt =
-  { id : Token.t
-  }
+  and stmt =
+    | Let of stmt_let
+    | Proc of stmt_proc
+    | Block of stmt_block
+    | Stmt_Expr of expr
+    | Return of expr
 
-and def_func_stmt =
-  { id : Token.t
-  ; params : TokenType.id_type list
-  ; rettype : TokenType.id_type
-  }
+  and stmt_module =
+    { id : Token.t
+    }
 
-and import_stmt =
-  { path : Token.t
-  }
+  and stmt_import =
+    { filepath : Token.t
+    }
 
-and struct_stmt =
-  { id : Token.t
-  ; fields : (Token.t * TokenType.id_type) list
-  ; export : bool
-  }
+  and stmt_let =
+    { id : Token.t
+    ; ty : TokenType.id_type
+    ; expr : expr
+    }
 
-and block_stmt = { stmts : stmt list }
+  and stmt_block = stmt list
 
-and ret_stmt = { expr : expr option }
+  and stmt_proc =
+    { id : Token.t
+    ; params : (Token.t * TokenType.id_type) list
+    ; rettype : TokenType.id_type
+    ; block : stmt_block
+    ; export : bool
+    }
 
-and while_stmt =
-  { expr : expr
-  ; block : block_stmt
-  }
+  and expr =
+    | Term of expr_term
+    | Binary of expr_binary
+    | Unary of expr_unary
 
-and for_stmt =
-  { init : stmt
-  ; cond : expr
-  ; after : stmt
-  ; block : block_stmt
-  }
+  and expr_term =
+    | IntLit of Token.t
+    | StrLit of Token.t
+    | CharLit of Token.t
+    | Ident of Token.t
+    | Proc_Call of expr_proc_call
 
-and if_stmt =
-  { expr : expr
-  ; block : block_stmt
-  ; else_ : block_stmt option
-  }
+  and expr_binary =
+    { lhs : expr
+    ; op : Token.t
+    ; rhs : expr
+    }
 
-and proc_def_stmt =
-  { id : Token.t
-  ; params : (Token.t * TokenType.id_type) list
-  ; block : block_stmt
-  ; rettype : TokenType.id_type
-  ; export : bool
-  }
+  and expr_unary =
+    { op : Token.t
+    ; expr : expr
+    }
 
-and let_stmt =
-  { id : Token.t
-  ; type_ : TokenType.id_type
-  ; expr : expr
-  }
-
-and mut_stmt =
-  { left : expr
-  ; right : expr
-  }
-
-and expr =
-  | Binary of binary_expr
-  | Term of term_expr
-  | Proc_call of proc_call_expr
-  | Array_retrieval of array_retrieval_expr
-  | Cast of TokenType.id_type * expr
-  | Reference of expr
-  | Dereference of expr
-
-and array_retrieval_expr =
-  { id : Token.t
-  ; index : expr
-  }
-
-and stmt_expr = expr
-
-and binary_expr =
-  { lhs : expr
-  ; rhs : expr
-  ; op : Token.t
-  }
-
-and term_expr =
-  | Ident of Token.t
-  | Intlit of Token.t
-  | Strlit of Token.t
-  | Char of Token.t
-  | IntCompoundLit of expr list * (int option)
-  | Struct_access of struct_access_expr
-
-and struct_access_expr =
-  { id : Token.t
-  ; member : Token.t
-  }
-
-and proc_call_expr =
-  { id : Token.t
-  ; args : expr list
-  }
-
-val dump_toplvl_stmts : toplvl_stmt list -> unit
-
+  and expr_proc_call =
+    { lhs : expr
+    ; args : expr list
+    }
+end

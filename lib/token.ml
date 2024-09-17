@@ -27,7 +27,6 @@ module TokenType = struct
     | Usize
     | Char
     | Void
-    | Number (* NOT TO BE USED IN PARSING *)
     | Pointer of id_type
     | Array of id_type * (int option)
     | Custom of string
@@ -100,7 +99,6 @@ module TokenType = struct
     | Char -> "Char"
     | Void -> "Void"
     | Pointer t -> "Pointer " ^ string_of_id_type t
-    | Number -> "Number"
     | Array (a,len) -> "Array " ^ string_of_id_type a ^ " len " ^ (match len with Some l -> string_of_int l | None -> "None")
     | Custom s -> "Custom " ^ s
 
@@ -128,7 +126,6 @@ module TokenType = struct
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
     | Type Pointer t -> "Type Pointer " ^ string_of_id_type t
-    | Type Number -> "Number (SHOULD NOT BE USED)"
     | Type (Array _) -> "Type Array PRINTING UNIMPLEMENTED"
     | Type (Custom s) -> "Type Custom " ^ s
     | GreaterThan -> "GreaterThan"
@@ -183,7 +180,6 @@ module Token = struct
     ; r : int
     ; c : int
     ; fp : string
-    ; macro : string option
     }
 
   (* Convert a Token to a string *)
