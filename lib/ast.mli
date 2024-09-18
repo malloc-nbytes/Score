@@ -41,6 +41,12 @@ module Ast : sig
     | For of stmt_for
     | If of stmt_if
     | Mut of stmt_mut
+    | While of stmt_while
+
+  and stmt_while =
+    { expr : expr
+    ; block : stmt_block
+    }
 
   and stmt_mut =
     { left : expr

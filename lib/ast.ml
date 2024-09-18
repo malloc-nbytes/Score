@@ -41,6 +41,12 @@ module Ast = struct
     | For of stmt_for
     | If of stmt_if
     | Mut of stmt_mut
+    | While of stmt_while
+
+  and stmt_while =
+    { expr : expr
+    ; block : stmt_block
+    }
 
   and stmt_mut =
     { left : expr
@@ -203,7 +209,7 @@ module Ast = struct
     printf "RETURN ";
     debug_print_expr return s false true
 
-  and debug_print_stmt_if _if s =
+  and debug_print_stmt_if (_if : stmt_if) s =
     let open Printf in
     spaces s;
     printf "IF(expr="; debug_print_expr _if.expr s false true;
@@ -214,7 +220,7 @@ module Ast = struct
     spaces (s);
     printf "}\n";
     match _if._else with
-    | Some _else -> List.iter (fun st -> debug_print_stmt st s) _if.block;
+    | Some _else -> List.iter (fun st -> debug_print_stmt st (s-1)) _if.block;
     | None -> ()
 
   and debug_print_stmt_for (_for : stmt_for) s =
@@ -243,6 +249,16 @@ module Ast = struct
     debug_print_expr mut.right s false false;
     printf ")\n";
 
+  and debug_print_stmt_while _while s =
+    let open Printf in
+    spaces s;
+    printf "WHILE("; debug_print_expr _while.expr s true true;
+    spaces s;
+    printf "{\n";
+    List.iter (fun st -> debug_print_stmt st s) _while.block;
+    spaces s;
+    printf "}\n";
+
   and debug_print_stmt stmt s =
     spaces s;
     match stmt with
@@ -254,6 +270,7 @@ module Ast = struct
     | If _if -> debug_print_stmt_if _if s
     | For _for -> debug_print_stmt_for _for s
     | Mut mut -> debug_print_stmt_mut mut s
+    | While _while -> debug_print_stmt_while _while s
 
   let debug_print_program program =
     Printf.printf "--- DUMPING GENERATED AST ---\n";

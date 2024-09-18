@@ -221,6 +221,11 @@ and parse_stmt_if tokens =
      Ast.{expr; block; _else = Some _else}, tokens
   | _ -> Ast.{expr; block; _else = None}, tokens
 
+and parse_stmt_while tokens =
+  let expr, tokens = parse_expr tokens in
+  let block, tokens = parse_stmt_block tokens in
+  Ast.{expr; block}, tokens
+
 and parse_stmt tokens =
   let open Token in
   let open TokenType in
@@ -247,6 +252,9 @@ and parse_stmt tokens =
   | {ttype = For; _} :: tl ->
      let stmt, tokens = parse_stmt_for tl in
      For stmt, tokens
+  | {ttype = While; _} :: tl ->
+     let stmt, tokens = parse_stmt_while tl in
+     While stmt, tokens
   | {ttype = If; _} :: tl ->
      let stmt, tokens = parse_stmt_if tl in
      If stmt, tokens
