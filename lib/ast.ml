@@ -27,7 +27,7 @@ module Ast = struct
   type program = toplvl_stmt list
 
   and toplvl_stmt =
-    | Proc_def of stmt_proc
+    | Proc_Def of stmt_proc
     | Let of stmt_let
     | Module of stmt_module
     | Import of stmt_import
@@ -91,4 +91,106 @@ module Ast = struct
     ; args : expr list
     }
 
+  let rec spaces = function
+    | 0 -> ()
+    | k -> let _ = Printf.printf " " in spaces (k-1)
+
+  let rec debug_print_expr expr s =
+    let open Printf in
+    let open Token in
+
+    let debug_print_expr_term term =
+      let debug_print_expr_term_proc_call (proc_call : expr_proc_call) (s : int) : unit =
+        let aux (proc_call : expr_proc_call) (s : int) : unit =
+          printf "src=";
+          debug_print_expr proc_call.lhs 0;
+          List.iter (fun expr ->
+              debug_print_expr expr (s+2)
+            ) proc_call.args
+        in
+
+        printf "PROC_CALL(";
+        aux proc_call s;
+        spaces s;
+        printf ")"
+      in
+
+      printf "TERM(";
+      let _ = match term with
+        | IntLit k -> printf "INTLIT(%s)" k.lexeme
+        | StrLit k -> printf "STRLIT(%s)" k.lexeme
+        | CharLit k -> printf "CHARLIT(%s)" k.lexeme
+        | Ident k -> printf "IDENT(%s)" k.lexeme
+        | Proc_Call k -> debug_print_expr_term_proc_call k s
+      in
+      printf ")"
+    in
+
+    let debug_print_expr_binary binary s =
+      printf "BINARY(\n";
+      debug_print_expr binary.lhs (s+2);
+      spaces (s+2);
+      printf "op=%s\n" binary.op.lexeme;
+      debug_print_expr binary.rhs (s+2);
+      spaces s;
+      printf ")"
+    in
+
+    spaces s;
+    printf "EXPR(";
+    let _ = match expr with
+      | Term term -> debug_print_expr_term term;
+      | Binary binary -> debug_print_expr_binary binary s;
+      | Unary _ -> failwith ""
+    in
+    print_endline ")"
+
+  let rec debug_print_stmt_proc (proc : stmt_proc) s =
+    let open Printf in
+    let open Token in
+    let open TokenType in
+    spaces s;
+    printf "PROC_DEF(id=%s args=" proc.id.lexeme;
+    List.iter (fun param -> printf "%s: %s," (fst param).lexeme (string_of_id_type (snd param))) proc.params;
+    printf ")";
+    printf ": %s {" @@ string_of_id_type proc.rettype;
+    List.iter (fun st -> debug_print_stmt st (s+2)) proc.block;
+    printf "}\n"
+
+  and debug_print_stmt_let (_let : stmt_let) s =
+    let open Printf in
+    let open Token in
+    spaces s;
+    printf "LET %s = " _let.id.lexeme;
+    debug_print_expr _let.expr s
+
+  and debug_print_stmt_module _module =
+    let open Printf in
+    printf "MODULE %s\n" _module.id.lexeme
+
+  and debug_print_stmt_import _import =
+    let open Printf in
+    printf "IMPORT %s\n" _import.filepath.lexeme
+
+  and debug_print_stmt stmt s = ()
+
+  let debug_print_program program =
+    let rec aux (stmt : toplvl_stmt list) : unit =
+      match stmt with
+      | [] -> ()
+      | (Proc_Def pd) :: tl ->
+        debug_print_stmt_proc pd 0;
+        aux tl
+      | (Let _let) :: tl ->
+        debug_print_stmt_let _let 0;
+        aux tl
+      | (Module _module) :: tl ->
+        debug_print_stmt_module _module;
+        aux tl
+      | (Import _import) :: tl ->
+        debug_print_stmt_import _import;
+        aux tl in
+    aux program
+
 end
+

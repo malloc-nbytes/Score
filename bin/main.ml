@@ -21,6 +21,7 @@
    * SOFTWARE. *)
 
 open Lib
+open Ast
 
 let () =
   let filepath = "src/input.scr" in
@@ -32,12 +33,10 @@ let () =
   print_endline "[ Compiling ]";
 
   let tokens = Lexer.lex_file filepath src_code 1 1 in
-
-  print_int @@ List.length tokens;
-
-  Lexer.print_tokens tokens;
+  (* Lexer.print_tokens tokens; *)
 
   let ast = Parser.produce_ast tokens in
+  Ast.debug_print_program ast;
   ignore ast;
 
   print_endline "[ Done ]"

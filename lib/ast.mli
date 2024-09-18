@@ -27,7 +27,7 @@ module Ast : sig
   type program = toplvl_stmt list
 
   and toplvl_stmt =
-    | Proc_def of stmt_proc
+    | Proc_Def of stmt_proc
     | Let of stmt_let
     | Module of stmt_module
     | Import of stmt_import
@@ -90,4 +90,9 @@ module Ast : sig
     { lhs : expr
     ; args : expr list
     }
+
+  val debug_print_expr : expr -> int -> unit
+  val debug_print_stmt : stmt -> int -> unit
+  val debug_print_program : program -> unit
+
 end

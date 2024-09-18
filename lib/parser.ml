@@ -61,12 +61,15 @@ and parse_comma_sep_exprs tokens =
 
   let rec aux tokens acc =
     match tokens with
-    | ({ttype = RParen; _} | {ttype = RBracket; _}) :: tl -> acc, tl
+    | {ttype = RParen; _} :: tl -> acc, tl
     | _ ->
        let expr, tokens = parse_expr tokens in
+       let acc = acc @ [expr] in
        (match tokens with
-        | {ttype = Comma; _} :: tl -> aux tl (acc @ [expr])
+        | {ttype = Comma; _} :: tl -> aux tl acc
+        | {ttype = RParen; _} :: tl -> acc, tl
         | _ -> acc, tokens) in
+
   aux tokens []
 
 and parse_primary_expr tokens =
@@ -77,12 +80,17 @@ and parse_primary_expr tokens =
     | [] ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
        exit 1
-    | {ttype = Identifier; _} as id :: tl -> aux tl @@ Some (Ast.Term (Ast.Ident id))
+    | {ttype = Identifier; _} as id :: tl ->
+       (match left with
+        | Some (Ast.Term _) ->
+           let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"illegal primary expression" @@ Some id in
+           exit 1
+        | _ -> ());
+       aux tl @@ Some (Ast.Term (Ast.Ident id))
     | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
     | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
     | {ttype = LParen; _} :: tl ->
        let args, tokens = parse_comma_sep_exprs tl in
-       let _, tokens = expect tokens RParen in
        (match left with
         (* Procedure call *)
         | Some lhs -> aux tokens @@ Some (Ast.Term (Ast.Proc_Call Ast.{lhs; args}))
@@ -132,12 +140,9 @@ and parse_equalitative_expr tokens =
 
   let rec aux tokens lhs =
     match tokens with
-    | {ttype = DoubleEquals; _}
-      | {ttype = GreaterThan; _}
-      | {ttype = GreaterThanEqual; _}
-      | {ttype = LessThanEqual; _}
-      | {ttype = NotEqual; _}
-      | {ttype = LessThan; _} as op :: tl ->
+    | {ttype = DoubleEquals; _} | {ttype = GreaterThan; _}
+      | {ttype = GreaterThanEqual; _} | {ttype = LessThanEqual; _}
+      | {ttype = NotEqual; _} | {ttype = LessThan; _} as op :: tl ->
        let rhs, tokens = parse_additive_expr tl in
        aux tokens (Ast.Binary {lhs; rhs; op})
     | _ -> lhs, tokens in
@@ -187,8 +192,8 @@ let rec parse_stmt tokens : Ast.stmt * Token.t list =
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
-  | {ttype = Identifier; _} :: tl ->
-     let stmt, tokens = parse_stmt_expr tl in
+  | ({ttype = Identifier; _} :: _) as tokens ->
+     let stmt, tokens = parse_stmt_expr tokens in
      Stmt_Expr stmt, tokens
   | {ttype = Return; _} :: tl ->
      let stmt, tokens = parse_stmt_return tl in
@@ -229,6 +234,7 @@ and parse_stmt_let tokens =
   let _, tokens = expect tokens Equals in
   let expr, tokens = parse_expr tokens in
   let _, tokens = expect tokens Semicolon in
+
   Ast.{id; ty; expr}, tokens
 
 and parse_stmt_proc tokens export =
@@ -274,10 +280,10 @@ let parse_toplvl_stmt tokens =
   match tokens with
   | {ttype = Export; _} :: {ttype = Proc; _} :: tl ->
      let stmt, tokens = parse_stmt_proc tl true in
-     Ast.Proc_def stmt, tokens
+     Ast.Proc_Def stmt, tokens
   | {ttype = Proc; _} :: tl ->
      let stmt, tokens = parse_stmt_proc tl false in
-     Ast.Proc_def stmt, tokens
+     Ast.Proc_Def stmt, tokens
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Ast.Let stmt, tokens
@@ -297,12 +303,7 @@ let parse_toplvl_stmt tokens =
 (* Entrypoint of the parser. Takes a list of tokens and produces
  * a program. *)
 let produce_ast (tokens : Token.t list) : Ast.program =
-  ignore parse_primary_expr;
-  ignore parse_multiplicative_expr;
-  ignore parse_additive_expr;
-  ignore parse_equalitative_expr;
-  ignore parse_logical_expr;
-  ignore parse_expr;
+  ignore Ast.debug_print_expr;
 
   let rec aux = function
     | [] -> []
