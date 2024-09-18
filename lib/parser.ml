@@ -205,6 +205,22 @@ and parse_mut_stmt tokens =
   let _, tokens = expect tokens Semicolon in
   Ast.{left; op; right}, tokens
 
+and parse_stmt_if tokens =
+  let open Token in
+  let open TokenType in
+
+  let expr, tokens = parse_expr tokens in
+  let block, tokens = parse_stmt_block tokens in
+  match tokens with
+  | {ttype = Else; _} :: {ttype = If; _} :: tl ->
+     let if_, tokens = parse_stmt_if tl in
+     let else_ = [Ast.If if_] in
+     Ast.{expr; block; _else = Some else_}, tokens
+  | {ttype = TokenType.Else; _} :: tl ->
+     let _else, tokens = parse_stmt_block tl in
+     Ast.{expr; block; _else = Some _else}, tokens
+  | _ -> Ast.{expr; block; _else = None}, tokens
+
 and parse_stmt tokens =
   let open Token in
   let open TokenType in
@@ -231,7 +247,9 @@ and parse_stmt tokens =
   | {ttype = For; _} :: tl ->
      let stmt, tokens = parse_stmt_for tl in
      For stmt, tokens
-  | {ttype = If; _} :: tl -> failwith "if todo"
+  | {ttype = If; _} :: tl ->
+     let stmt, tokens = parse_stmt_if tl in
+     If stmt, tokens
   | [] ->
      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"no more tokens" @@ None in
      exit 1

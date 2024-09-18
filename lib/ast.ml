@@ -203,9 +203,34 @@ module Ast = struct
     printf "RETURN ";
     debug_print_expr return s false true
 
-  and debug_print_stmt_if _if s = failwith "todo"
+  and debug_print_stmt_if _if s =
+    let open Printf in
+    spaces s;
+    printf "IF(expr="; debug_print_expr _if.expr s false true;
+    spaces s;
+    printf "BLOCK={\n";
+    spaces s;
+    List.iter (fun st -> debug_print_stmt st s) _if.block;
+    spaces (s);
+    printf "}\n";
+    match _if._else with
+    | Some _else -> List.iter (fun st -> debug_print_stmt st s) _if.block;
+    | None -> ()
 
-  and debug_print_stmt_for _for s = failwith "todo"
+  and debug_print_stmt_for (_for : stmt_for) s =
+    let open Printf in
+    spaces s;
+    printf "FOR(start="; debug_print_stmt _for.start 0;
+    spaces (s+2);
+    printf "; while="; debug_print_expr _for._while (s+4) false true;
+    spaces (s+2);
+    printf "; after=\n"; debug_print_stmt _for._end (s+2);
+    spaces (s+2);
+    printf "block={\n";
+    List.iter (fun st -> debug_print_stmt st s) _for.block;
+    spaces (s+2);
+    printf "}\n";
+    ()
 
   and debug_print_stmt_mut mut s =
     let open Printf in
