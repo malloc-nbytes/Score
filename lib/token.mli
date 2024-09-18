@@ -26,6 +26,7 @@ module TokenType : sig
     | Str
     | Usize
     | Char
+    | Bool
     | Void
     | Pointer of id_type
     | Array of id_type * (int option)
@@ -91,6 +92,8 @@ module TokenType : sig
     | StructIdentifier
     | Module
     | Where
+    | True
+    | False
 
   val to_string : t -> string
   val string_of_id_type : id_type -> string

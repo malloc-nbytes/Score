@@ -100,6 +100,7 @@ and parse_primary_expr tokens =
        aux tl @@ Some (Ast.Term (Ast.Ident id))
     | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
     | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
+    | {ttype; lexeme = value} :: tl when ttype = True || ttype = False -> aux tl @@ Some (Ast.Term (Ast.BoolLit (bool_of_string value)))
     | {ttype = LParen; _} :: tl ->
        let args, tokens = parse_comma_sep_exprs tl in
        (match left with

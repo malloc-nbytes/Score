@@ -26,6 +26,7 @@ module TokenType = struct
     | Str
     | Usize
     | Char
+    | Bool
     | Void
     | Pointer of id_type
     | Array of id_type * (int option)
@@ -91,12 +92,15 @@ module TokenType = struct
     | StructIdentifier
     | Module
     | Where
+    | True
+    | False
 
   let rec string_of_id_type = function
     | I32 -> "I32"
     | Str -> "Str"
     | Usize -> "Usize"
     | Char -> "Char"
+    | Bool -> "Bool"
     | Void -> "Void"
     | Pointer t -> "Pointer " ^ string_of_id_type t
     | Array (a,len) -> "Array " ^ string_of_id_type a ^ " len " ^ (match len with Some l -> string_of_int l | None -> "None")
@@ -123,6 +127,7 @@ module TokenType = struct
     | Type I32 -> "Type I32"
     | Type Usize -> "Usize"
     | Type Char -> "Type Char"
+    | Type Bool -> "Bool"
     | Type Str -> "Type Str"
     | Type Void -> "Type Void"
     | Type Pointer t -> "Type Pointer " ^ string_of_id_type t
@@ -170,6 +175,8 @@ module TokenType = struct
     | StructIdentifier -> "StructIdentifier"
     | Module -> "Module"
     | Where -> "Where"
+    | True -> "true"
+    | False -> "false"
 
 end
 

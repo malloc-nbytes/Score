@@ -50,6 +50,8 @@ let populate_keywords () : unit =
   let _ = Hashtbl.add keywords "null"      TokenType.Null in
   let _ = Hashtbl.add keywords "module"    TokenType.Module in
   let _ = Hashtbl.add keywords "where"     TokenType.Where in
+  let _ = Hashtbl.add keywords "true"      TokenType.True in
+  let _ = Hashtbl.add keywords "false"     TokenType.False in
   ()
 
 let rec repl_quote (lst : char list) : string =

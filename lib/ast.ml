@@ -101,6 +101,7 @@ module Ast = struct
     | IntLit of Token.t
     | StrLit of Token.t
     | CharLit of Token.t
+    | BoolLit of bool
     | Ident of Token.t
     | Proc_Call of expr_proc_call
 
@@ -149,6 +150,7 @@ module Ast = struct
         | IntLit k -> printf "INTLIT(%s)" k.lexeme
         | StrLit k -> printf "STRLIT(%s)" k.lexeme
         | CharLit k -> printf "CHARLIT(%s)" k.lexeme
+        | BoolLit k -> printf "BOOLLIT(%b)" k
         | Ident k -> printf "IDENT(%s)" k.lexeme
         | Proc_Call k -> debug_print_expr_term_proc_call k s
       in

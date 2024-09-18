@@ -101,6 +101,7 @@ module Ast : sig
     | IntLit of Token.t
     | StrLit of Token.t
     | CharLit of Token.t
+    | BoolLit of bool
     | Ident of Token.t
     | Proc_Call of expr_proc_call
 
