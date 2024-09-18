@@ -33,7 +33,7 @@ let () =
   print_endline "[ Compiling ]";
 
   let tokens = Lexer.lex_file filepath src_code 1 1 in
-  (* Lexer.print_tokens tokens; *)
+  Lexer.print_tokens tokens;
 
   let ast = Parser.produce_ast tokens in
   Ast.debug_print_program ast;

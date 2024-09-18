@@ -42,6 +42,17 @@ let maybe_expect tokens ty =
   | hd :: tl when hd.Token.ttype = ty -> Some hd, tl
   | tokens -> None, tokens
 
+let is_mut tokens =
+  let open Token in
+  let open TokenType in
+  let rec aux = function
+    | [] -> false
+    | {ttype = Eof; _} :: _ -> false
+    | {ttype = Semicolon; _} :: _ -> false
+    | {ttype = Equals; _} :: _ -> true
+    | _ :: tl -> aux tl in
+  aux tokens
+
 let rec expect_idtype (tokens : Token.t list) : TokenType.id_type * (Token.t list) =
   match tokens with
   | [] ->
@@ -178,7 +189,23 @@ and parse_stmt_return tokens =
   let _, tokens = expect tokens Semicolon in
   expr, tokens
 
-let rec parse_stmt tokens : Ast.stmt * Token.t list =
+and parse_stmt_for tokens =
+  let open TokenType in
+  let start, tokens = parse_stmt tokens in
+  let _while, tokens = parse_expr tokens in
+  let _, tokens = expect tokens Semicolon in
+  let _end, tokens = parse_stmt tokens in
+  let block, tokens = parse_stmt_block tokens in
+  Ast.{start; _while; _end; block}, tokens
+
+and parse_mut_stmt tokens =
+  let left, tokens = parse_expr tokens in
+  let op, tokens = expect tokens Equals in
+  let right, tokens = parse_expr tokens in
+  let _, tokens = expect tokens Semicolon in
+  Ast.{left; op; right}, tokens
+
+and parse_stmt tokens =
   let open Token in
   let open TokenType in
 
@@ -192,12 +219,19 @@ let rec parse_stmt tokens : Ast.stmt * Token.t list =
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
+  | ({ttype = Identifier; _} :: tl) as tokens when is_mut tokens ->
+     let stmt, tokens = parse_mut_stmt tokens in
+     Mut stmt, tokens
   | ({ttype = Identifier; _} :: _) as tokens ->
      let stmt, tokens = parse_stmt_expr tokens in
      Stmt_Expr stmt, tokens
   | {ttype = Return; _} :: tl ->
      let stmt, tokens = parse_stmt_return tl in
      Return stmt, tokens
+  | {ttype = For; _} :: tl ->
+     let stmt, tokens = parse_stmt_for tl in
+     For stmt, tokens
+  | {ttype = If; _} :: tl -> failwith "if todo"
   | [] ->
      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"no more tokens" @@ None in
      exit 1
@@ -235,7 +269,7 @@ and parse_stmt_let tokens =
   let expr, tokens = parse_expr tokens in
   let _, tokens = expect tokens Semicolon in
 
-  Ast.{id; ty; expr}, tokens
+  Ast.{id; ty; expr; export=false}, tokens
 
 and parse_stmt_proc tokens export =
   let open Token in

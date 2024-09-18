@@ -38,6 +38,28 @@ module Ast : sig
     | Block of stmt_block
     | Stmt_Expr of expr
     | Return of expr
+    | For of stmt_for
+    | If of stmt_if
+    | Mut of stmt_mut
+
+  and stmt_mut =
+    { left : expr
+    ; op : Token.t
+    ; right : expr
+    }
+
+  and stmt_for =
+    { start : stmt
+    ; _while : expr
+    ; _end : stmt
+    ; block : stmt_block
+    }
+
+  and stmt_if =
+    { expr : expr
+    ; block : stmt_block
+    ; _else : stmt_block option
+    }
 
   and stmt_module =
     { id : Token.t
@@ -51,6 +73,7 @@ module Ast : sig
     { id : Token.t
     ; ty : TokenType.id_type
     ; expr : expr
+    ; export : bool
     }
 
   and stmt_block = stmt list
@@ -91,7 +114,7 @@ module Ast : sig
     ; args : expr list
     }
 
-  val debug_print_expr : expr -> int -> bool -> unit
+  val debug_print_expr : expr -> int -> bool -> bool -> unit
   val debug_print_stmt : stmt -> int -> unit
   val debug_print_program : program -> unit
 
