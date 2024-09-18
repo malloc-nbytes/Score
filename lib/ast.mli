@@ -91,7 +91,7 @@ module Ast : sig
     ; args : expr list
     }
 
-  val debug_print_expr : expr -> int -> unit
+  val debug_print_expr : expr -> int -> bool -> unit
   val debug_print_stmt : stmt -> int -> unit
   val debug_print_program : program -> unit
 

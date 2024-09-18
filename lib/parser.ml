@@ -214,7 +214,7 @@ and parse_stmt_block (tokens : Token.t list) : (Ast.stmt list) * Token.t list =
   let open Token in
   let open TokenType in
 
-  let rec aux tokens acc : (Ast.stmt list) * Token.t list =
+  let rec aux tokens acc =
     match tokens with
     | [] -> acc, []
     | {ttype = RBrace; _} :: tl -> acc, tl
@@ -249,8 +249,9 @@ and parse_stmt_proc tokens export =
        let id, tokens = expect tokens Identifier in
        let _, tokens = expect tokens Colon in
        let ty, tokens = expect_idtype tokens in
+       let acc = acc @ [id, ty] in
        (match tokens with
-        | {ttype = Comma; _} :: tl -> parse_parameters' tl (acc @ [id, ty])
+        | {ttype = Comma; _} :: tl -> parse_parameters' tl acc
         | _ -> acc, tokens) in
 
   let parse_parameters = function

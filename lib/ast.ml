@@ -95,7 +95,7 @@ module Ast = struct
     | 0 -> ()
     | k -> let _ = Printf.printf " " in spaces (k-1)
 
-  let rec debug_print_expr expr s =
+  let rec debug_print_expr expr s start_spaces =
     let open Printf in
     let open Token in
 
@@ -103,15 +103,15 @@ module Ast = struct
       let debug_print_expr_term_proc_call (proc_call : expr_proc_call) (s : int) : unit =
         let aux (proc_call : expr_proc_call) (s : int) : unit =
           printf "src=";
-          debug_print_expr proc_call.lhs 0;
+          debug_print_expr proc_call.lhs 0 true;
           List.iter (fun expr ->
-              debug_print_expr expr (s+2)
+              debug_print_expr expr (s+2) true
             ) proc_call.args
         in
 
         printf "PROC_CALL(";
-        aux proc_call s;
-        spaces s;
+        aux proc_call (s+2);
+        spaces (s+2);
         printf ")"
       in
 
@@ -128,15 +128,16 @@ module Ast = struct
 
     let debug_print_expr_binary binary s =
       printf "BINARY(\n";
-      debug_print_expr binary.lhs (s+2);
+      debug_print_expr binary.lhs (s+2) true;
       spaces (s+2);
       printf "op=%s\n" binary.op.lexeme;
-      debug_print_expr binary.rhs (s+2);
+      debug_print_expr binary.rhs (s+2) true;
       spaces s;
       printf ")"
     in
 
-    spaces s;
+    (if start_spaces then spaces s
+    else ());
     printf "EXPR(";
     let _ = match expr with
       | Term term -> debug_print_expr_term term;
@@ -150,10 +151,10 @@ module Ast = struct
     let open Token in
     let open TokenType in
     spaces s;
-    printf "PROC_DEF(id=%s args=" proc.id.lexeme;
-    List.iter (fun param -> printf "%s: %s," (fst param).lexeme (string_of_id_type (snd param))) proc.params;
+    printf "PROC_DEF(id=%s, args=" proc.id.lexeme;
+    List.iter (fun param -> printf "%s:%s," (fst param).lexeme (string_of_id_type (snd param))) proc.params;
     printf ")";
-    printf ": %s {" @@ string_of_id_type proc.rettype;
+    printf ": %s {\n" @@ string_of_id_type proc.rettype;
     List.iter (fun st -> debug_print_stmt st (s+2)) proc.block;
     printf "}\n"
 
@@ -162,7 +163,7 @@ module Ast = struct
     let open Token in
     spaces s;
     printf "LET %s = " _let.id.lexeme;
-    debug_print_expr _let.expr s
+    debug_print_expr _let.expr (s+2) false
 
   and debug_print_stmt_module _module =
     let open Printf in
@@ -172,7 +173,20 @@ module Ast = struct
     let open Printf in
     printf "IMPORT %s\n" _import.filepath.lexeme
 
-  and debug_print_stmt stmt s = ()
+  and debug_print_stmt_return return s =
+    let open Printf in
+    spaces s;
+    printf "RETURN ";
+    debug_print_expr return s false
+
+  and debug_print_stmt stmt s =
+    spaces s;
+    match stmt with
+    | Let _let -> debug_print_stmt_let _let s
+    | Proc proc -> debug_print_stmt_proc proc s
+    | Block block -> List.iter (fun st -> debug_print_stmt st s) block
+    | Stmt_Expr se -> debug_print_expr se s true
+    | Return return -> debug_print_stmt_return return s
 
   let debug_print_program program =
     let rec aux (stmt : toplvl_stmt list) : unit =
