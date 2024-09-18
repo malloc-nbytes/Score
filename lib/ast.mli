@@ -31,6 +31,7 @@ module Ast : sig
     | Let of stmt_let
     | Module of stmt_module
     | Import of stmt_import
+    | Struct of stmt_struct
 
   and stmt =
     | Let of stmt_let
@@ -42,6 +43,12 @@ module Ast : sig
     | If of stmt_if
     | Mut of stmt_mut
     | While of stmt_while
+
+  and stmt_struct =
+    { id : Token.t
+    ; members : (Token.t * TokenType.id_type) list
+    ; export : bool
+    }
 
   and stmt_while =
     { expr : expr

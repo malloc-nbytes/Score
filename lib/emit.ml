@@ -20,25 +20,17 @@
    * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    * SOFTWARE. *)
 
-open Lib
 open Ast
-open Emit
 
-let () =
-  let filepath = "src/input.scr" in
-  let src_code = Utils.file_to_str filepath
-                 |> String.to_seq
-                 |> List.of_seq in
+module Emit = struct
+  let context = Llvm.global_context ()
+  let the_module = Llvm.create_module context "main"
+  let builder = Llvm.builder context
+  let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 10
 
-  Lexer.populate_keywords ();
-  print_endline "[ Compiling ]";
+  let create_entry_block_alloca func varname =
+    let builder = Llvm.builder_at context (Llvm.instr_begin (Llvm.entry_block func)) in
+    Llvm.build_alloca (Llvm.i32_type context) varname builder
 
-  let tokens = Lexer.lex_file filepath src_code 1 1 in
-  (* Lexer.print_tokens tokens; *)
-
-  let ast = Parser.produce_ast tokens in
-  Ast.debug_print_program ast;
-
-   Emit.emit_ir ast;
-
-  print_endline "[ Done ]"
+  let emit_ir program = ()
+end

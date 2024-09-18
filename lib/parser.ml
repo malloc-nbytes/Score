@@ -42,7 +42,7 @@ let maybe_expect tokens ty =
   | hd :: tl when hd.Token.ttype = ty -> Some hd, tl
   | tokens -> None, tokens
 
-let is_mut tokens =
+let is_mut_stmt tokens =
   let open Token in
   let open TokenType in
   let rec aux = function
@@ -81,6 +81,28 @@ and parse_comma_sep_exprs tokens =
         | {ttype = RParen; _} :: tl -> acc, tl
         | _ -> acc, tokens) in
 
+  aux tokens []
+
+and parse_ids_and_types_group (tokens : Token.t list) : ((Token.t * TokenType.id_type) list) * (Token.t list) =
+  let open Token in
+  let open TokenType in
+
+  let rec aux tokens acc =
+    match tokens with
+    | [] -> acc, tokens
+    | {ttype = RBrace; _} :: tl -> acc, tl
+    | tokens ->
+      let id, tokens = expect tokens Identifier in
+      let _, tokens = expect tokens Colon in
+      let ty, tokens = expect_idtype tokens in
+      let acc = acc @ [id, ty] in
+      (match tokens with
+       | {ttype = Comma; _} :: tl -> aux tl acc
+       | _ ->
+         let _, tokens = expect tokens RBrace in
+         acc, tokens) in
+
+  let _, tokens = expect tokens LBrace in
   aux tokens []
 
 and parse_primary_expr tokens =
@@ -241,7 +263,7 @@ and parse_stmt tokens =
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
-  | ({ttype = Identifier; _} :: tl) as tokens when is_mut tokens ->
+  | ({ttype = Identifier; _} :: tl) as tokens when is_mut_stmt tokens ->
      let stmt, tokens = parse_mut_stmt tokens in
      Mut stmt, tokens
   | ({ttype = Identifier; _} :: _) as tokens ->
@@ -266,11 +288,14 @@ and parse_stmt tokens =
      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"invalid stmt" @@ Some hd in
      exit 1
 
+(* Parses an `import` statement *)
 and parse_stmt_import tokens =
   let filepath, tokens = expect tokens TokenType.StringLiteral in
   let _, tokens = expect tokens TokenType.Semicolon in
   Ast.{filepath}, tokens
 
+(* Parses a `block` statement (which is a list of statements
+ * that is surrounded by { }.*)
 and parse_stmt_block (tokens : Token.t list) : (Ast.stmt list) * Token.t list =
   let open Token in
   let open TokenType in
@@ -286,6 +311,7 @@ and parse_stmt_block (tokens : Token.t list) : (Ast.stmt list) * Token.t list =
   let _, tokens = expect tokens LBrace in
   aux tokens []
 
+(* Parses a `let` statement. *)
 and parse_stmt_let tokens =
   let open TokenType in
 
@@ -329,23 +355,36 @@ and parse_stmt_proc tokens export =
   let block, tokens = parse_stmt_block tokens in
   Ast.{id; params; rettype; block; export}, tokens
 
-let parse_stmt_module tokens =
-  let id, tokens = expect tokens TokenType.Identifier in
-  let _, tokens = expect tokens TokenType.Where in
+and parse_stmt_module tokens =
+  let open TokenType in
+  let id, tokens = expect tokens Identifier in
+  let _, tokens = expect tokens Where in
   Ast.{id}, tokens
 
-(* Parses the top-most statements (proc defs, global vars etc). *)
+and parse_stmt_struct tokens export =
+  let open TokenType in
+  let id, tokens = expect tokens Identifier in
+  let members, tokens = parse_ids_and_types_group tokens in
+  Ast.{id; members; export}, tokens
+
+(* Parses the top-most statements (proc defs, structs, global vars etc). *)
 let parse_toplvl_stmt tokens =
   let open Token in
   let open TokenType in
 
   match tokens with
   | {ttype = Export; _} :: {ttype = Proc; _} :: tl ->
-     let stmt, tokens = parse_stmt_proc tl true in
-     Ast.Proc_Def stmt, tokens
+    let stmt, tokens = parse_stmt_proc tl true in
+    Ast.Proc_Def stmt, tokens
   | {ttype = Proc; _} :: tl ->
-     let stmt, tokens = parse_stmt_proc tl false in
-     Ast.Proc_Def stmt, tokens
+      let stmt, tokens = parse_stmt_proc tl false in
+      Ast.Proc_Def stmt, tokens
+  | {ttype = Export; _} :: {ttype = Struct; _} :: tl ->
+     let stmt, tokens = parse_stmt_struct tl true in
+     Ast.Struct stmt, tokens
+  | {ttype = Struct; _} :: tl ->
+     let stmt, tokens = parse_stmt_struct tl false in
+     Ast.Struct stmt, tokens
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Ast.Let stmt, tokens

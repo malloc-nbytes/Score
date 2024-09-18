@@ -31,6 +31,7 @@ module Ast = struct
     | Let of stmt_let
     | Module of stmt_module
     | Import of stmt_import
+    | Struct of stmt_struct
 
   and stmt =
     | Let of stmt_let
@@ -42,6 +43,12 @@ module Ast = struct
     | If of stmt_if
     | Mut of stmt_mut
     | While of stmt_while
+
+  and stmt_struct =
+    { id : Token.t
+    ; members : (Token.t * TokenType.id_type) list
+    ; export : bool
+    }
 
   and stmt_while =
     { expr : expr
@@ -197,7 +204,7 @@ module Ast = struct
     printf "LET(export=%b, id=%s) = " _let.export _let.id.lexeme;
     debug_print_expr _let.expr (s+2) false true
 
-  and debug_print_stmt_module _module =
+  and debug_print_stmt_module (_module : stmt_module) =
     let open Printf in
     printf "MODULE %s\n" _module.id.lexeme
 
@@ -261,6 +268,8 @@ module Ast = struct
     spaces s;
     printf "}\n";
 
+  and debug_print_stmt_struct _struct = failwith "todo"
+
   and debug_print_stmt stmt s =
     spaces s;
     match stmt with
@@ -285,6 +294,7 @@ module Ast = struct
       | (Let _let) :: tl ->
         debug_print_stmt_let _let 0;
         aux tl
+      | (Struct _struct) :: tl -> failwith "todo"
       | (Module _module) :: tl ->
         debug_print_stmt_module _module;
         aux tl
@@ -293,5 +303,4 @@ module Ast = struct
         aux tl in
     aux program;
     Printf.printf "--- DONE ---\n";
-
 end
