@@ -284,6 +284,7 @@ module Ast = struct
     | While _while -> debug_print_stmt_while _while s
 
   let debug_print_program program =
+    ignore debug_print_stmt_struct;
     Printf.printf "--- DUMPING GENERATED AST ---\n";
     let rec aux (stmt : toplvl_stmt list) : unit =
       match stmt with
@@ -294,7 +295,7 @@ module Ast = struct
       | (Let _let) :: tl ->
         debug_print_stmt_let _let 0;
         aux tl
-      | (Struct _struct) :: tl -> failwith "todo"
+      | (Struct _struct) :: _ -> failwith "todo"
       | (Module _module) :: tl ->
         debug_print_stmt_module _module;
         aux tl

@@ -1,4 +1,5 @@
 (executable
  (public_name Score)
  (name main)
- (libraries Lib))
+ (libraries Lib)
+ (flags (:standard -g)))

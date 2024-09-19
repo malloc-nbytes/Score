@@ -83,6 +83,7 @@ and parse_comma_sep_exprs tokens =
 
   aux tokens []
 
+(* Parses a group of comma separated "members" in the form of id: <type>. *)
 and parse_ids_and_types_group (tokens : Token.t list) : ((Token.t * TokenType.id_type) list) * (Token.t list) =
   let open Token in
   let open TokenType in
@@ -99,8 +100,8 @@ and parse_ids_and_types_group (tokens : Token.t list) : ((Token.t * TokenType.id
       (match tokens with
        | {ttype = Comma; _} :: tl -> aux tl acc
        | _ ->
-         let _, tokens = expect tokens RBrace in
-         acc, tokens) in
+          let _, tokens = expect tokens RBrace in
+          acc, tokens) in
 
   let _, tokens = expect tokens LBrace in
   aux tokens []
@@ -122,7 +123,7 @@ and parse_primary_expr tokens =
        aux tl @@ Some (Ast.Term (Ast.Ident id))
     | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
     | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
-    | {ttype; lexeme = value} :: tl when ttype = True || ttype = False -> aux tl @@ Some (Ast.Term (Ast.BoolLit (bool_of_string value)))
+    | {ttype; lexeme = value; _} :: tl when ttype = True || ttype = False -> aux tl @@ Some (Ast.Term (Ast.BoolLit (bool_of_string value)))
     | {ttype = LParen; _} :: tl ->
        let args, tokens = parse_comma_sep_exprs tl in
        (match left with
@@ -263,7 +264,7 @@ and parse_stmt tokens =
   | {ttype = Let; _} :: tl ->
      let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
-  | ({ttype = Identifier; _} :: tl) as tokens when is_mut_stmt tokens ->
+  | ({ttype = Identifier; _} :: _) as tokens when is_mut_stmt tokens ->
      let stmt, tokens = parse_mut_stmt tokens in
      Mut stmt, tokens
   | ({ttype = Identifier; _} :: _) as tokens ->

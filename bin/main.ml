@@ -21,11 +21,11 @@
    * SOFTWARE. *)
 
 open Lib
-open Ast
+(* open Ast *)
 open Emit
 
 let () =
-  let filepath = "src/input.scr" in
+  let filepath = "./src/input.scr" in
   let src_code = Utils.file_to_str filepath
                  |> String.to_seq
                  |> List.of_seq in
@@ -37,7 +37,7 @@ let () =
   (* Lexer.print_tokens tokens; *)
 
   let ast = Parser.produce_ast tokens in
-  Ast.debug_print_program ast;
+  (* Ast.debug_print_program ast; *)
 
    Emit.emit_ir ast;
 
