@@ -28,6 +28,7 @@ module Emit = struct
   type variable =
     { id : string
     ; tok : Token.t
+    ; ty : TokenType.id_type
     ; llvm_value : Llvm.llvalue
     }
 
@@ -122,18 +123,32 @@ module Emit = struct
   let rec compile_expr_unary expr context : Llvm.llvalue =
     failwith ""
 
-  let compile_expr_binary expr context : Llvm.llvalue =
-    failwith ""
+  and compile_expr_binary Ast.{lhs; op; rhs} context : Llvm.llvalue =
+    let open Token in
+    let open TokenType in
+    let lhs = compile_expr lhs context in
+    let rhs = compile_expr rhs context in
+    match op.ttype with
+    | Plus -> Llvm.build_add lhs rhs "addtmp" context.builder
+    | Minus -> Llvm.build_sub lhs rhs "subtmp" context.builder
+    | Asterisk -> Llvm.build_mul lhs rhs "multmp" context.builder
+    | ForwardSlash -> Llvm.build_sdiv lhs rhs "divtmp" context.builder
+    | _ -> failwith "todo: compile_expr_binary"
 
-  let compile_expr_term expr context : Llvm.llvalue =
+  and compile_expr_term expr context : Llvm.llvalue =
     match expr with
     | Ast.IntLit i -> Llvm.const_int (i32_t context) (int_of_string i.lexeme)
+    | Ast.StrLit s -> build_global_str s.lexeme context
+    | Ast.Ident i ->
+      let var = scope_get_variable i.lexeme context in
+      Llvm.build_load (scr_ty_to_llvm_ty var.ty ctx) var.llvm_value var.id context.builder
+    | Ast.Proc_Call pc -> failwith "todo: compile_expr_term"
     | _ -> failwith "todo: compile_expr_term"
 
-  let compile_expr expr context : Llvm.llvalue =
+  and compile_expr expr context : Llvm.llvalue =
     match expr with
     | Ast.Term e -> compile_expr_term e context
-    | Ast.Binary _ -> failwith "Binary"
+    | Ast.Binary e -> compile_expr_binary e context
     | Ast.Unary _ -> failwith "Unary"
 
   let rec compile_stmt_while stmt context : context =
@@ -172,14 +187,15 @@ module Emit = struct
 
     let context = push_scope context in
 
-    let rec aux (params : (Token.t * TokenType.id_type) list) context =
+    let rec aux params context =
+      let open Token in
       match params with
       | [] -> context
       | hd :: tl ->
          let id, tok = (fst hd).lexeme, (fst hd) in
          let _ = assert_variables_not_in_vscope [id] context in
          let alloca = emit_entry_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
-         let var = {id; tok; llvm_value=alloca} in
+         let var = {id; tok; ty=(snd hd); llvm_value=alloca} in
          let _ = scope_add_variable id var context in
          aux tl context in
 
@@ -187,8 +203,7 @@ module Emit = struct
     let context = aux params context in
     let context = {context with func = Some proc_def;
                                 builder = builder} in
-    let context = compile_stmt_block block context in
-    context
+    compile_stmt_block block context
 
   and compile_stmt_let Ast.{id; ty; expr; _} context : context =
     let _ = match context.func with
@@ -196,12 +211,12 @@ module Emit = struct
       | Some _ -> () in
 
     let _ = assert_variables_not_in_vscope [id.lexeme] context in
-    let ty = scr_ty_to_llvm_ty ty context in
+    let llvm_ty = scr_ty_to_llvm_ty ty context in
 
-    let local_var = Llvm.build_alloca ty id.lexeme context.builder in
+    let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
     let value = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
-    let var = {id=id.lexeme; tok=id; llvm_value=local_var} in
+    let var = {id=id.lexeme; tok=id; ty=ty; llvm_value=local_var} in
     let _ = scope_add_variable id.lexeme var context in
     context
 
@@ -246,5 +261,6 @@ module Emit = struct
          aux tl context in
 
     let _ = aux program context in
+    Llvm_analysis.assert_valid_module md;
     Llvm.dump_module md
 end
