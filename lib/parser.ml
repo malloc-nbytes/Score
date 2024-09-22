@@ -128,7 +128,8 @@ and parse_primary_expr tokens =
        let args, tokens = parse_comma_sep_exprs tl in
        (match left with
         (* Procedure call *)
-        | Some lhs -> aux tokens @@ Some (Ast.Term (Ast.Proc_Call Ast.{lhs; args}))
+        | Some (Ast.Term (Ast.Ident id)) -> aux tokens @@ Some (Ast.Term (Ast.Proc_Call Ast.{lhs=id; args}))
+        (* | Some lhs -> aux tokens @@ Some (Ast.Term (Ast.Proc_Call Ast.{lhs; args})) *)
         (* Tuple *)
         | _ when List.length args > 1 -> failwith "tuples are unimplemented"
         (* Math *)
@@ -405,8 +406,6 @@ let parse_toplvl_stmt tokens =
 (* Entrypoint of the parser. Takes a list of tokens and produces
  * a program. *)
 let produce_ast (tokens : Token.t list) : Ast.program =
-  ignore Ast.debug_print_expr;
-
   let rec aux = function
     | [] -> []
     | hd :: _ when hd.Token.ttype = TokenType.Eof -> []

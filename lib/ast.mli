@@ -124,12 +124,7 @@ module Ast : sig
     }
 
   and expr_proc_call =
-    { lhs : expr
+    { lhs : Token.t
     ; args : expr list
     }
-
-  val debug_print_expr : expr -> int -> bool -> bool -> unit
-  val debug_print_stmt : stmt -> int -> unit
-  val debug_print_program : program -> unit
-
 end

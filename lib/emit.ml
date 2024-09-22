@@ -25,25 +25,20 @@ open Err
 open Token
 
 module Emit = struct
-  type scr_variable =
-    { id : string
-    ; tok : Token.t
-    ; ty : TokenType.id_type
-    ; llvm_value : Llvm.llvalue
-    }
+  type symbol_type =
+    | Function of TokenType.id_type
+    | Variable of TokenType.id_type
 
-  type scr_function =
-    { id : string
-    ; tok : Token.t
-    ; ty : TokenType.id_type
-    ; llvm_value : Llvm.llvalue
+  type symbol =
+    { tok : Token.t
+    ; ty : symbol_type
+    ; value : Llvm.llvalue
     }
 
   type context =
-    { vscope : ((string, scr_variable) Hashtbl.t) list
-    ; fscope : ((string, scr_function) Hashtbl.t) list
-    ; func : Llvm.llvalue option
+    { func : Llvm.llvalue option
     ; builder : Llvm.llbuilder
+    ; symtbl : ((string, symbol) Hashtbl.t list)
     }
 
   let ctx = Llvm.global_context ()
@@ -53,90 +48,42 @@ module Emit = struct
   (* --- TYPES --- *)
 
   let i32_t context = Llvm.i32_type ctx
-  let void_t context = Llvm.i32_type ctx
+  let void_t context = Llvm.void_type ctx
 
   (* --- UTILITY --- *)
 
   let push_scope context : context =
-    let vscope = Hashtbl.create 10 :: context.vscope in
-    let fscope = Hashtbl.create 10 :: context.fscope in
-    {context with vscope; fscope}
+    {context with symtbl = Hashtbl.create 10 :: context.symtbl}
 
   let pop_scope context : context =
-    match context.vscope, context.fscope with
-    | [], _ | _, [] -> let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"cannot pop scope of size 0" None in
-                       exit 1
-    | _, _ -> {context with vscope=List.tl context.vscope; fscope=List.tl context.fscope}
+    if List.length context.symtbl = 0 then
+      let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"cannot pop scope of size 0" None in
+      exit 1
+    else {context with symtbl = List.tl context.symtbl}
 
-  let scope_add_variable id value context =
-    match context.vscope with
-    | [] ->
-       let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"no scope to add variable to" None in
-       exit 1
-    | hd :: _ -> Hashtbl.add hd id value
+  let add_symbol id tok ty value context : unit =
+    let sym = {tok; ty; value} in
+    match context.symtbl with
+    | [] -> failwith "cannot add symbol because the symtbl is empty"
+    | hd :: _ -> Hashtbl.add hd id sym
 
-  let scope_add_function id value context =
-    match context.fscope with
-    | [] ->
-       let _ = Err.err Err.Fatal __FILE__ __FUNCTION__ ~msg:"no scope to add function to" None in
-       exit 1
-    | hd :: _ -> Hashtbl.add hd id
-
-  let rec scope_contains_variable id context =
+  let get_symbol id context : symbol =
     let rec aux = function
-      | [] -> false
+      | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
       | hd :: tl ->
-        if Hashtbl.mem hd id then true
-        else aux tl in
-    aux context.vscope
+         (match Hashtbl.find_opt hd id with
+          | Some sym -> sym
+          | None -> aux tl) in
+    aux context.symtbl
 
-  let rec scope_contains_function id context =
+  let assert_symbol_noexist id context : unit =
     let rec aux = function
-      | [] -> false
+      | [] -> ()
       | hd :: tl ->
-         if Hashtbl.mem hd id then true
+         if Hashtbl.mem hd id then
+           failwith @@ Printf.sprintf "%s: symbol already exists: `%s`" __FUNCTION__ id
          else aux tl in
-    aux context.fscope
-
-  let scope_get_variable id context =
-    let rec aux = function
-      | [] -> failwith @@ Printf.sprintf "%s: variable %s is not in scope" __FUNCTION__ id
-      | hd :: tl ->
-         (match Hashtbl.find_opt hd id with
-          | Some v -> v
-          | None -> aux tl) in
-    aux context.vscope
-
-  let scope_get_function id context =
-    let rec aux = function
-      | [] -> failwith @@ Printf.sprintf "%s: function %s is not in scope" __FUNCTION__ id
-      | hd :: tl ->
-         (match Hashtbl.find_opt hd id with
-          | Some v -> v
-          | None -> aux tl) in
-    aux context.fscope
-
-  let assert_variables_not_in_vscope ids context =
-    List.iter (fun id ->
-        match scope_contains_variable id context with
-        | true ->
-           let var = scope_get_variable id context in
-           let msg = Printf.sprintf "variable `%s` has already been declared" id in
-           let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__ ~msg @@ Some var.tok in
-           exit 1
-        | false -> ()
-      ) ids
-
-  let assert_functions_not_in_fscope ids context =
-    List.iter (fun id ->
-        match scope_contains_function id context with
-        | true ->
-           let var = scope_get_function id context in
-           let msg = Printf.sprintf "function `%s` has already been declared" id in
-           let _ = Err.err Err.Redeclaration __FILE__ __FUNCTION__ ~msg @@ Some var.tok in
-           exit 1
-        | false -> ()
-      ) ids
+    aux context.symtbl
 
   let create_attr ?(defval=0L) context s : Llvm.llattribute =
     Llvm.create_enum_attr ctx s defval
@@ -146,7 +93,7 @@ module Emit = struct
     let zero = Llvm.const_int (Llvm.i32_type ctx) 0 in
     Llvm.build_in_bounds_gep (Llvm.i32_type ctx) s [|zero|] "" bl
 
-  let emit_entry_alloca
+  let emit_entry_block_alloca
         (func : Llvm.llvalue) (var_name : string)
         (ty : Llvm.lltype) (context : context)
       : Llvm.llvalue =
@@ -168,6 +115,7 @@ module Emit = struct
   and compile_expr_binary Ast.{lhs; op; rhs} context : Llvm.llvalue =
     let open Token in
     let open TokenType in
+
     let lhs = compile_expr lhs context in
     let rhs = compile_expr rhs context in
     match op.ttype with
@@ -187,13 +135,28 @@ module Emit = struct
 
   and compile_expr_ident i context =
     let open Token in
-    let var = scope_get_variable i.lexeme context in
-    Llvm.build_load (scr_ty_to_llvm_ty var.ty ctx) var.llvm_value var.id context.builder
+    let sym = get_symbol i.lexeme context in
+    let ty = scr_ty_to_llvm_ty (match sym.ty with
+      | Function ty -> ty
+      | Variable ty -> ty) context in
+    Llvm.build_load ty sym.value sym.tok.lexeme context.builder
 
   and compile_expr_proc_call Ast.{lhs; args} context =
-    let proc = compile_expr lhs context in
-    let args = List.map (fun expr -> compile_expr expr context) args in
-    failwith "todo: compile_expr_term"
+    (* let proc = compile_expr lhs context in *)
+    let (args : Llvm.llvalue array) = List.map (fun expr -> compile_expr expr context) args |> Array.of_list in
+    let callee = match Llvm.lookup_function lhs.lexeme md with
+      | None ->
+         let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__ ~msg:"function does not exist" @@ Some lhs in
+         exit 1
+      | Some proc -> proc in
+    let stored_proc = (get_symbol lhs.lexeme context) in
+    let stored_proc_ty = scr_ty_to_llvm_ty (match stored_proc.ty with
+                                            | Function ty -> ty
+                                            | Variable ty -> ty) context in
+    let ty = Llvm.function_type stored_proc_ty (Array.of_list
+      (List.map (fun x -> Llvm.type_of x) (Array.to_list (Llvm.params callee))
+    )) in
+    Llvm.build_call ty callee args "" context.builder
 
   and compile_expr_term expr context : Llvm.llvalue =
     match expr with
@@ -242,9 +205,7 @@ module Emit = struct
     let context = aux stmt context in
     pop_scope context
 
-  and compile_stmt_proc Ast.{id; params; rettype; block; export} context : context =
-    let _ = assert_functions_not_in_fscope [id.lexeme] context in
-
+  and compile_stmt_proc Ast.{id; params; rettype; block; _} context : context =
     (* Create the return type and parameter types *)
     let ret_ty = scr_ty_to_llvm_ty rettype context in
     let param_tys = List.map (fun ty -> scr_ty_to_llvm_ty ty context) @@ List.map snd params in
@@ -254,30 +215,31 @@ module Emit = struct
     let proc_def = Llvm.define_function id.lexeme proc_ty md in
 
     (* Add function to the scope *)
-    let (func : scr_function) = {id=id.lexeme; tok=id; ty=rettype; llvm_value=proc_def} in
-    let _ = scope_add_function id.lexeme func context in
+    let _ = add_symbol id.lexeme id (Function rettype) proc_def context in
 
     let context = push_scope context in
 
     (* Alloc all parameters on the stack and register
      * all of them into the scope. *)
-    let rec aux params context =
+    let rec aux params acc context =
       let open Token in
       match params with
-      | [] -> context
+      | [] -> context, acc
       | hd :: tl ->
          let id, tok = (fst hd).lexeme, (fst hd) in
-         let _ = assert_variables_not_in_vscope [id] context in
-         let alloca = emit_entry_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
-         let (var : scr_variable) = {id; tok; ty=(snd hd); llvm_value=alloca} in
-         let _ = scope_add_variable id var context in
-         aux tl context in
+         let _ = assert_symbol_noexist id context in
+         let alloca = emit_entry_block_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
+         let _ = add_symbol id tok (Variable (snd hd)) alloca context in
+         aux tl (acc @ [alloca]) context in
 
     (* Position the builder *)
     let builder = Llvm.builder_at ctx (Llvm.instr_begin (Llvm.entry_block proc_def)) in
 
-    (* Iter the parameters *)
-    let context = aux params context in
+    let context, values = aux params [] context in
+
+    List.iter (fun (param, value) ->
+        let _ = Llvm.build_store value param builder in
+        ()) (List.combine values (Array.to_list (Llvm.params proc_def)));
 
     (* Register the current procedure and the builder position. *)
     let context = {context with func = Some proc_def;
@@ -291,14 +253,13 @@ module Emit = struct
       | None -> failwith "no function to add variable to"
       | Some _ -> () in
 
-    let _ = assert_variables_not_in_vscope [id.lexeme] context in
+    let _ = assert_symbol_noexist id.lexeme context in
     let llvm_ty = scr_ty_to_llvm_ty ty context in
 
     let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
     let value = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
-    let (var : scr_variable) = {id=id.lexeme; tok=id; ty=ty; llvm_value=local_var} in
-    let _ = scope_add_variable id.lexeme var context in
+    let _ = add_symbol id.lexeme id (Variable ty) local_var context in
     context
 
   and compile_stmt_module stmt context : context =
@@ -331,8 +292,8 @@ module Emit = struct
     | Ast.Struct stmt -> compile_stmt_struct stmt context
 
   let emit_ir program =
-    let vscope, fscope = [Hashtbl.create 10], [Hashtbl.create 10] in
-    let context = {vscope; fscope; func=None; builder=bl} in
+    let symtbl = [Hashtbl.create 10] in
+    let context = {func=None; builder=bl; symtbl} in
 
     let rec aux toplvl_stmts context =
       match toplvl_stmts with
