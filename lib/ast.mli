@@ -32,6 +32,7 @@ module Ast : sig
     | Module of stmt_module
     | Import of stmt_import
     | Struct of stmt_struct
+    | Def of stmt_def
 
   and stmt =
     | Let of stmt_let
@@ -97,6 +98,15 @@ module Ast : sig
     ; rettype : TokenType.id_type
     ; block : stmt_block
     ; export : bool
+    ; variadic : bool
+    }
+
+  and stmt_def =
+    { id : Token.t
+    ; params : (Token.t * TokenType.id_type) list
+    ; rettype : TokenType.id_type
+    ; export : bool
+    ; variadic : bool
     }
 
   and expr =

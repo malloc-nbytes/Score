@@ -1,0 +1,13 @@
+#!/usr/local/bin/earl
+
+#--- This file can only be run if EARL is installed,
+#--- although this file is not necessary.
+
+module Main
+
+import "std/system.earl"
+
+let watch = len(argv()) > 1 && argv()[1] == "watch";
+let build = "dune exec ./bin/main.exe --profile=release";
+if watch {build += " --watch";}
+System::cmd_wcheck(build);

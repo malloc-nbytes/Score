@@ -94,6 +94,8 @@ module TokenType : sig
     | Where
     | True
     | False
+    | Underscore
+    | TriplePeriod
 
   val to_string : t -> string
   val string_of_id_type : id_type -> string

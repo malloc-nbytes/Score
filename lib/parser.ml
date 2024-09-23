@@ -23,7 +23,7 @@
 open Token
 open Ast
 
-let expect (tokens : Token.t list) (ty : TokenType.t) : Token.t * (Token.t list) =
+let rec expect (tokens : Token.t list) (ty : TokenType.t) : Token.t * (Token.t list) =
   match tokens with
   | [] ->
      let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
@@ -34,7 +34,7 @@ let expect (tokens : Token.t list) (ty : TokenType.t) : Token.t * (Token.t list)
      let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:msg (Some hd) in
      exit 1
 
-let maybe_expect tokens ty =
+and maybe_expect tokens ty =
   match tokens with
   | [] ->
      let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
@@ -42,7 +42,27 @@ let maybe_expect tokens ty =
   | hd :: tl when hd.Token.ttype = ty -> Some hd, tl
   | tokens -> None, tokens
 
-let is_mut_stmt tokens =
+let rec parse_parameters tokens =
+  let open Token in
+  let rec parse_parameters' tokens acc =
+    match tokens with
+    | [] -> acc, [], false
+    | {ttype = RParen; _} :: _ -> acc, tokens, false
+    | {ttype = TriplePeriod; _} :: tl ->
+       acc, tl, true
+    | tokens ->
+       let id, tokens = expect tokens Identifier in
+       let _, tokens = expect tokens Colon in
+       let ty, tokens = expect_idtype tokens in
+       let acc = acc @ [id, ty] in
+       (match tokens with
+        | {ttype = Comma; _} :: tl -> parse_parameters' tl acc
+        | _ -> acc, tokens, false) in
+  match tokens with
+  | {ttype = (Type Void); _} :: tl -> [], tl, false
+  | tokens -> parse_parameters' tokens []
+
+and is_mut_stmt tokens =
   let open Token in
   let open TokenType in
   let rec aux = function
@@ -53,7 +73,7 @@ let is_mut_stmt tokens =
     | _ :: tl -> aux tl in
   aux tokens
 
-let rec expect_idtype (tokens : Token.t list) : TokenType.id_type * (Token.t list) =
+and expect_idtype (tokens : Token.t list) : TokenType.id_type * (Token.t list) =
   match tokens with
   | [] ->
      let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
@@ -330,32 +350,25 @@ and parse_stmt_proc tokens export =
   let open Token in
   let open TokenType in
 
-  let rec parse_parameters' tokens acc =
-    match tokens with
-    | [] -> acc, []
-    | {ttype = RParen; _} :: _ -> acc, tokens
-    | tokens ->
-       let id, tokens = expect tokens Identifier in
-       let _, tokens = expect tokens Colon in
-       let ty, tokens = expect_idtype tokens in
-       let acc = acc @ [id, ty] in
-       (match tokens with
-        | {ttype = Comma; _} :: tl -> parse_parameters' tl acc
-        | _ -> acc, tokens) in
-
-  let parse_parameters = function
-    | {ttype = (Type Void); _} :: tl -> [], tl
-    | tokens -> parse_parameters' tokens [] in
-
-  let _, tokens = maybe_expect tokens Export in
   let id, tokens = expect tokens Identifier in
   let _, tokens = expect tokens LParen in
-  let params, tokens = parse_parameters tokens in
+  let params, tokens, variadic = parse_parameters tokens in
   let _, tokens = expect tokens RParen in
   let _, tokens = expect tokens Colon in
   let rettype, tokens = expect_idtype tokens in
   let block, tokens = parse_stmt_block tokens in
-  Ast.{id; params; rettype; block; export}, tokens
+  Ast.{id; params; rettype; block; export; variadic}, tokens
+
+and parse_stmt_def tokens export =
+  let open TokenType in
+  let id, tokens = expect tokens Identifier in
+  let _, tokens = expect tokens LParen in
+  let params, tokens, variadic = parse_parameters tokens in
+  let _, tokens = expect tokens RParen in
+  let _, tokens = expect tokens Colon in
+  let rettype, tokens = expect_idtype tokens in
+  let _, tokens = expect tokens Semicolon in
+  Ast.{id; params; rettype; export; variadic}, tokens
 
 and parse_stmt_module tokens =
   let open TokenType in
@@ -381,6 +394,9 @@ let parse_toplvl_stmt tokens =
   | {ttype = Proc; _} :: tl ->
       let stmt, tokens = parse_stmt_proc tl false in
       Ast.Proc_Def stmt, tokens
+  | {ttype = Def; _} :: tl ->
+    let stmt, tokens = parse_stmt_def tl false in
+    Ast.Def stmt, tokens
   | {ttype = Export; _} :: {ttype = Struct; _} :: tl ->
      let stmt, tokens = parse_stmt_struct tl true in
      Ast.Struct stmt, tokens
@@ -414,4 +430,3 @@ let produce_ast (tokens : Token.t list) : Ast.program =
        [stmt] @ aux rest in
 
   aux tokens
-

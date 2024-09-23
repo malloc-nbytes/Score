@@ -49,6 +49,7 @@ module Emit = struct
 
   let i32_t context = Llvm.i32_type ctx
   let void_t context = Llvm.void_type ctx
+  let str_t context = Llvm.pointer_type ctx
 
   (* --- UTILITY --- *)
 
@@ -89,9 +90,10 @@ module Emit = struct
     Llvm.create_enum_attr ctx s defval
 
   let build_global_str value context : Llvm.llvalue =
-    let s = Llvm.build_global_stringptr value "" bl in
-    let zero = Llvm.const_int (Llvm.i32_type ctx) 0 in
-    Llvm.build_in_bounds_gep (Llvm.i32_type ctx) s [|zero|] "" bl
+    let s = Llvm.build_global_stringptr value "" context.builder in
+    s
+    (* let zero = Llvm.const_int (Llvm.i32_type ctx) 0 in *)
+    (* Llvm.build_in_bounds_gep (Llvm.i32_type ctx) s [|zero|] "" bl *)
 
   let emit_entry_block_alloca
         (func : Llvm.llvalue) (var_name : string)
@@ -105,6 +107,7 @@ module Emit = struct
     match ty with
     | I32 -> Llvm.i32_type ctx
     | Void -> Llvm.void_type ctx
+    | Str -> Llvm.pointer_type ctx
     | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (string_of_id_type ty)
 
   (* --- COMPILATION --- *)
@@ -190,7 +193,8 @@ module Emit = struct
     context
 
   and compile_stmt_expr stmt context : context =
-    failwith "todo: compile_stmt_expr"
+    let _ = compile_expr stmt context in
+    context
 
   (* NOTE: It is up to the caller of this function
    * to push () the scope. This is because it
@@ -246,7 +250,9 @@ module Emit = struct
                                 builder = builder} in
 
     (* Iterate over the statements in the procedure body *)
-    compile_stmt_block block context
+    let result = compile_stmt_block block context in
+    Llvm_analysis.assert_valid_function proc_def;
+    result
 
   and compile_stmt_let Ast.{id; ty; expr; _} context : context =
     let _ = match context.func with
@@ -271,17 +277,29 @@ module Emit = struct
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
 
+  and compile_stmt_def Ast.{id; params; rettype; _} context : context =
+    (* Create the return type and parameter types *)
+    let ret_ty = scr_ty_to_llvm_ty rettype context in
+    let param_tys = List.map (fun ty -> scr_ty_to_llvm_ty ty context) @@ List.map snd params in
+
+    (* Define and create the function *)
+    let proc_ty = Llvm.function_type ret_ty (Array.of_list param_tys) in
+
+    (* Add function to the scope *)
+    (* let _ = add_symbol id.lexeme id (Function rettype) proc_ty context in*)
+    context
+
   and compile_stmt stmt context : context =
     match stmt with
     | Ast.Let s -> compile_stmt_let s context
-    | Ast.Proc _ -> failwith ""
-    | Ast.Block _ -> failwith ""
-    | Ast.Stmt_Expr _ -> failwith ""
+    | Ast.Proc _ -> failwith "todo: compile_stmt: proc"
+    | Ast.Block _ -> failwith "todo: compile_stmt: block"
+    | Ast.Stmt_Expr e -> compile_stmt_expr e context
     | Ast.Return s -> compile_stmt_return s context
-    | Ast.For _ -> failwith ""
-    | Ast.If _ -> failwith ""
-    | Ast.Mut _ -> failwith ""
-    | Ast.While _ -> failwith ""
+    | Ast.For _ -> failwith "todo: compile_stmt: for"
+    | Ast.If _ -> failwith "todo: compile_stmt: if"
+    | Ast.Mut _ -> failwith "todo: compile_stmt: mut"
+    | Ast.While _ -> failwith "todo: compile_stmt: while"
 
   let compile_toplvl_stmt toplvl_stmt context : context =
     match toplvl_stmt with
@@ -290,6 +308,7 @@ module Emit = struct
     | Ast.Module stmt -> compile_stmt_module stmt context
     | Ast.Import stmt -> compile_stmt_import stmt context
     | Ast.Struct stmt -> compile_stmt_struct stmt context
+    | Ast.Def stmt -> compile_stmt_def stmt context
 
   let emit_ir program =
     let symtbl = [Hashtbl.create 10] in

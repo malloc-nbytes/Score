@@ -94,6 +94,8 @@ module TokenType = struct
     | Where
     | True
     | False
+    | Underscore
+    | TriplePeriod
 
   let rec string_of_id_type = function
     | I32 -> "I32"
@@ -177,6 +179,8 @@ module TokenType = struct
     | Where -> "Where"
     | True -> "true"
     | False -> "false"
+    | Underscore -> "Underscore"
+    | TriplePeriod -> "TriplePeriod"
 
 end
 
