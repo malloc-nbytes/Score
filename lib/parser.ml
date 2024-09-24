@@ -359,7 +359,18 @@ and parse_stmt_proc tokens export =
   let block, tokens = parse_stmt_block tokens in
   Ast.{id; params; rettype; block; export; variadic}, tokens
 
-and parse_stmt_def tokens export =
+and parse_stmt_def tokens export : Ast.stmt_def * Token.t list =
+  let open TokenType in
+  let id, tokens = expect tokens Identifier in
+  let _, tokens = expect tokens LParen in
+  let params, tokens, variadic = parse_parameters tokens in
+  let _, tokens = expect tokens RParen in
+  let _, tokens = expect tokens Colon in
+  let rettype, tokens = expect_idtype tokens in
+  let _, tokens = expect tokens Semicolon in
+  Ast.{id; params; rettype; export; variadic}, tokens
+
+and parse_stmt_extern tokens export : Ast.stmt_extern * Token.t list =
   let open TokenType in
   let id, tokens = expect tokens Identifier in
   let _, tokens = expect tokens LParen in
@@ -395,8 +406,11 @@ let parse_toplvl_stmt tokens =
       let stmt, tokens = parse_stmt_proc tl false in
       Ast.Proc_Def stmt, tokens
   | {ttype = Def; _} :: tl ->
-    let stmt, tokens = parse_stmt_def tl false in
+    let (stmt : Ast.stmt_def), tokens = parse_stmt_def tl false in
     Ast.Def stmt, tokens
+  | {ttype = Extern; _} :: tl ->
+     let (stmt : Ast.stmt_extern), tokens = parse_stmt_extern tl false in
+     Ast.Extern stmt, tokens
   | {ttype = Export; _} :: {ttype = Struct; _} :: tl ->
      let stmt, tokens = parse_stmt_struct tl true in
      Ast.Struct stmt, tokens

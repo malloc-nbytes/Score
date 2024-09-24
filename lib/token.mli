@@ -96,6 +96,7 @@ module TokenType : sig
     | False
     | Underscore
     | TriplePeriod
+    | Extern
 
   val to_string : t -> string
   val string_of_id_type : id_type -> string

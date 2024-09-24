@@ -96,6 +96,7 @@ module TokenType = struct
     | False
     | Underscore
     | TriplePeriod
+    | Extern
 
   let rec string_of_id_type = function
     | I32 -> "I32"
@@ -181,6 +182,7 @@ module TokenType = struct
     | False -> "false"
     | Underscore -> "Underscore"
     | TriplePeriod -> "TriplePeriod"
+    | Extern -> "Extern"
 
 end
 

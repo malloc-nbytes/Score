@@ -32,7 +32,7 @@ module Emit = struct
   type symbol =
     { tok : Token.t
     ; ty : symbol_type
-    ; value : Llvm.llvalue
+    ; value : Llvm.llvalue option
     }
 
   type context =
@@ -52,6 +52,13 @@ module Emit = struct
   let str_t context = Llvm.pointer_type ctx
 
   (* --- UTILITY --- *)
+
+  let add_target_triple triple llm =
+    let lltarget = Llvm_target.Target.by_triple triple in
+    let llmachine = Llvm_target.TargetMachine.create ~triple:triple lltarget in
+    let lldly = Llvm_target.TargetMachine.data_layout llmachine in
+    Llvm.set_target_triple (Llvm_target.TargetMachine.triple llmachine) llm;
+    Llvm.set_data_layout (Llvm_target.DataLayout.as_string lldly) llm
 
   let push_scope context : context =
     {context with symtbl = Hashtbl.create 10 :: context.symtbl}
@@ -142,7 +149,9 @@ module Emit = struct
     let ty = scr_ty_to_llvm_ty (match sym.ty with
       | Function ty -> ty
       | Variable ty -> ty) context in
-    Llvm.build_load ty sym.value sym.tok.lexeme context.builder
+    match sym.value with
+    | Some value -> Llvm.build_load ty value sym.tok.lexeme context.builder
+    | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__
 
   and compile_expr_proc_call Ast.{lhs; args} context =
     (* let proc = compile_expr lhs context in *)
@@ -159,7 +168,14 @@ module Emit = struct
     let ty = Llvm.function_type stored_proc_ty (Array.of_list
       (List.map (fun x -> Llvm.type_of x) (Array.to_list (Llvm.params callee))
     )) in
-    Llvm.build_call ty callee args "" context.builder
+
+    if Llvm.is_var_arg stored_proc_ty then
+      let va_arg_ty = Llvm.var_arg_function_type stored_proc_ty (Array.of_list
+        (List.map (fun x -> Llvm.type_of x) (Array.to_list (Llvm.params callee))
+      )) in
+      Llvm.build_call va_arg_ty callee args "" context.builder
+    else
+      Llvm.build_call ty callee args "" context.builder
 
   and compile_expr_term expr context : Llvm.llvalue =
     match expr with
@@ -219,7 +235,7 @@ module Emit = struct
     let proc_def = Llvm.define_function id.lexeme proc_ty md in
 
     (* Add function to the scope *)
-    let _ = add_symbol id.lexeme id (Function rettype) proc_def context in
+    let _ = add_symbol id.lexeme id (Function rettype) (Some proc_def) context in
 
     let context = push_scope context in
 
@@ -233,7 +249,7 @@ module Emit = struct
          let id, tok = (fst hd).lexeme, (fst hd) in
          let _ = assert_symbol_noexist id context in
          let alloca = emit_entry_block_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
-         let _ = add_symbol id tok (Variable (snd hd)) alloca context in
+         let _ = add_symbol id tok (Variable (snd hd)) (Some alloca) context in
          aux tl (acc @ [alloca]) context in
 
     (* Position the builder *)
@@ -243,7 +259,7 @@ module Emit = struct
 
     List.iter (fun (param, value) ->
         let _ = Llvm.build_store value param builder in
-        ()) (List.combine values (Array.to_list (Llvm.params proc_def)));
+    ()) (List.combine values (Array.to_list (Llvm.params proc_def)));
 
     (* Register the current procedure and the builder position. *)
     let context = {context with func = Some proc_def;
@@ -251,7 +267,7 @@ module Emit = struct
 
     (* Iterate over the statements in the procedure body *)
     let result = compile_stmt_block block context in
-    Llvm_analysis.assert_valid_function proc_def;
+    (* Llvm_analysis.assert_valid_function proc_def; *)
     result
 
   and compile_stmt_let Ast.{id; ty; expr; _} context : context =
@@ -265,7 +281,7 @@ module Emit = struct
     let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
     let value = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
-    let _ = add_symbol id.lexeme id (Variable ty) local_var context in
+    let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) context in
     context
 
   and compile_stmt_module stmt context : context =
@@ -277,16 +293,25 @@ module Emit = struct
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
 
-  and compile_stmt_def Ast.{id; params; rettype; _} context : context =
+  and compile_stmt_def (Ast.{id; params; rettype; variadic; _} : Ast.stmt_def) context : context =
+    failwith "compile_stmt_def: todo"
+
+  and compile_stmt_extern (Ast.{id; params; rettype; variadic; _} : Ast.stmt_extern) context : context =
     (* Create the return type and parameter types *)
     let ret_ty = scr_ty_to_llvm_ty rettype context in
     let param_tys = List.map (fun ty -> scr_ty_to_llvm_ty ty context) @@ List.map snd params in
 
     (* Define and create the function *)
-    let proc_ty = Llvm.function_type ret_ty (Array.of_list param_tys) in
+    let proc_ty = if variadic then
+                    Llvm.var_arg_function_type ret_ty (Array.of_list param_tys)
+                  else
+                    Llvm.function_type ret_ty (Array.of_list param_tys) in
 
-    (* Add function to the scope *)
-    (* let _ = add_symbol id.lexeme id (Function rettype) proc_ty context in*)
+    let proc_decl = Llvm.declare_function id.lexeme proc_ty md in
+
+    let _ = Llvm.add_function_attr proc_decl (create_attr context "nounwind") (Llvm.AttrIndex.Function) in
+    let _ = Llvm.add_function_attr proc_decl (create_attr context "nocapture") (Llvm.AttrIndex.Param 0) in
+    let _ = add_symbol id.lexeme id (Function rettype) (Some proc_decl) context in
     context
 
   and compile_stmt stmt context : context =
@@ -309,6 +334,7 @@ module Emit = struct
     | Ast.Import stmt -> compile_stmt_import stmt context
     | Ast.Struct stmt -> compile_stmt_struct stmt context
     | Ast.Def stmt -> compile_stmt_def stmt context
+    | Ast.Extern stmt -> compile_stmt_extern stmt context
 
   let emit_ir program =
     let symtbl = [Hashtbl.create 10] in
@@ -323,5 +349,6 @@ module Emit = struct
 
     let _ = aux program context in
     Llvm_analysis.assert_valid_module md;
-    Llvm.dump_module md
+    let _ = print_endline @@ Llvm.string_of_llmodule md in
+    (* Llvm.dump_module md *) ()
 end

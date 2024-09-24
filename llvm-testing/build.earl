@@ -1,0 +1,23 @@
+#!/usr/local/bin/earl
+
+module Main
+
+import "std/system.earl"
+
+let main_file = "main";
+
+let f = |_| { panic("command failed"); };
+
+@world fn build() {
+    System::cmd_onfail(f"llvm-as {main_file}.ll", f);
+    System::cmd_onfail(f"llc -filetype=asm -mtriple=x86_64-pc-linux-gnu -relocation-model=pic ./{main_file}.bc -o {main_file}.s", f);
+    System::cmd_onfail(f"clang -c -fPIC ./{main_file}.s -o ./{main_file}.o", f);
+    System::cmd_onfail(f"clang -o {main_file} {main_file}.o -fPIE", f);
+}
+
+@world fn run() {
+    return System::cmd(f"./{main_file}");
+}
+
+build();
+run();

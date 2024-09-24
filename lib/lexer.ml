@@ -52,6 +52,7 @@ let populate_keywords () : unit =
   let _ = Hashtbl.add keywords "where"     TokenType.Where in
   let _ = Hashtbl.add keywords "true"      TokenType.True in
   let _ = Hashtbl.add keywords "false"     TokenType.False in
+  let _ = Hashtbl.add keywords "extern"    TokenType.Extern in
   ()
 
 let rec repl_quote (lst : char list) : string =

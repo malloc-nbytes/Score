@@ -33,6 +33,7 @@ module Ast = struct
     | Import of stmt_import
     | Struct of stmt_struct
     | Def of stmt_def
+    | Extern of stmt_extern
 
   and stmt =
     | Let of stmt_let
@@ -102,6 +103,14 @@ module Ast = struct
     }
 
   and stmt_def =
+    { id : Token.t
+    ; params : (Token.t * TokenType.id_type) list
+    ; rettype : TokenType.id_type
+    ; export : bool
+    ; variadic : bool
+    }
+
+  and stmt_extern =
     { id : Token.t
     ; params : (Token.t * TokenType.id_type) list
     ; rettype : TokenType.id_type

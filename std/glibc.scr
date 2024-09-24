@@ -1,0 +1,4 @@
+module C where
+
+extern printf(format: str, ...): i32;
+
