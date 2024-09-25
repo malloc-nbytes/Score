@@ -119,8 +119,10 @@ module Emit = struct
     let open TokenType in
     match ty with
     | I32 -> Llvm.i32_type ctx
+    | I8 -> Llvm.i8_type ctx
     | Void -> Llvm.void_type ctx
     | Str -> Llvm.pointer_type ctx
+    | Pointer _ -> Llvm.pointer_type ctx
     | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (string_of_id_type ty)
 
   let llvm_ty_to_scr_ty ty =
@@ -406,7 +408,7 @@ module Emit = struct
     let proc_decl = Llvm.declare_function id.lexeme proc_ty md in
 
     let _ = Llvm.add_function_attr proc_decl (create_attr context "nounwind") (Llvm.AttrIndex.Function) in
-    let _ = Llvm.add_function_attr proc_decl (create_attr context "nocapture") (Llvm.AttrIndex.Param 0) in
+    (* let _ = Llvm.add_function_attr proc_decl (create_attr context "nocapture") (Llvm.AttrIndex.Param 0) in *)
     let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_decl) context in
     context
 

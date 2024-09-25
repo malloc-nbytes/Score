@@ -36,9 +36,7 @@ let rec expect (tokens : Token.t list) (ty : TokenType.t) : Token.t * (Token.t l
 
 and maybe_expect tokens ty =
   match tokens with
-  | [] ->
-     let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
-     exit 1
+  | [] -> None, []
   | hd :: tl when hd.Token.ttype = ty -> Some hd, tl
   | tokens -> None, tokens
 
@@ -53,7 +51,7 @@ let rec parse_parameters tokens =
     | tokens ->
        let id, tokens = expect tokens Identifier in
        let _, tokens = expect tokens Colon in
-       let ty, tokens = expect_idtype tokens in
+       let ty, tokens = expect_idtype tokens None in
        let acc = acc @ [id, ty] in
        (match tokens with
         | {ttype = Comma; _} :: tl -> parse_parameters' tl acc
@@ -73,18 +71,32 @@ and is_mut_stmt tokens =
     | _ :: tl -> aux tl in
   aux tokens
 
-and expect_idtype (tokens : Token.t list) : TokenType.id_type * (Token.t list) =
+and unwrap : 'a = function
+  | Some k -> k
+  | None ->
+     let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:"tried to unwrap a None value" None in
+     exit 1
+
+and expect_idtype (tokens : Token.t list) (prev : TokenType.id_type option) : TokenType.id_type * (Token.t list) =
+  let open TokenType in
   match tokens with
   | [] ->
      let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
      exit 1
-  | {ttype = _ as ty; _} as hd :: tl ->
-     (match ty with
-     | TokenType.Type k -> k, tl
-     | _ ->
-       let msg = Printf.sprintf "Expected token of type `Type` but got `%s`" (TokenType.to_string hd.ttype) in
-       let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:msg (Some hd) in
-       exit 1)
+  | {ttype = Asterisk; _} :: tl when prev <> None -> expect_idtype tl (Some (Pointer (unwrap prev)))
+  | {ttype = LBracket; _} :: tl when prev <> None ->
+     let len, tokens = maybe_expect tl IntegerLiteral in
+     let len = match len with
+       | Some i -> Some (int_of_string i.lexeme)
+       | None -> None in
+     let _, tokens = expect tokens RBracket in
+     expect_idtype tokens (Some (Array (unwrap prev, len)))
+  | {ttype = Type k; _} :: tl -> expect_idtype tl (Some k)
+  | tokens when prev <> None -> unwrap prev, tokens
+  | hd :: _ ->
+     let msg = Printf.sprintf "Expected token of type `Type` but got `%s`" (TokenType.to_string hd.ttype) in
+     let _ = Err.err Err.Expect __FILE__ __FUNCTION__ ~msg:msg (Some hd) in
+     exit 1
 
 and parse_comma_sep_exprs tokens =
   let open Token in
@@ -115,7 +127,7 @@ and parse_ids_and_types_group (tokens : Token.t list) : ((Token.t * TokenType.id
     | tokens ->
       let id, tokens = expect tokens Identifier in
       let _, tokens = expect tokens Colon in
-      let ty, tokens = expect_idtype tokens in
+      let ty, tokens = expect_idtype tokens None in
       let acc = acc @ [id, ty] in
       (match tokens with
        | {ttype = Comma; _} :: tl -> aux tl acc
@@ -339,7 +351,7 @@ and parse_stmt_let tokens =
 
   let id, tokens = expect tokens Identifier in
   let _, tokens = expect tokens Colon in
-  let ty, tokens = expect_idtype tokens in
+  let ty, tokens = expect_idtype tokens None in
   let _, tokens = expect tokens Equals in
   let expr, tokens = parse_expr tokens in
   let _, tokens = expect tokens Semicolon in
@@ -355,7 +367,7 @@ and parse_stmt_proc tokens export =
   let params, tokens, variadic = parse_parameters tokens in
   let _, tokens = expect tokens RParen in
   let _, tokens = expect tokens Colon in
-  let rettype, tokens = expect_idtype tokens in
+  let rettype, tokens = expect_idtype tokens None in
   let block, tokens = parse_stmt_block tokens in
   Ast.{id; params; rettype; block; export; variadic}, tokens
 
@@ -366,7 +378,7 @@ and parse_stmt_def tokens export : Ast.stmt_def * Token.t list =
   let params, tokens, variadic = parse_parameters tokens in
   let _, tokens = expect tokens RParen in
   let _, tokens = expect tokens Colon in
-  let rettype, tokens = expect_idtype tokens in
+  let rettype, tokens = expect_idtype tokens None in
   let _, tokens = expect tokens Semicolon in
   Ast.{id; params; rettype; export; variadic}, tokens
 
@@ -377,7 +389,7 @@ and parse_stmt_extern tokens export : Ast.stmt_extern * Token.t list =
   let params, tokens, variadic = parse_parameters tokens in
   let _, tokens = expect tokens RParen in
   let _, tokens = expect tokens Colon in
-  let rettype, tokens = expect_idtype tokens in
+  let rettype, tokens = expect_idtype tokens None in
   let _, tokens = expect tokens Semicolon in
   Ast.{id; params; rettype; export; variadic}, tokens
 

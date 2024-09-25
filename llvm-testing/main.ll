@@ -1,10 +1,14 @@
 ; ModuleID = 'global_mod'
 source_filename = "global_mod"
 
-@0 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
+; Function Attrs: nounwind
+declare i32 @printf(ptr, ...) #0
 
 ; Function Attrs: nounwind
-declare i32 @printf(ptr nocapture, ...) #0
+declare ptr @malloc(i32) #0
+
+; Function Attrs: nounwind
+declare void @free(ptr) #0
 
 define i32 @sum(i32 %0, i32 %1) {
 entry:
@@ -31,13 +35,16 @@ loop_cond:                                        ; preds = %loop_body, %entry
 
 loop_body:                                        ; preds = %loop_cond
   %i2 = load i32, ptr %i, align 4
-  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %i2)
-  %i3 = load i32, ptr %i, align 4
-  %addtmp = add i32 %i3, 1
+  %addtmp = add i32 %i2, 1
   store i32 %addtmp, ptr %i, align 4
   br label %loop_cond
 
 loop_end:                                         ; preds = %loop_cond
+  %x = alloca ptr, align 8
+  %0 = call ptr @malloc(i32 1000000)
+  store ptr %0, ptr %x, align 8
+  %x3 = load ptr, ptr %x, align 8
+  call void @free(ptr %x3)
   ret i32 0
 }
 
