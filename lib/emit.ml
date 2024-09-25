@@ -23,6 +23,7 @@
 open Ast
 open Err
 open Token
+open Types
 
 module Emit = struct
   type function_ =
@@ -122,6 +123,19 @@ module Emit = struct
     | Str -> Llvm.pointer_type ctx
     | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (string_of_id_type ty)
 
+  let llvm_ty_to_scr_ty ty =
+    let open TokenType in
+    match Llvm.classify_type ty with
+    | Llvm.TypeKind.Integer -> I32
+    | Llvm.TypeKind.Void -> Void
+    | Llvm.TypeKind.Pointer -> Str
+    | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (Llvm.string_of_lltype ty)
+
+  let assert_types_compat ty1 ty2 =
+    if not (Types.typecheck ty1 ty2) then
+      failwith @@ Printf.sprintf "%s: type mismatch: `%s` and `%s`" __FUNCTION__ (TokenType.string_of_id_type ty1) (TokenType.string_of_id_type ty2)
+    else ()
+
   (* --- COMPILATION --- *)
 
   let rec compile_expr_unary expr context : Llvm.llvalue =
@@ -133,6 +147,9 @@ module Emit = struct
 
     let lhs = compile_expr lhs context in
     let rhs = compile_expr rhs context in
+    let _ = assert_types_compat
+            (llvm_ty_to_scr_ty (Llvm.type_of lhs))
+            (llvm_ty_to_scr_ty (Llvm.type_of rhs)) in
     match op.ttype with
     | Plus -> Llvm.build_add lhs rhs "addtmp" context.builder
     | Minus -> Llvm.build_sub lhs rhs "subtmp" context.builder
@@ -206,7 +223,7 @@ module Emit = struct
 
   and compile_stmt_mut Ast.{left; op; right} context : context =
     (* Compile the left-hand side expression to get the variable *)
-    let left_value = compile_expr left context in
+    (* let left_value = compile_expr left context in *)
 
     (* Ensure the left expression is a variable *)
     (match left with
@@ -215,21 +232,15 @@ module Emit = struct
 
         (* Ensure it's a variable and has a value *)
         (match sym.ty with
-         | Variable _ ->
+         | Variable varty ->
             (match sym.value with
              | Some llvm_value ->
                 (* Compile the right-hand side expression *)
                 let right_value = compile_expr right context in
 
-                (* Perform the operation based on the operator *)
-                (* let new_value = *)
-                (*   match op.ttype with *)
-                (*   | Plus -> Llvm.build_add left_value right_value "addtmp" context.builder *)
-                (*   | Minus -> Llvm.build_sub left_value right_value "subtmp" context.builder *)
-                (*   | Asterisk -> Llvm.build_mul left_value right_value "multmp" context.builder *)
-                (*   | ForwardSlash -> Llvm.build_sdiv left_value right_value "divtmp" context.builder *)
-                (*   | _ -> *)
-                (*      failwith @@ Printf.sprintf "%s: unhandled mutation operator: %s" __FUNCTION__ op.lexeme in *)
+                let llvm_ty = llvm_ty_to_scr_ty (Llvm.type_of right_value) in
+
+                let _ = assert_types_compat varty llvm_ty in
 
                 (* Build a store instruction to update the variable's value *)
                 let _ = Llvm.build_store right_value llvm_value context.builder in
