@@ -97,6 +97,18 @@ let consume_while (lst : char list) (predicate : char -> bool) : string * char l
   in
   aux lst ""
 
+let handle_string_escape_sequences (s : string) : string =
+  let rec aux s =
+    match s with
+    | [] -> ""
+    | '\\' :: 'n' :: tl -> "\n" ^ aux tl
+    | '\\' :: 't' :: tl -> "\t" ^ aux tl
+    | '\\' :: 'r' :: tl -> "\r" ^ aux tl
+    | '\\' :: '0' :: tl -> "\000" ^ aux tl
+    | '\\' :: '\\' :: tl -> "\\" ^ aux tl
+    | hd :: tl -> String.make 1 hd ^ aux tl in
+  aux (String.to_seq s |> List.of_seq)
+
 (* Given `src` (source code converted to a char list), will lex
  * all chars into tokens. `r` and `c` are the rows and columns that
  * will be added to a created token for error reporting. *)
@@ -135,7 +147,9 @@ let rec lex_file (fp : string) (src : char list) (r : int) (c : int) : Token.t l
 
   (* String literals *)
   | '"' :: tl ->
+     (* let strlit, rest = consume_while tl (fun c -> c <> '"') in *)
      let strlit, rest = consume_while tl (fun c -> c <> '"') in
+     let strlit = handle_string_escape_sequences strlit in
      if rest = []
      then
        let _ = Err.err Err.Fatal
