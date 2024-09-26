@@ -45,6 +45,7 @@ module Emit = struct
     { func : Llvm.llvalue option
     ; builder : Llvm.llbuilder
     ; symtbl : ((string, symbol) Hashtbl.t list)
+    ; last_sym : symbol option
     }
 
   let ctx = Llvm.global_context ()
@@ -58,6 +59,15 @@ module Emit = struct
   let str_t context = Llvm.pointer_type ctx
 
   (* --- UTILITY --- *)
+
+  let rec strip_pointer_type ty =
+    let open TokenType in
+    match ty with
+    | Pointer p ->
+       (match p with
+        | Pointer k -> strip_pointer_type k
+        | _ -> p)
+    | _ -> failwith "tried to strip pointer type from non-pointer type"
 
   let add_target_triple triple llm =
     let lltarget = Llvm_target.Target.by_triple triple in
@@ -143,46 +153,47 @@ module Emit = struct
   let rec compile_expr_unary expr context : Llvm.llvalue =
     failwith "compile_expr_unary: todo"
 
-  and compile_expr_binary Ast.{lhs; op; rhs} context : Llvm.llvalue =
+  and compile_expr_binary Ast.{lhs; op; rhs} context : Llvm.llvalue * context =
     let open Token in
     let open TokenType in
 
-    let lhs = compile_expr lhs context in
-    let rhs = compile_expr rhs context in
+    let lhs, context = compile_expr lhs context in
+    let rhs, context = compile_expr rhs context in
     let _ = assert_types_compat
             (llvm_ty_to_scr_ty (Llvm.type_of lhs))
             (llvm_ty_to_scr_ty (Llvm.type_of rhs)) in
     match op.ttype with
-    | Plus -> Llvm.build_add lhs rhs "addtmp" context.builder
-    | Minus -> Llvm.build_sub lhs rhs "subtmp" context.builder
-    | Asterisk -> Llvm.build_mul lhs rhs "multmp" context.builder
-    | ForwardSlash -> Llvm.build_sdiv lhs rhs "divtmp" context.builder
-    | LessThan -> Llvm.build_icmp Llvm.Icmp.Slt lhs rhs "cmptmp" context.builder
-    | GreaterThan -> Llvm.build_icmp Llvm.Icmp.Sgt lhs rhs "cmptmp" context.builder
-    | DoubleEquals -> Llvm.build_icmp Llvm.Icmp.Eq lhs rhs "cmptmp" context.builder
+    | Plus -> Llvm.build_add lhs rhs "addtmp" context.builder, context
+    | Minus -> Llvm.build_sub lhs rhs "subtmp" context.builder, context
+    | Asterisk -> Llvm.build_mul lhs rhs "multmp" context.builder, context
+    | ForwardSlash -> Llvm.build_sdiv lhs rhs "divtmp" context.builder, context
+    | LessThan -> Llvm.build_icmp Llvm.Icmp.Slt lhs rhs "cmptmp" context.builder, context
+    | GreaterThan -> Llvm.build_icmp Llvm.Icmp.Sgt lhs rhs "cmptmp" context.builder, context
+    | DoubleEquals -> Llvm.build_icmp Llvm.Icmp.Eq lhs rhs "cmptmp" context.builder, context
     | _ -> failwith @@ Printf.sprintf "%s: unhandled binary operator: %s" __FUNCTION__ op.lexeme
 
   and compile_expr_intlit i context =
     let open Token in
-    Llvm.const_int (i32_t context) (int_of_string i.lexeme)
+    Llvm.const_int (i32_t context) (int_of_string i.lexeme), context
 
   and compile_expr_strlit s context =
     let open Token in
-    build_global_str s.lexeme context
+    build_global_str s.lexeme context, context
 
   and compile_expr_ident i context =
     let open Token in
     let sym = get_symbol i.lexeme context in
+    let context = {context with last_sym=Some sym} in
     let ty = scr_ty_to_llvm_ty (match sym.ty with
       | Function f -> f.rettype
       | Variable ty -> ty) context in
     match sym.value with
-    | Some value -> Llvm.build_load ty value sym.tok.lexeme context.builder
+    | Some value -> Llvm.build_load ty value sym.tok.lexeme context.builder, context
     | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__
 
   and compile_expr_proc_call Ast.{lhs; args} context =
     (* let proc = compile_expr lhs context in *)
-    let (args : Llvm.llvalue array) = List.map (fun expr -> compile_expr expr context) args |> Array.of_list in
+    let (args : Llvm.llvalue array) = List.map (fun expr -> let value, _ = compile_expr expr context in value) args |> Array.of_list in
     let callee = match Llvm.lookup_function lhs.lexeme md with
       | None ->
          let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__ ~msg:"function does not exist" @@ Some lhs in
@@ -204,24 +215,31 @@ module Emit = struct
       let va_arg_ty = Llvm.var_arg_function_type stored_proc_ty (Array.of_list
         (List.map (fun x -> Llvm.type_of x) (Array.to_list (Llvm.params callee))
       )) in
-      Llvm.build_call va_arg_ty callee args "" context.builder
+      Llvm.build_call va_arg_ty callee args "" context.builder, context
     else
-      Llvm.build_call ty callee args "" context.builder
+      Llvm.build_call ty callee args "" context.builder, context
 
   and compile_expr_index Ast.{accessor; idx} context =
     let open Token in
-    let accessor_value = compile_expr accessor context in
-    let accessor_type = Llvm.type_of accessor_value in
 
-    let index_value = compile_expr idx context in
+    let accessor_value, context = compile_expr accessor context in
 
-    (* let underlying_type = Llvm.element_type accessor_type in *)
+    let stripped_ty = match context.last_sym with
+      | Some s -> (match s.ty with
+                   | Function ty -> ty.rettype
+                   | Variable ty -> ty)
+      | None -> failwith "cannot strip ty" in
+
+    let stripped_ty = strip_pointer_type stripped_ty in
+    let stripped_ty = scr_ty_to_llvm_ty stripped_ty context in
+
+    let index_value, context = compile_expr idx context in
 
     (* Get the pointer to the indexed element *)
-    let pointer = Llvm.build_in_bounds_gep accessor_type accessor_value [|index_value|] "indexptr" context.builder in
-    Llvm.build_load (i32_t ctx) pointer "loadtmp" context.builder
+    let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
+    Llvm.build_load (i32_t ctx) pointer "loadtmp" context.builder, context
 
-  and compile_expr_term expr context : Llvm.llvalue =
+  and compile_expr_term expr context : Llvm.llvalue * context =
     match expr with
     | Ast.IntLit i -> compile_expr_intlit i context
     | Ast.StrLit s -> compile_expr_strlit s context
@@ -230,7 +248,7 @@ module Emit = struct
     | Ast.Index i -> compile_expr_index i context
     | _ -> failwith "todo: compile_expr_term"
 
-  and compile_expr expr context : Llvm.llvalue =
+  and compile_expr expr context : Llvm.llvalue * context =
     match expr with
     | Ast.Term e -> compile_expr_term e context
     | Ast.Binary e -> compile_expr_binary e context
@@ -250,7 +268,7 @@ module Emit = struct
             (match sym.value with
              | Some llvm_value ->
                 (* Compile the right-hand side expression *)
-                let right_value = compile_expr right context in
+                let right_value, context = compile_expr right context in
 
                 let llvm_ty = llvm_ty_to_scr_ty (Llvm.type_of right_value) in
                 let _ = assert_types_compat varty llvm_ty in
@@ -263,19 +281,23 @@ module Emit = struct
          | _ ->
             failwith @@ Printf.sprintf "%s: symbol `%s` is not a variable" __FUNCTION__ id.lexeme)
      | Ast.Term (Ast.Index {accessor; idx}) ->
-        let accessor_value = compile_expr accessor context in
-        let index_value = compile_expr idx context in
-        let llvm_ty = Llvm.type_of accessor_value in
+        let accessor_value, context = compile_expr accessor context in
+
+        let stripped_ty = match context.last_sym with
+          | Some s -> (match s.ty with
+                       | Function ty -> ty.rettype
+                       | Variable ty -> ty)
+          | None -> failwith "cannot strip ty" in
+        let stripped_ty = strip_pointer_type stripped_ty in
+        let stripped_ty = scr_ty_to_llvm_ty stripped_ty context in
+
+        let index_value, context = compile_expr idx context in
 
         (* Get the pointer to the indexed element *)
-        let pointer = Llvm.build_in_bounds_gep llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
+        let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
 
         (* Compile the right-hand side expression to get the new value *)
-        let right_value = compile_expr right context in
-
-        (* Ensure the types are compatible *)
-        (* let llvm_indexed_ty = llvm_ty_to_scr_ty (Llvm.type_of right_value) in *)
-        (* Assuming the original array element type matches with right_value's type *)
+        let right_value, context = compile_expr right context in
 
         (* Store the new value at the indexed pointer *)
         let _ = Llvm.build_store right_value pointer context.builder in
@@ -310,7 +332,7 @@ module Emit = struct
     let merge_block = Llvm.append_block ctx "ifcont" func in
 
     (* Compile the condition *)
-    let cond_value = compile_expr expr context in
+    let cond_value, context = compile_expr expr context in
 
     (* Create the conditional branch based on the condition *)
     let _ = match else_block with
@@ -364,7 +386,7 @@ module Emit = struct
     let context = {context with builder = builder} in
 
     (* Compile the while condition *)
-    let cond_value = compile_expr _while context in
+    let cond_value, context = compile_expr _while context in
 
     (* Create the conditional branch based on the condition *)
     let _ = Llvm.build_cond_br cond_value loop_body_block loop_end_block builder in
@@ -405,7 +427,7 @@ module Emit = struct
     let context = {context with builder = builder} in
 
     (* Compile the while condition *)
-    let cond_value = compile_expr expr context in
+    let cond_value, context = compile_expr expr context in
 
     (* Create the conditional branch based on the condition *)
     let _ = Llvm.build_cond_br cond_value loop_body_block loop_end_block builder in
@@ -426,7 +448,7 @@ module Emit = struct
     context
 
   and compile_stmt_return expr context : context =
-    let value = compile_expr expr context in
+    let value, context = compile_expr expr context in
     let _ = Llvm.build_ret value context.builder in
     context
 
@@ -487,9 +509,10 @@ module Emit = struct
     let llvm_ty = scr_ty_to_llvm_ty ty context in
 
     let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
-    let value = compile_expr expr context in
+    let value, context = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
     let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) context in
+
     context
 
   and compile_stmt_module stmt context : context =
@@ -546,7 +569,7 @@ module Emit = struct
 
   let emit_ir program =
     let symtbl = [Hashtbl.create 10] in
-    let context = {func=None; builder=bl; symtbl} in
+    let context = {func=None; builder=bl; symtbl; last_sym=None} in
 
     let rec aux toplvl_stmts context =
       match toplvl_stmts with
