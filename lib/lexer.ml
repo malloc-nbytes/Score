@@ -29,6 +29,7 @@ let keywords : (string, TokenType.t) Hashtbl.t = Hashtbl.create 30
 let populate_keywords () : unit =
   let _ = Hashtbl.add keywords "i32"    @@ TokenType.Type TokenType.I32 in
   let _ = Hashtbl.add keywords "i8"     @@ TokenType.Type TokenType.I8 in
+  let _ = Hashtbl.add keywords "u8"     @@ TokenType.Type TokenType.U8 in
   let _ = Hashtbl.add keywords "char"   @@ TokenType.Type TokenType.Char in
   let _ = Hashtbl.add keywords "usize"  @@ TokenType.Type TokenType.Usize in
   let _ = Hashtbl.add keywords "str"    @@ TokenType.Type TokenType.Str in

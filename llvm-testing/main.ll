@@ -1,6 +1,8 @@
 ; ModuleID = 'global_mod'
 source_filename = "global_mod"
 
+@0 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
+
 ; Function Attrs: nounwind
 declare i32 @printf(ptr, ...) #0
 
@@ -24,27 +26,24 @@ entry:
 
 define i32 @main() {
 entry:
-  %i = alloca i32, align 4
-  store i32 0, ptr %i, align 4
+  %x = alloca i32, align 4
+  store i32 0, ptr %x, align 4
   br label %loop_cond
 
 loop_cond:                                        ; preds = %loop_body, %entry
-  %i1 = load i32, ptr %i, align 4
-  %cmptmp = icmp slt i32 %i1, 10
+  %x1 = load i32, ptr %x, align 4
+  %cmptmp = icmp slt i32 %x1, 10
   br i1 %cmptmp, label %loop_body, label %loop_end
 
 loop_body:                                        ; preds = %loop_cond
-  %i2 = load i32, ptr %i, align 4
-  %addtmp = add i32 %i2, 1
-  store i32 %addtmp, ptr %i, align 4
+  %x2 = load i32, ptr %x, align 4
+  %0 = call i32 (ptr, ...) @printf(ptr @0, i32 %x2)
+  %x3 = load i32, ptr %x, align 4
+  %addtmp = add i32 %x3, 1
+  store i32 %addtmp, ptr %x, align 4
   br label %loop_cond
 
 loop_end:                                         ; preds = %loop_cond
-  %x = alloca ptr, align 8
-  %0 = call ptr @malloc(i32 1000000)
-  store ptr %0, ptr %x, align 8
-  %x3 = load ptr, ptr %x, align 8
-  call void @free(ptr %x3)
   ret i32 0
 }
 

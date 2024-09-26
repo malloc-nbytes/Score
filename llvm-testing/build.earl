@@ -20,4 +20,4 @@ let f = |_| { panic("command failed"); };
 }
 
 build();
-run();
+# run();

@@ -23,6 +23,7 @@
 module TokenType : sig
   type id_type =
     | I32
+    | U8
     | I8
     | Str
     | Usize

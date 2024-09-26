@@ -158,6 +158,8 @@ module Emit = struct
     | Asterisk -> Llvm.build_mul lhs rhs "multmp" context.builder
     | ForwardSlash -> Llvm.build_sdiv lhs rhs "divtmp" context.builder
     | LessThan -> Llvm.build_icmp Llvm.Icmp.Slt lhs rhs "cmptmp" context.builder
+    | GreaterThan -> Llvm.build_icmp Llvm.Icmp.Sgt lhs rhs "cmptmp" context.builder
+    | DoubleEquals -> Llvm.build_icmp Llvm.Icmp.Eq lhs rhs "cmptmp" context.builder
     | _ -> failwith @@ Printf.sprintf "%s: unhandled binary operator: %s" __FUNCTION__ op.lexeme
 
   and compile_expr_intlit i context =
@@ -220,9 +222,6 @@ module Emit = struct
     | Ast.Binary e -> compile_expr_binary e context
     | Ast.Unary _ -> failwith "Unary"
 
-  let rec compile_stmt_while stmt context : context =
-    failwith "todo: compile_stmt_while"
-
   and compile_stmt_mut Ast.{left; op; right} context : context =
     (* Compile the left-hand side expression to get the variable *)
     (* let left_value = compile_expr left context in *)
@@ -241,7 +240,6 @@ module Emit = struct
                 let right_value = compile_expr right context in
 
                 let llvm_ty = llvm_ty_to_scr_ty (Llvm.type_of right_value) in
-
                 let _ = assert_types_compat varty llvm_ty in
 
                 (* Build a store instruction to update the variable's value *)
@@ -254,8 +252,66 @@ module Emit = struct
      | _ ->
         failwith "Left-hand side of mutation must be an identifier")
 
-  and compile_stmt_if stmt context : context =
-    failwith "todo: compile_stmt_if"
+  (* NOTE: It is up to the caller of this function
+   * to push () and pop () the scope. This is because it
+   * makes it easier to keep track of proc params! *)
+   and compile_stmt_block stmt context : context =
+    let rec aux lst context =
+      match lst with
+      | [] -> context
+      | hd :: tl ->
+         let context = compile_stmt hd context in
+         aux tl context in
+    aux stmt context
+
+  and compile_stmt_if Ast.{expr; block; _else} context : context =
+    let ctx = Llvm.global_context () in
+    let func = Option.get context.func in
+
+    (* Create blocks for the if statement *)
+    let then_block = Llvm.append_block ctx "then" func in
+    (* let else_block = Llvm.append_block ctx "else" func in *)
+    let else_block = match _else with
+      | Some _ -> Some (Llvm.append_block ctx "else" func)
+      | None -> None in
+
+    (* Create the merge block *)
+    let merge_block = Llvm.append_block ctx "ifcont" func in
+
+    (* Compile the condition *)
+    let cond_value = compile_expr expr context in
+
+    (* Create the conditional branch based on the condition *)
+    let _ = match else_block with
+      | Some else_block ->
+        Llvm.build_cond_br cond_value then_block else_block context.builder
+      | None ->
+        Llvm.build_cond_br cond_value then_block merge_block context.builder in
+
+    (* Position the builder at the then block *)
+    let builder = Llvm.builder_at ctx (Llvm.instr_begin then_block) in
+    let context = {context with builder = builder} in
+
+    (* Compile the then block *)
+    let context = compile_stmt_block block context in
+
+    (* Create a branch to the merge block from the then block *)
+    let _ = Llvm.build_br merge_block context.builder in
+
+    (* Position the builder at the else block *)
+    let builder = match else_block with
+      | Some else_block -> Llvm.builder_at ctx (Llvm.instr_begin else_block)
+      | None -> Llvm.builder_at ctx (Llvm.instr_begin merge_block) in
+    let context = {context with builder = builder} in
+
+    (* Compile the else block *)
+    match _else with
+    | Some _else ->
+      let context = compile_stmt_block _else context in
+      let _ = Llvm.build_br merge_block context.builder in
+      {context with builder = Llvm.builder_at ctx (Llvm.instr_begin merge_block)}
+    | None ->
+      {context with builder = Llvm.builder_at ctx (Llvm.instr_begin merge_block)}
 
   and compile_stmt_for Ast.{start; _while; _end; block} context : context =
     let context = push_scope context in
@@ -302,6 +358,42 @@ module Emit = struct
 
     context
 
+  and compile_stmt_while (Ast.{expr; block} : Ast.stmt_while) context : context =
+    let context = push_scope context in
+
+    (* Create the condition block and the loop body block *)
+    let loop_cond_block = Llvm.append_block ctx "loop_cond" (Option.get context.func) in
+    let loop_body_block = Llvm.append_block ctx "loop_body" (Option.get context.func) in
+    let loop_end_block = Llvm.append_block ctx "loop_end" (Option.get context.func) in
+
+    (* Create a branch to the condition block from the entry block *)
+    let _ = Llvm.build_br loop_cond_block context.builder in
+
+    (* Position the builder at the condition block *)
+    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_cond_block) in
+    let context = {context with builder = builder} in
+
+    (* Compile the while condition *)
+    let cond_value = compile_expr expr context in
+
+    (* Create the conditional branch based on the condition *)
+    let _ = Llvm.build_cond_br cond_value loop_body_block loop_end_block builder in
+
+    (* Position the builder at the body block *)
+    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_body_block) in
+    let context = {context with builder = builder} in
+
+    (* Compile the loop body *)
+    let context = compile_stmt_block block context in
+
+    (* Unconditionally branch back to the condition block *)
+    let _ = Llvm.build_br loop_cond_block context.builder in
+
+    (* Position the builder at the end block *)
+    let context = {context with builder = Llvm.builder_at ctx (Llvm.instr_begin loop_end_block)} in
+    let context = pop_scope context in
+    context
+
   and compile_stmt_return expr context : context =
     let value = compile_expr expr context in
     let _ = Llvm.build_ret value context.builder in
@@ -310,19 +402,6 @@ module Emit = struct
   and compile_stmt_expr stmt context : context =
     let _ = compile_expr stmt context in
     context
-
-  (* NOTE: It is up to the caller of this function
-   * to push () and pop () the scope. This is because it
-   * makes it easier to keep track of proc params! *)
-  and compile_stmt_block stmt context : context =
-    let rec aux lst context =
-      match lst with
-      | [] -> context
-      | hd :: tl ->
-         let context = compile_stmt hd context in
-         aux tl context in
-    aux stmt context
-    (* pop_scope context *)
 
   and compile_stmt_proc Ast.{id; params; rettype; block; variadic} context : context =
     (* Create the return type and parameter types *)
@@ -420,9 +499,9 @@ module Emit = struct
     | Ast.Stmt_Expr e -> compile_stmt_expr e context
     | Ast.Return s -> compile_stmt_return s context
     | Ast.For f -> compile_stmt_for f context
-    | Ast.If _ -> failwith "todo: compile_stmt: if"
+    | Ast.If _if -> compile_stmt_if _if context
     | Ast.Mut m -> compile_stmt_mut m context
-    | Ast.While _ -> failwith "todo: compile_stmt: while"
+    | Ast.While w -> compile_stmt_while w context
 
   let compile_toplvl_stmt toplvl_stmt context : context =
     match toplvl_stmt with
@@ -446,7 +525,7 @@ module Emit = struct
          aux tl context in
 
     let _ = aux program context in
-    Llvm_analysis.assert_valid_module md;
     let _ = print_endline @@ Llvm.string_of_llmodule md in
+    Llvm_analysis.assert_valid_module md;
     (* Llvm.dump_module md *) ()
 end

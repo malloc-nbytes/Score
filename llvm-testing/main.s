@@ -22,39 +22,40 @@ sum:                                    # @sum
 main:                                   # @main
 	.cfi_startproc
 # %bb.0:                                # %entry
-	pushq	%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset %rbp, -16
-	movq	%rsp, %rbp
-	.cfi_def_cfa_register %rbp
 	pushq	%rbx
-	pushq	%rax
-	.cfi_offset %rbx, -24
-	movl	$0, -12(%rbp)
-	cmpl	$9, -12(%rbp)
+	.cfi_def_cfa_offset 16
+	subq	$16, %rsp
+	.cfi_def_cfa_offset 32
+	.cfi_offset %rbx, -16
+	movl	$0, 12(%rsp)
+	leaq	.L__unnamed_1(%rip), %rbx
+	cmpl	$9, 12(%rsp)
 	jg	.LBB1_3
 	.p2align	4, 0x90
 .LBB1_2:                                # %loop_body
                                         # =>This Inner Loop Header: Depth=1
-	incl	-12(%rbp)
-	cmpl	$9, -12(%rbp)
+	movl	12(%rsp), %esi
+	movq	%rbx, %rdi
+	xorl	%eax, %eax
+	callq	printf@PLT
+	incl	12(%rsp)
+	cmpl	$9, 12(%rsp)
 	jle	.LBB1_2
 .LBB1_3:                                # %loop_end
-	movq	%rsp, %rbx
-	leaq	-16(%rbx), %rsp
-	movl	$1000000, %edi                  # imm = 0xF4240
-	callq	malloc@PLT
-	movq	%rax, -16(%rbx)
-	movq	%rax, %rdi
-	callq	free@PLT
 	xorl	%eax, %eax
-	leaq	-8(%rbp), %rsp
+	addq	$16, %rsp
+	.cfi_def_cfa_offset 16
 	popq	%rbx
-	popq	%rbp
-	.cfi_def_cfa %rsp, 8
+	.cfi_def_cfa_offset 8
 	retq
 .Lfunc_end1:
 	.size	main, .Lfunc_end1-main
 	.cfi_endproc
                                         # -- End function
+	.type	.L__unnamed_1,@object           # @0
+	.section	.rodata.str1.1,"aMS",@progbits,1
+.L__unnamed_1:
+	.asciz	"%d\n"
+	.size	.L__unnamed_1, 4
+
 	.section	".note.GNU-stack","",@progbits

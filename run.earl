@@ -7,7 +7,9 @@ module Main
 
 import "std/system.earl"
 
-let redirect = len(argv()) > 1 && argv()[1] == "redirect";
+let run = len(argv()) > 1 && argv()[1] == "run";
 let build = "dune exec ./bin/main.exe --profile=release";
-if redirect { build += " > llvm-testing/main.ll"; }
+if run {
+    build += " > llvm-testing/main.ll && cd llvm-testing && ./build.earl && ./main && cd ..";
+}
 System::cmd_wcheck(build);

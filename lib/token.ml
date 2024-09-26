@@ -23,6 +23,7 @@
 module TokenType = struct
   type id_type =
     | I32
+    | U8
     | I8
     | Str
     | Usize
@@ -101,6 +102,7 @@ module TokenType = struct
 
   let rec string_of_id_type = function
     | I32 -> "I32"
+    | U8 -> "U8"
     | I8 -> "I8"
     | Str -> "Str"
     | Usize -> "Usize"
@@ -130,6 +132,7 @@ module TokenType = struct
     | RightArrow -> "RightArrow"
     | Comment -> "Comment"
     | Type I32 -> "Type I32"
+    | Type U8 -> "Type U8"
     | Type I8 -> "Type I8"
     | Type Usize -> "Usize"
     | Type Char -> "Type Char"
