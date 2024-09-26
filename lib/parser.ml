@@ -166,6 +166,13 @@ and parse_primary_expr tokens =
         | _ when List.length args > 1 -> failwith "tuples are unimplemented"
         (* Math *)
         | _ -> aux tokens @@ Some (List.hd args))
+    | {ttype = LBracket; _} :: tl ->
+       let accessor = match left with
+         | Some l -> l
+         | None -> failwith "array indexing must have a left expression" in
+       let idx, tokens = parse_expr tl in
+       let _, tokens = expect tokens RBracket in
+       aux tokens @@ Some (Ast.Term (Index {accessor; idx}))
     | _ -> left, tokens in
 
   aux tokens None
@@ -255,7 +262,7 @@ and parse_stmt_for tokens =
   let block, tokens = parse_stmt_block tokens in
   Ast.{start; _while; _end; block}, tokens
 
-and parse_mut_stmt tokens =
+and parse_stmt_mut tokens =
   let left, tokens = parse_expr tokens in
   let op, tokens = expect tokens Equals in
   let right, tokens = parse_expr tokens in
@@ -298,7 +305,7 @@ and parse_stmt tokens =
      let stmt, tokens = parse_stmt_let tl in
      Let stmt, tokens
   | ({ttype = Identifier; _} :: _) as tokens when is_mut_stmt tokens ->
-     let stmt, tokens = parse_mut_stmt tokens in
+     let stmt, tokens = parse_stmt_mut tokens in
      Mut stmt, tokens
   | ({ttype = Identifier; _} :: _) as tokens ->
      let stmt, tokens = parse_stmt_expr tokens in

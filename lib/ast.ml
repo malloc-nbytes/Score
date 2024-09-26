@@ -130,6 +130,12 @@ module Ast = struct
     | BoolLit of bool
     | Ident of Token.t
     | Proc_Call of expr_proc_call
+    | Index of expr_index
+
+  and expr_index =
+    { accessor : expr
+    ; idx : expr
+    }
 
   and expr_binary =
     { lhs : expr

@@ -208,12 +208,26 @@ module Emit = struct
     else
       Llvm.build_call ty callee args "" context.builder
 
+  and compile_expr_index Ast.{accessor; idx} context =
+    let open Token in
+    let accessor_value = compile_expr accessor context in
+    let accessor_type = Llvm.type_of accessor_value in
+
+    let index_value = compile_expr idx context in
+
+    (* let underlying_type = Llvm.element_type accessor_type in *)
+
+    (* Get the pointer to the indexed element *)
+    let pointer = Llvm.build_in_bounds_gep accessor_type accessor_value [|index_value|] "indexptr" context.builder in
+    Llvm.build_load (i32_t ctx) pointer "loadtmp" context.builder
+
   and compile_expr_term expr context : Llvm.llvalue =
     match expr with
     | Ast.IntLit i -> compile_expr_intlit i context
     | Ast.StrLit s -> compile_expr_strlit s context
     | Ast.Ident i -> compile_expr_ident i context
     | Ast.Proc_Call pc -> compile_expr_proc_call pc context
+    | Ast.Index i -> compile_expr_index i context
     | _ -> failwith "todo: compile_expr_term"
 
   and compile_expr expr context : Llvm.llvalue =
@@ -230,7 +244,6 @@ module Emit = struct
     (match left with
      | Ast.Term (Ast.Ident id) ->
         let sym = get_symbol id.lexeme context in
-
         (* Ensure it's a variable and has a value *)
         (match sym.ty with
          | Variable varty ->
@@ -249,6 +262,24 @@ module Emit = struct
                 failwith @@ Printf.sprintf "%s: variable `%s` has no associated LLVM value" __FUNCTION__ id.lexeme)
          | _ ->
             failwith @@ Printf.sprintf "%s: symbol `%s` is not a variable" __FUNCTION__ id.lexeme)
+     | Ast.Term (Ast.Index {accessor; idx}) ->
+        let accessor_value = compile_expr accessor context in
+        let index_value = compile_expr idx context in
+        let llvm_ty = Llvm.type_of accessor_value in
+
+        (* Get the pointer to the indexed element *)
+        let pointer = Llvm.build_in_bounds_gep llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
+
+        (* Compile the right-hand side expression to get the new value *)
+        let right_value = compile_expr right context in
+
+        (* Ensure the types are compatible *)
+        (* let llvm_indexed_ty = llvm_ty_to_scr_ty (Llvm.type_of right_value) in *)
+        (* Assuming the original array element type matches with right_value's type *)
+
+        (* Store the new value at the indexed pointer *)
+        let _ = Llvm.build_store right_value pointer context.builder in
+        context
      | _ ->
         failwith "Left-hand side of mutation must be an identifier")
 
