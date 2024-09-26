@@ -113,10 +113,7 @@ module Emit = struct
     Llvm.create_enum_attr ctx s defval
 
   let build_global_str value context : Llvm.llvalue =
-    let s = Llvm.build_global_stringptr value "" context.builder in
-    s
-    (* let zero = Llvm.const_int (Llvm.i32_type ctx) 0 in *)
-    (* Llvm.build_in_bounds_gep (Llvm.i32_type ctx) s [|zero|] "" bl *)
+    Llvm.build_global_stringptr value "" context.builder
 
   let emit_entry_block_alloca
         (func : Llvm.llvalue) (var_name : string)
@@ -130,6 +127,7 @@ module Emit = struct
     match ty with
     | I32 -> Llvm.i32_type ctx
     | I8 -> Llvm.i8_type ctx
+    | Usize -> Llvm.i64_type ctx
     | Void -> Llvm.void_type ctx
     | Str -> Llvm.pointer_type ctx
     | Pointer _ -> Llvm.pointer_type ctx
@@ -239,6 +237,22 @@ module Emit = struct
     let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
     Llvm.build_load (i32_t ctx) pointer "loadtmp" context.builder, context
 
+  and compile_expr_cast (Ast.{_type; rhs} : Ast.expr_cast) context : Llvm.llvalue * context =
+    let open TokenType in
+    let rhs_value, context = compile_expr rhs context in
+    let rhs_type = llvm_ty_to_scr_ty (Llvm.type_of rhs_value) in
+    let _ = Types.typecheck_for_casting _type rhs_type in
+
+    let casted = match _type with
+      | I32 -> Llvm.build_intcast rhs_value (i32_t ctx) "casttmp" context.builder
+      | I8 -> Llvm.build_intcast rhs_value (Llvm.i8_type ctx) "casttmp" context.builder
+      | Usize -> Llvm.build_intcast rhs_value (Llvm.i64_type ctx) "casttmp" context.builder
+      | Str -> Llvm.build_bitcast rhs_value (str_t ctx) "casttmp" context.builder
+      | Pointer _ -> Llvm.build_bitcast rhs_value (scr_ty_to_llvm_ty _type context) "casttmp" context.builder
+      | _ -> failwith "unhandled cast" in
+
+    casted, context
+
   and compile_expr_term expr context : Llvm.llvalue * context =
     match expr with
     | Ast.IntLit i -> compile_expr_intlit i context
@@ -246,6 +260,7 @@ module Emit = struct
     | Ast.Ident i -> compile_expr_ident i context
     | Ast.Proc_Call pc -> compile_expr_proc_call pc context
     | Ast.Index i -> compile_expr_index i context
+    | Ast.Cast c -> compile_expr_cast c context
     | _ -> failwith "todo: compile_expr_term"
 
   and compile_expr expr context : Llvm.llvalue * context =

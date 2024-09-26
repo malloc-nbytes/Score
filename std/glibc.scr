@@ -1,4 +1,5 @@
 module C where
 
 extern printf(format: str, ...): i32;
-
+extern malloc(bytes: usize): void*;
+extern free(ptr: void*): void;

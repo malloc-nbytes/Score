@@ -131,6 +131,12 @@ module Ast : sig
     | Ident of Token.t
     | Proc_Call of expr_proc_call
     | Index of expr_index
+    | Cast of expr_cast
+
+  and expr_cast =
+    { _type : TokenType.id_type
+    ; rhs : expr
+    }
 
   and expr_index =
     { accessor : expr

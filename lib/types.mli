@@ -23,4 +23,5 @@
 open Token
 
 val typecheck : TokenType.id_type -> TokenType.id_type -> bool
+val typecheck_for_casting : TokenType.id_type -> TokenType.id_type -> bool
 

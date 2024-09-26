@@ -47,3 +47,10 @@ let rec typecheck ty1 ty2 =
      aux (match Hashtbl.find_opt compat_types ty1 with
           | Some compatible_types -> compatible_types
           | None -> [])
+
+let rec typecheck_for_casting ty1 ty2 =
+  let open TokenType in
+  match ty1, ty2 with
+  | Pointer p1, Pointer p2 -> true
+  | _ -> typecheck ty1 ty2
+
