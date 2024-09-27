@@ -1,4 +1,4 @@
-module C where
+module c where
 
 extern printf(format: str, ...): i32;
 extern malloc(bytes: usize): void*;

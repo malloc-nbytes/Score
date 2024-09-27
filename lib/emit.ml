@@ -39,6 +39,7 @@ module Emit = struct
     { tok : Token.t
     ; ty : symbol_type
     ; value : Llvm.llvalue option
+    ; _module : Token.t
     }
 
   type context =
@@ -46,17 +47,11 @@ module Emit = struct
     ; builder : Llvm.llbuilder
     ; symtbl : ((string, symbol) Hashtbl.t list)
     ; last_sym : symbol option
+    ; _module : Token.t option
+    ; ctx : Llvm.llcontext
+    ; md : Llvm.llmodule
+    ; children_contexts : context list
     }
-
-  let ctx = Llvm.global_context ()
-  let md = Llvm.create_module ctx "global_mod"
-  let bl = Llvm.builder ctx
-
-  (* --- TYPES --- *)
-
-  let i32_t context = Llvm.i32_type ctx
-  let void_t context = Llvm.void_type ctx
-  let str_t context = Llvm.pointer_type ctx
 
   (* --- UTILITY --- *)
 
@@ -85,8 +80,8 @@ module Emit = struct
       exit 1
     else {context with symtbl = List.tl context.symtbl}
 
-  let add_symbol id tok ty value context : unit =
-    let sym = {tok; ty; value} in
+  let add_symbol id tok ty value _module context : unit =
+    let sym = {tok; ty; value; _module} in
     match context.symtbl with
     | [] -> failwith "cannot add symbol because the symtbl is empty"
     | hd :: _ -> Hashtbl.add hd id sym
@@ -110,7 +105,7 @@ module Emit = struct
     aux context.symtbl
 
   let create_attr ?(defval=0L) context s : Llvm.llattribute =
-    Llvm.create_enum_attr ctx s defval
+    Llvm.create_enum_attr context.ctx s defval
 
   let build_global_str value context : Llvm.llvalue =
     Llvm.build_global_stringptr value "" context.builder
@@ -119,18 +114,18 @@ module Emit = struct
         (func : Llvm.llvalue) (var_name : string)
         (ty : Llvm.lltype) (context : context)
       : Llvm.llvalue =
-    let builder = Llvm.builder_at (ctx) (Llvm.instr_begin (Llvm.entry_block func)) in
+    let builder = Llvm.builder_at (context.ctx) (Llvm.instr_begin (Llvm.entry_block func)) in
     Llvm.build_alloca ty var_name builder
 
   let scr_ty_to_llvm_ty ty context =
     let open TokenType in
     match ty with
-    | I32 -> Llvm.i32_type ctx
-    | I8 -> Llvm.i8_type ctx
-    | Usize -> Llvm.i64_type ctx
-    | Void -> Llvm.void_type ctx
-    | Str -> Llvm.pointer_type ctx
-    | Pointer _ -> Llvm.pointer_type ctx
+    | I32 -> Llvm.i32_type context.ctx
+    | I8 -> Llvm.i8_type context.ctx
+    | Usize -> Llvm.i64_type context.ctx
+    | Void -> Llvm.void_type context.ctx
+    | Str -> Llvm.pointer_type context.ctx
+    | Pointer _ -> Llvm.pointer_type context.ctx
     | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (string_of_id_type ty)
 
   let llvm_ty_to_scr_ty ty =
@@ -172,7 +167,7 @@ module Emit = struct
 
   and compile_expr_intlit i context =
     let open Token in
-    Llvm.const_int (i32_t context) (int_of_string i.lexeme), context
+    Llvm.const_int (Llvm.i32_type context.ctx) (int_of_string i.lexeme), context
 
   and compile_expr_strlit s context =
     let open Token in
@@ -192,7 +187,7 @@ module Emit = struct
   and compile_expr_proc_call Ast.{lhs; args} context =
     (* let proc = compile_expr lhs context in *)
     let (args : Llvm.llvalue array) = List.map (fun expr -> let value, _ = compile_expr expr context in value) args |> Array.of_list in
-    let callee = match Llvm.lookup_function lhs.lexeme md with
+    let callee = match Llvm.lookup_function lhs.lexeme context.md with
       | None ->
          let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__ ~msg:"function does not exist" @@ Some lhs in
          exit 1
@@ -235,7 +230,7 @@ module Emit = struct
 
     (* Get the pointer to the indexed element *)
     let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
-    Llvm.build_load (i32_t ctx) pointer "loadtmp" context.builder, context
+    Llvm.build_load (Llvm.i32_type context.ctx) pointer "loadtmp" context.builder, context
 
   and compile_expr_cast (Ast.{_type; rhs} : Ast.expr_cast) context : Llvm.llvalue * context =
     let open TokenType in
@@ -244,10 +239,10 @@ module Emit = struct
     let _ = Types.typecheck_for_casting _type rhs_type in
 
     let casted = match _type with
-      | I32 -> Llvm.build_intcast rhs_value (i32_t ctx) "casttmp" context.builder
-      | I8 -> Llvm.build_intcast rhs_value (Llvm.i8_type ctx) "casttmp" context.builder
-      | Usize -> Llvm.build_intcast rhs_value (Llvm.i64_type ctx) "casttmp" context.builder
-      | Str -> Llvm.build_bitcast rhs_value (str_t ctx) "casttmp" context.builder
+      | I32 -> Llvm.build_intcast rhs_value (Llvm.i32_type context.ctx) "casttmp" context.builder
+      | I8 -> Llvm.build_intcast rhs_value (Llvm.i8_type context.ctx) "casttmp" context.builder
+      | Usize -> Llvm.build_intcast rhs_value (Llvm.i64_type context.ctx) "casttmp" context.builder
+      | Str -> Llvm.build_bitcast rhs_value (Llvm.pointer_type context.ctx) "casttmp" context.builder
       | Pointer _ -> Llvm.build_bitcast rhs_value (scr_ty_to_llvm_ty _type context) "casttmp" context.builder
       | _ -> failwith "unhandled cast" in
 
@@ -388,15 +383,15 @@ module Emit = struct
     let context = compile_stmt start context in
 
     (* Create the condition block and the loop body block *)
-    let loop_cond_block = Llvm.append_block ctx "loop_cond" (Option.get context.func) in
-    let loop_body_block = Llvm.append_block ctx "loop_body" (Option.get context.func) in
-    let loop_end_block = Llvm.append_block ctx "loop_end" (Option.get context.func) in
+    let loop_cond_block = Llvm.append_block context.ctx "loop_cond" (Option.get context.func) in
+    let loop_body_block = Llvm.append_block context.ctx "loop_body" (Option.get context.func) in
+    let loop_end_block = Llvm.append_block context.ctx "loop_end" (Option.get context.func) in
 
     (* Create a branch to the condition block from the entry block *)
     let _ = Llvm.build_br loop_cond_block context.builder in
 
     (* Position the builder at the condition block *)
-    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_cond_block) in
+    let builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_cond_block) in
     (* context.builder <- builder; *)
     let context = {context with builder = builder} in
 
@@ -407,7 +402,7 @@ module Emit = struct
     let _ = Llvm.build_cond_br cond_value loop_body_block loop_end_block builder in
 
     (* Position the builder at the body block *)
-    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_body_block) in
+    let builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_body_block) in
     let context = {context with builder = builder} in
 
     (* Compile the loop body *)
@@ -422,7 +417,7 @@ module Emit = struct
     let _ = Llvm.build_br loop_cond_block context.builder in
 
     (* Position the builder at the end block *)
-    let context = {context with builder = Llvm.builder_at ctx (Llvm.instr_begin loop_end_block)} in
+    let context = {context with builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_end_block)} in
 
     context
 
@@ -430,15 +425,15 @@ module Emit = struct
     let context = push_scope context in
 
     (* Create the condition block and the loop body block *)
-    let loop_cond_block = Llvm.append_block ctx "loop_cond" (Option.get context.func) in
-    let loop_body_block = Llvm.append_block ctx "loop_body" (Option.get context.func) in
-    let loop_end_block = Llvm.append_block ctx "loop_end" (Option.get context.func) in
+    let loop_cond_block = Llvm.append_block context.ctx "loop_cond" (Option.get context.func) in
+    let loop_body_block = Llvm.append_block context.ctx "loop_body" (Option.get context.func) in
+    let loop_end_block = Llvm.append_block context.ctx "loop_end" (Option.get context.func) in
 
     (* Create a branch to the condition block from the entry block *)
     let _ = Llvm.build_br loop_cond_block context.builder in
 
     (* Position the builder at the condition block *)
-    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_cond_block) in
+    let builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_cond_block) in
     let context = {context with builder = builder} in
 
     (* Compile the while condition *)
@@ -448,7 +443,7 @@ module Emit = struct
     let _ = Llvm.build_cond_br cond_value loop_body_block loop_end_block builder in
 
     (* Position the builder at the body block *)
-    let builder = Llvm.builder_at ctx (Llvm.instr_begin loop_body_block) in
+    let builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_body_block) in
     let context = {context with builder = builder} in
 
     (* Compile the loop body *)
@@ -458,7 +453,7 @@ module Emit = struct
     let _ = Llvm.build_br loop_cond_block context.builder in
 
     (* Position the builder at the end block *)
-    let context = {context with builder = Llvm.builder_at ctx (Llvm.instr_begin loop_end_block)} in
+    let context = {context with builder = Llvm.builder_at context.ctx (Llvm.instr_begin loop_end_block)} in
     let context = pop_scope context in
     context
 
@@ -478,10 +473,10 @@ module Emit = struct
 
     (* Define and create the function *)
     let proc_ty = Llvm.function_type ret_ty (Array.of_list param_tys) in
-    let proc_def = Llvm.define_function id.lexeme proc_ty md in
+    let proc_def = Llvm.define_function id.lexeme proc_ty context.md in
 
     (* Add function to the scope *)
-    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_def) context in
+    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_def) (Option.get context._module) context in
 
     let context = push_scope context in
 
@@ -495,11 +490,11 @@ module Emit = struct
          let id, tok = (fst hd).lexeme, (fst hd) in
          let _ = assert_symbol_noexist id context in
          let alloca = emit_entry_block_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
-         let _ = add_symbol id tok (Variable (snd hd)) (Some alloca) context in
+         let _ = add_symbol id tok (Variable (snd hd)) (Some alloca) (Option.get context._module) context in
          aux tl (acc @ [alloca]) context in
 
     (* Position the builder *)
-    let builder = Llvm.builder_at ctx (Llvm.instr_begin (Llvm.entry_block proc_def)) in
+    let builder = Llvm.builder_at context.ctx (Llvm.instr_begin (Llvm.entry_block proc_def)) in
 
     let context, values = aux params [] context in
 
@@ -526,15 +521,22 @@ module Emit = struct
     let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
     let value, context = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
-    let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) context in
+    let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) (Option.get context._module) context in
 
     context
 
-  and compile_stmt_module stmt context : context =
-    failwith "todo: compile_stmt_module"
+  and compile_stmt_module (Ast.{id} : Ast.stmt_module) context : context =
+    {context with _module = Some id}
 
-  and compile_stmt_import stmt context : context =
-    failwith "todo: compile_stmt_import"
+  and compile_stmt_import (Ast.{filepath} : Ast.stmt_import) context : context =
+    let filepath = filepath.lexeme in
+    let src_code = Utils.file_to_str filepath
+                   |> String.to_seq
+                   |> List.of_seq in
+    let tokens = Lexer.lex_file filepath src_code 1 1 in
+    let ast = Parser.produce_ast tokens in
+    let ic = emit_ir filepath ast in
+    {context with children_contexts = context.children_contexts @ [ic]}
 
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
@@ -553,11 +555,11 @@ module Emit = struct
                   else
                     Llvm.function_type ret_ty (Array.of_list param_tys) in
 
-    let proc_decl = Llvm.declare_function id.lexeme proc_ty md in
+    let proc_decl = Llvm.declare_function id.lexeme proc_ty context.md in
 
     let _ = Llvm.add_function_attr proc_decl (create_attr context "nounwind") (Llvm.AttrIndex.Function) in
     (* let _ = Llvm.add_function_attr proc_decl (create_attr context "nocapture") (Llvm.AttrIndex.Param 0) in *)
-    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_decl) context in
+    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_decl) (Option.get context._module) context in
     context
 
   and compile_stmt stmt context : context =
@@ -572,7 +574,7 @@ module Emit = struct
     | Ast.Mut m -> compile_stmt_mut m context
     | Ast.While w -> compile_stmt_while w context
 
-  let compile_toplvl_stmt toplvl_stmt context : context =
+  and compile_toplvl_stmt toplvl_stmt context : context =
     match toplvl_stmt with
     | Ast.Proc_Def stmt -> compile_stmt_proc stmt context
     | Ast.Let stmt -> compile_stmt_let stmt context
@@ -582,9 +584,19 @@ module Emit = struct
     | Ast.Def stmt -> compile_stmt_def stmt context
     | Ast.Extern stmt -> compile_stmt_extern stmt context
 
-  let emit_ir program =
+  and emit_ir (src_filename : string) program : context =
+    let ctx = Llvm.global_context () in
+    let md = Llvm.create_module ctx src_filename in
+    let bl = Llvm.builder ctx in
     let symtbl = [Hashtbl.create 10] in
-    let context = {func=None; builder=bl; symtbl; last_sym=None} in
+    let context = {func=None;
+                   builder=bl;
+                   symtbl;
+                   last_sym=None;
+                   _module=None;
+                   ctx;
+                   md;
+                   children_contexts=[]} in
 
     let rec aux toplvl_stmts context =
       match toplvl_stmts with
@@ -593,8 +605,8 @@ module Emit = struct
          let context = compile_toplvl_stmt hd context in
          aux tl context in
 
-    let _ = aux program context in
-    let _ = print_endline @@ Llvm.string_of_llmodule md in
-    Llvm_analysis.assert_valid_module md;
-    (* Llvm.dump_module md *) ()
+    let context = aux program context in
+    (* let _ = print_endline @@ Llvm.string_of_llmodule md in *)
+    Llvm_analysis.assert_valid_module context.md;
+    context
 end

@@ -22,6 +22,35 @@
 
 open Ast
 
+open Token
+
 module Emit : sig
-    val emit_ir : Ast.program -> unit
+  type function_ =
+    { rettype : TokenType.id_type
+    ; variadic : bool
+    }
+
+  type symbol_type =
+    | Function of function_
+    | Variable of TokenType.id_type
+
+  type symbol =
+    { tok : Token.t
+    ; ty : symbol_type
+    ; value : Llvm.llvalue option
+    ; _module : Token.t
+    }
+
+  type context =
+    { func : Llvm.llvalue option
+    ; builder : Llvm.llbuilder
+    ; symtbl : ((string, symbol) Hashtbl.t list)
+    ; last_sym : symbol option
+    ; _module : Token.t option
+    ; ctx : Llvm.llcontext
+    ; md : Llvm.llmodule
+    ; children_contexts : context list
+    }
+
+  val emit_ir : string -> Ast.program -> context
 end
