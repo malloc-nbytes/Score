@@ -91,12 +91,24 @@ module Emit = struct
     | [] -> failwith "cannot add symbol because the symtbl is empty"
     | hd :: _ -> Hashtbl.add hd id sym
 
-  let get_symbol id _module context : symbol =
+  let get_symbol id context : symbol =
     let rec aux = function
       | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
       | hd :: tl ->
          (match Hashtbl.find_opt hd id with
-          | Some sym when sym._module = _module -> sym
+          | Some sym -> sym
+          | _ -> aux tl) in
+    aux context.symtbl
+
+  let get_symbol_wmodule (id : string) (_module : string) context : symbol =
+    let rec aux = function
+      | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
+      | hd :: tl ->
+         (match Hashtbl.find_opt hd id with
+          | Some (sym : symbol) ->
+              (match sym._module.lexeme = _module with
+               | true -> sym
+               | false -> aux tl)
           | _ -> aux tl) in
     aux context.symtbl
 
@@ -268,7 +280,7 @@ module Emit = struct
        (*  | Some value -> Llvm.build_load ty value right_id.lexeme updated_context.builder, context *)
        (*  | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__) *)
     | Ast.Proc_Call pc ->
-       let res, context = compile_expr_proc_call pc {import_context with builder=context.builder} in
+       (* let res, context = compile_expr_proc_call pc {import_context with builder=context.builder} in *)
        failwith ""
        (* let res, context' = compile_expr_proc_call pc {import_context with builder=context.builder} in *)
        (* res, {context with builder=context'.builder} *)
