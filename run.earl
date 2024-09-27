@@ -1,7 +1,7 @@
 #!/usr/local/bin/earl
 
-#--- This file can only be run if EARL is installed,
-#--- although this file is not necessary.
+#--- This file can only be run if EARL is installed https://github.com/malloc-nbytes/EARL/
+#--- Although this file is not necessary
 
 module Main
 

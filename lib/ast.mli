@@ -158,4 +158,6 @@ module Ast : sig
     { lhs : Token.t
     ; args : expr list
     }
+
+  val get_module_name : program -> string
 end

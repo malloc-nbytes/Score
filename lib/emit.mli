@@ -49,7 +49,7 @@ module Emit : sig
     ; _module : Token.t option
     ; ctx : Llvm.llcontext
     ; md : Llvm.llmodule
-    ; children_contexts : context list
+    ; imports : (string, context) Hashtbl.t
     }
 
   val emit_ir : string -> Ast.program -> context

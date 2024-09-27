@@ -159,4 +159,11 @@ module Ast = struct
     ; args : expr list
     }
 
+  let get_module_name program =
+    let rec f = function
+      | [] -> failwith "no module name found"
+      | Module {id} :: _ -> id.lexeme
+      | _ :: tl -> f tl in
+    f program
+
 end

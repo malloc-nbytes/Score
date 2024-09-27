@@ -50,7 +50,7 @@ module Emit = struct
     ; _module : Token.t option
     ; ctx : Llvm.llcontext
     ; md : Llvm.llmodule
-    ; children_contexts : context list
+    ; imports : (string, context) Hashtbl.t
     }
 
   (* --- UTILITY --- *)
@@ -530,13 +530,13 @@ module Emit = struct
 
   and compile_stmt_import (Ast.{filepath} : Ast.stmt_import) context : context =
     let filepath = filepath.lexeme in
-    let src_code = Utils.file_to_str filepath
-                   |> String.to_seq
-                   |> List.of_seq in
+    let src_code = Utils.file_to_str filepath |> String.to_seq |> List.of_seq in
     let tokens = Lexer.lex_file filepath src_code 1 1 in
     let ast = Parser.produce_ast tokens in
-    let ic = emit_ir filepath ast in
-    {context with children_contexts = context.children_contexts @ [ic]}
+    let import_context_module = Ast.get_module_name ast in
+    let import_context = emit_ir filepath ast in
+    let _ = Hashtbl.add context.imports import_context_module import_context in
+    context
 
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
@@ -596,7 +596,7 @@ module Emit = struct
                    _module=None;
                    ctx;
                    md;
-                   children_contexts=[]} in
+                   imports=Hashtbl.create 3} in
 
     let rec aux toplvl_stmts context =
       match toplvl_stmts with
