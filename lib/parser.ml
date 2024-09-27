@@ -141,7 +141,7 @@ and parse_ids_and_types_group (tokens : Token.t list) : ((Token.t * TokenType.id
 and parse_primary_expr tokens =
   let open Token in
 
-  let rec aux tokens left =
+  let rec aux tokens (left : Ast.expr option) =
     match tokens with
     | [] ->
        let _ = Err.err Err.Exhausted_tokens __FILE__ __FUNCTION__ None in
@@ -156,6 +156,14 @@ and parse_primary_expr tokens =
     | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
     | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
     | {ttype; lexeme = value; _} :: tl when ttype = True || ttype = False -> aux tl @@ Some (Ast.Term (Ast.BoolLit (bool_of_string value)))
+    | {ttype = DoubleColon; _} :: tl ->
+       let left = match left with
+         | Some (Ast.Term (Ast.Ident t)) -> t
+         | _ -> failwith "cannot use namespace operator `::` without left identifier"
+       and right, tokens = match parse_expr tl with
+         | Ast.Term t, tokens -> t, tokens
+         | _ -> failwith "cannot use namespace operator `::` without right term expression" in
+       aux tokens @@ Some (Ast.Term (Ast.Namespace Ast.{left; right}))
     | ({ttype = Type _; _} :: tl) as tokens ->
        let _type, tokens = expect_idtype tokens None in
        let rhs, tokens = parse_expr tokens in

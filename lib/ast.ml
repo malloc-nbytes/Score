@@ -132,6 +132,12 @@ module Ast = struct
     | Proc_Call of expr_proc_call
     | Index of expr_index
     | Cast of expr_cast
+    | Namespace of expr_namespace
+
+  and expr_namespace =
+    { left : Token.t
+    ; right : expr_term
+    }
 
   and expr_cast =
     { _type : TokenType.id_type

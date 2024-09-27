@@ -55,6 +55,11 @@ module Emit = struct
 
   (* --- UTILITY --- *)
 
+  let get_specific_import id context =
+    match Hashtbl.find_opt context.imports id with
+    | Some ctx -> ctx
+    | None -> failwith @@ Printf.sprintf "%s: could not find import: `%s`" __FUNCTION__ id
+
   let rec strip_pointer_type ty =
     let open TokenType in
     match ty with
@@ -86,13 +91,13 @@ module Emit = struct
     | [] -> failwith "cannot add symbol because the symtbl is empty"
     | hd :: _ -> Hashtbl.add hd id sym
 
-  let get_symbol id context : symbol =
+  let get_symbol id _module context : symbol =
     let rec aux = function
       | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
       | hd :: tl ->
          (match Hashtbl.find_opt hd id with
-          | Some sym -> sym
-          | None -> aux tl) in
+          | Some sym when sym._module = _module -> sym
+          | _ -> aux tl) in
     aux context.symtbl
 
   let assert_symbol_noexist id context : unit =
@@ -248,6 +253,28 @@ module Emit = struct
 
     casted, context
 
+  and compile_expr_namespace (Ast.{left; right} : Ast.expr_namespace) context =
+    let open Token in
+    let id = left.lexeme in
+    (* let import_context = get_specific_import id context in *)
+    (* let updated_context = {context with symtbl = import_context.symtbl} in *)
+    match right with
+    | Ast.Ident right_id -> failwith "compile_expr_namespace: Ast.Ident: todo"
+       (* let sym = get_symbol right_id.lexeme updated_context in *)
+       (* let ty = scr_ty_to_llvm_ty (match sym.ty with *)
+       (*                             | Function f -> f.rettype *)
+       (*                             | Variable ty -> ty) updated_context in *)
+       (* (match sym.value with *)
+       (*  | Some value -> Llvm.build_load ty value right_id.lexeme updated_context.builder, context *)
+       (*  | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__) *)
+    | Ast.Proc_Call pc ->
+       let res, context = compile_expr_proc_call pc {import_context with builder=context.builder} in
+       failwith ""
+       (* let res, context' = compile_expr_proc_call pc {import_context with builder=context.builder} in *)
+       (* res, {context with builder=context'.builder} *)
+    | _ ->
+       failwith "unhandled right expression type in namespace"
+
   and compile_expr_term expr context : Llvm.llvalue * context =
     match expr with
     | Ast.IntLit i -> compile_expr_intlit i context
@@ -256,6 +283,7 @@ module Emit = struct
     | Ast.Proc_Call pc -> compile_expr_proc_call pc context
     | Ast.Index i -> compile_expr_index i context
     | Ast.Cast c -> compile_expr_cast c context
+    | Ast.Namespace n -> compile_expr_namespace n context
     | _ -> failwith "todo: compile_expr_term"
 
   and compile_expr expr context : Llvm.llvalue * context =
@@ -535,8 +563,8 @@ module Emit = struct
     let ast = Parser.produce_ast tokens in
     let import_context_module = Ast.get_module_name ast in
     let import_context = emit_ir filepath ast in
-    let _ = Hashtbl.add context.imports import_context_module import_context in
-    context
+    (* let _ = Hashtbl.add context.imports import_context_module import_context in *)
+    import_context
 
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
@@ -604,6 +632,8 @@ module Emit = struct
       | hd :: tl ->
          let context = compile_toplvl_stmt hd context in
          aux tl context in
+
+
 
     let context = aux program context in
     (* let _ = print_endline @@ Llvm.string_of_llmodule md in *)
