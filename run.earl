@@ -5,11 +5,11 @@
 
 module Main
 
-import "std/system.earl"
+import "std/system.earl" full as sys
 
 let run = len(argv()) > 1 && argv()[1] == "run";
 let build = "dune exec ./bin/main.exe --profile=release";
 if run {
     build += " > llvm-testing/main.ll && cd llvm-testing && ./build.earl && ./main && cd ..";
 }
-System::cmd_wcheck(build);
+sys::cmd_wcheck(build);

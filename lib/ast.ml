@@ -133,6 +133,7 @@ module Ast = struct
     | Index of expr_index
     | Cast of expr_cast
     | Namespace of expr_namespace
+    | BraceInitializerList of expr list
 
   and expr_namespace =
     { left : Token.t

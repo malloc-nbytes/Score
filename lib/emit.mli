@@ -38,7 +38,7 @@ module Emit : sig
     { tok : Token.t
     ; ty : symbol_type
     ; value : Llvm.llvalue option
-    ; _module : Token.t
+    ; _module : string
     }
 
   type context =
@@ -46,7 +46,7 @@ module Emit : sig
     ; builder : Llvm.llbuilder
     ; symtbl : ((string, symbol) Hashtbl.t list)
     ; last_sym : symbol option
-    ; _module : Token.t option
+    ; _module : string
     ; ctx : Llvm.llcontext
     ; md : Llvm.llmodule
     ; imports : (string, context) Hashtbl.t

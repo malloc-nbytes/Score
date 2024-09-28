@@ -104,13 +104,13 @@ and parse_comma_sep_exprs tokens =
 
   let rec aux tokens acc =
     match tokens with
-    | {ttype = RParen; _} :: tl -> acc, tl
+    | ({ttype = RParen; _} | {ttype = RBrace; _}) :: tl -> acc, tl
     | _ ->
        let expr, tokens = parse_expr tokens in
        let acc = acc @ [expr] in
        (match tokens with
         | {ttype = Comma; _} :: tl -> aux tl acc
-        | {ttype = RParen; _} :: tl -> acc, tl
+        | ({ttype = RParen; _} | {ttype = RBrace; _}) :: tl -> acc, tl
         | _ -> acc, tokens) in
 
   aux tokens []
@@ -156,6 +156,9 @@ and parse_primary_expr tokens =
     | {ttype = IntegerLiteral; _} as intlit :: tl -> aux tl @@ Some (Ast.Term (Ast.IntLit intlit))
     | {ttype = StringLiteral; _} as strlit :: tl -> aux tl @@ Some (Ast.Term (Ast.StrLit strlit))
     | {ttype; lexeme = value; _} :: tl when ttype = True || ttype = False -> aux tl @@ Some (Ast.Term (Ast.BoolLit (bool_of_string value)))
+    | {ttype = LBrace; _} :: tl ->
+       let exprs, tokens = parse_comma_sep_exprs tl in
+       aux tokens @@ Some (Term (BraceInitializerList exprs))
     | {ttype = DoubleColon; _} :: tl ->
        let left = match left with
          | Some (Ast.Term (Ast.Ident t)) -> t

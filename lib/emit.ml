@@ -39,7 +39,7 @@ module Emit = struct
     { tok : Token.t
     ; ty : symbol_type
     ; value : Llvm.llvalue option
-    ; _module : Token.t
+    ; _module : string
     }
 
   type context =
@@ -47,7 +47,7 @@ module Emit = struct
     ; builder : Llvm.llbuilder
     ; symtbl : ((string, symbol) Hashtbl.t list)
     ; last_sym : symbol option
-    ; _module : Token.t option
+    ; _module : string
     ; ctx : Llvm.llcontext
     ; md : Llvm.llmodule
     ; imports : (string, context) Hashtbl.t
@@ -67,6 +67,11 @@ module Emit = struct
        (match p with
         | Pointer k -> strip_pointer_type k
         | _ -> p)
+    | Array (p, _) ->
+        (match p with
+          | Pointer k -> strip_pointer_type k
+          | Array (k, _) -> strip_pointer_type k
+          | _ -> p)
     | _ -> failwith "tried to strip pointer type from non-pointer type"
 
   let add_target_triple triple llm =
@@ -85,28 +90,19 @@ module Emit = struct
       exit 1
     else {context with symtbl = List.tl context.symtbl}
 
-  let add_symbol id tok ty value _module context : unit =
+  let add_symbol id tok ty value (_module : string) context : unit =
     let sym = {tok; ty; value; _module} in
     match context.symtbl with
     | [] -> failwith "cannot add symbol because the symtbl is empty"
     | hd :: _ -> Hashtbl.add hd id sym
 
-  let get_symbol id context : symbol =
-    let rec aux = function
-      | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
-      | hd :: tl ->
-         (match Hashtbl.find_opt hd id with
-          | Some sym -> sym
-          | _ -> aux tl) in
-    aux context.symtbl
-
-  let get_symbol_wmodule (id : string) (_module : string) context : symbol =
+  let get_symbol id _module context : symbol =
     let rec aux = function
       | [] -> failwith @@ Printf.sprintf "%s: could not find symbol: `%s`" __FUNCTION__ id
       | hd :: tl ->
          (match Hashtbl.find_opt hd id with
           | Some (sym : symbol) ->
-              (match sym._module.lexeme = _module with
+              (match sym._module = _module with
                | true -> sym
                | false -> aux tl)
           | _ -> aux tl) in
@@ -134,7 +130,7 @@ module Emit = struct
     let builder = Llvm.builder_at (context.ctx) (Llvm.instr_begin (Llvm.entry_block func)) in
     Llvm.build_alloca ty var_name builder
 
-  let scr_ty_to_llvm_ty ty context =
+  let rec scr_ty_to_llvm_ty ty context =
     let open TokenType in
     match ty with
     | I32 -> Llvm.i32_type context.ctx
@@ -142,6 +138,8 @@ module Emit = struct
     | Usize -> Llvm.i64_type context.ctx
     | Void -> Llvm.void_type context.ctx
     | Str -> Llvm.pointer_type context.ctx
+    (* Array = Array of id_type * (int option) *)
+    | Array (ty, Some size) -> Llvm.array_type (scr_ty_to_llvm_ty ty context) size
     | Pointer _ -> Llvm.pointer_type context.ctx
     | _ -> failwith @@ Printf.sprintf "%s unhandled type: %s" __FUNCTION__ (string_of_id_type ty)
 
@@ -192,7 +190,7 @@ module Emit = struct
 
   and compile_expr_ident i context =
     let open Token in
-    let sym = get_symbol i.lexeme context in
+    let sym = get_symbol i.lexeme context._module context in
     let context = {context with last_sym=Some sym} in
     let ty = scr_ty_to_llvm_ty (match sym.ty with
       | Function f -> f.rettype
@@ -201,7 +199,7 @@ module Emit = struct
     | Some value -> Llvm.build_load ty value sym.tok.lexeme context.builder, context
     | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__
 
-  and compile_expr_proc_call Ast.{lhs; args} context =
+  and compile_expr_proc_call (Ast.{lhs; args} : Ast.expr_proc_call) (module_name : string option) (context : context) : Llvm.llvalue * context =
     (* let proc = compile_expr lhs context in *)
     let (args : Llvm.llvalue array) = List.map (fun expr -> let value, _ = compile_expr expr context in value) args |> Array.of_list in
     let callee = match Llvm.lookup_function lhs.lexeme context.md with
@@ -209,7 +207,7 @@ module Emit = struct
          let _ = Err.err Err.Undeclared __FILE__ __FUNCTION__ ~msg:"function does not exist" @@ Some lhs in
          exit 1
       | Some proc -> proc in
-    let stored_proc = (get_symbol lhs.lexeme context) in
+    let stored_proc = get_symbol lhs.lexeme (if module_name = None then context._module else Option.get module_name) context in
     let stored_proc_ty = scr_ty_to_llvm_ty (match stored_proc.ty with
                                             | Function f -> f.rettype
                                             | Variable ty -> ty) context in
@@ -234,19 +232,19 @@ module Emit = struct
 
     let accessor_value, context = compile_expr accessor context in
 
-    let stripped_ty = match context.last_sym with
+    let whole_ty = match context.last_sym with
       | Some s -> (match s.ty with
                    | Function ty -> ty.rettype
                    | Variable ty -> ty)
       | None -> failwith "cannot strip ty" in
 
-    let stripped_ty = strip_pointer_type stripped_ty in
-    let stripped_ty = scr_ty_to_llvm_ty stripped_ty context in
+    let stripped_ty = strip_pointer_type whole_ty in
+    let stripped_llvm_ty = scr_ty_to_llvm_ty stripped_ty context in
 
     let index_value, context = compile_expr idx context in
 
     (* Get the pointer to the indexed element *)
-    let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
+    let pointer = Llvm.build_in_bounds_gep stripped_llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
     Llvm.build_load (Llvm.i32_type context.ctx) pointer "loadtmp" context.builder, context
 
   and compile_expr_cast (Ast.{_type; rhs} : Ast.expr_cast) context : Llvm.llvalue * context =
@@ -267,35 +265,54 @@ module Emit = struct
 
   and compile_expr_namespace (Ast.{left; right} : Ast.expr_namespace) context =
     let open Token in
+    let old_module = context._module in
     let id = left.lexeme in
-    (* let import_context = get_specific_import id context in *)
-    (* let updated_context = {context with symtbl = import_context.symtbl} in *)
     match right with
     | Ast.Ident right_id -> failwith "compile_expr_namespace: Ast.Ident: todo"
-       (* let sym = get_symbol right_id.lexeme updated_context in *)
-       (* let ty = scr_ty_to_llvm_ty (match sym.ty with *)
-       (*                             | Function f -> f.rettype *)
-       (*                             | Variable ty -> ty) updated_context in *)
-       (* (match sym.value with *)
-       (*  | Some value -> Llvm.build_load ty value right_id.lexeme updated_context.builder, context *)
-       (*  | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__) *)
     | Ast.Proc_Call pc ->
-       (* let res, context = compile_expr_proc_call pc {import_context with builder=context.builder} in *)
-       failwith ""
-       (* let res, context' = compile_expr_proc_call pc {import_context with builder=context.builder} in *)
-       (* res, {context with builder=context'.builder} *)
+       let res, context = compile_expr_proc_call pc (Some id) context in
+       res, {context with _module = old_module}
     | _ ->
        failwith "unhandled right expression type in namespace"
+
+  and compile_expr_brace_initializer_list exprs context =
+    let open Token in
+    let rec aux lst acc context =
+      match lst with
+      | [] -> acc, context
+      | hd :: tl ->
+         let value, context = compile_expr hd context in
+         aux tl (acc @ [value]) context in
+
+    let values, context = aux exprs [] context in
+    let ty = Llvm.type_of (List.hd values) in
+    let arr = Llvm.const_array ty (Array.of_list values) in
+    let alloca = Llvm.build_alloca (Llvm.array_type ty (List.length values)) "arr" context.builder in
+    let _ = Llvm.build_store arr alloca context.builder in
+
+    (* let const_values = [|Llvm.const_int (Llvm.i32_type context.ctx) 1; *)
+    (*                      Llvm.const_int (Llvm.i32_type context.ctx) 2; *)
+    (*                      Llvm.const_int (Llvm.i32_type context.ctx) 3;|] in *)
+
+    (* let const_array = Llvm.const_array (Llvm.array_type (Llvm.i32_type context.ctx) 3) const_values in *)
+    (* let global_var = Llvm.define_global "array" const_array context.md in *)
+
+    (* Llvm.set_linkage (Llvm.Linkage.Private) global_var; *)
+    (* Llvm.set_unnamed_addr true global_var; *)
+    (* Llvm.set_alignment 16 global_var; *)
+
+    alloca, context
 
   and compile_expr_term expr context : Llvm.llvalue * context =
     match expr with
     | Ast.IntLit i -> compile_expr_intlit i context
     | Ast.StrLit s -> compile_expr_strlit s context
     | Ast.Ident i -> compile_expr_ident i context
-    | Ast.Proc_Call pc -> compile_expr_proc_call pc context
+    | Ast.Proc_Call pc -> compile_expr_proc_call pc None context
     | Ast.Index i -> compile_expr_index i context
     | Ast.Cast c -> compile_expr_cast c context
     | Ast.Namespace n -> compile_expr_namespace n context
+    | Ast.BraceInitializerList b -> compile_expr_brace_initializer_list b context
     | _ -> failwith "todo: compile_expr_term"
 
   and compile_expr expr context : Llvm.llvalue * context =
@@ -311,7 +328,7 @@ module Emit = struct
     (* Ensure the left expression is a variable *)
     (match left with
      | Ast.Term (Ast.Ident id) ->
-        let sym = get_symbol id.lexeme context in
+        let sym = get_symbol id.lexeme context._module context in
         (* Ensure it's a variable and has a value *)
         (match sym.ty with
          | Variable varty ->
@@ -333,25 +350,29 @@ module Emit = struct
      | Ast.Term (Ast.Index {accessor; idx}) ->
         let accessor_value, context = compile_expr accessor context in
 
-        let stripped_ty = match context.last_sym with
+        let whole_ty = match context.last_sym with
           | Some s -> (match s.ty with
                        | Function ty -> ty.rettype
                        | Variable ty -> ty)
-          | None -> failwith "cannot strip ty" in
-        let stripped_ty = strip_pointer_type stripped_ty in
-        let stripped_ty = scr_ty_to_llvm_ty stripped_ty context in
+          | None -> failwith @@ Printf.sprintf "%s:no type found" __FUNCTION__ in
+        let stripped_ty = strip_pointer_type whole_ty in
+        let stripped_llvm_ty = scr_ty_to_llvm_ty stripped_ty context in
 
         let index_value, context = compile_expr idx context in
 
-        (* Get the pointer to the indexed element *)
-        let pointer = Llvm.build_in_bounds_gep stripped_ty accessor_value [|index_value|] "indexptr" context.builder in
+        (match whole_ty with
+         | Array _ -> failwith "todo: array mutation"
+         | Pointer _ ->
+            (* Get the pointer to the indexed element *)
+            let pointer = Llvm.build_in_bounds_gep stripped_llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
 
-        (* Compile the right-hand side expression to get the new value *)
-        let right_value, context = compile_expr right context in
+            (* Compile the right-hand side expression to get the new value *)
+            let right_value, context = compile_expr right context in
 
-        (* Store the new value at the indexed pointer *)
-        let _ = Llvm.build_store right_value pointer context.builder in
-        context
+            (* Store the new value at the indexed pointer *)
+            let _ = Llvm.build_store right_value pointer context.builder in
+            context
+         | _ -> failwith "unreachable")
      | _ ->
         failwith "Left-hand side of mutation must be an identifier")
 
@@ -516,7 +537,7 @@ module Emit = struct
     let proc_def = Llvm.define_function id.lexeme proc_ty context.md in
 
     (* Add function to the scope *)
-    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_def) (Option.get context._module) context in
+    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_def) context._module context in
 
     let context = push_scope context in
 
@@ -530,7 +551,7 @@ module Emit = struct
          let id, tok = (fst hd).lexeme, (fst hd) in
          let _ = assert_symbol_noexist id context in
          let alloca = emit_entry_block_alloca proc_def ((fst hd).Token.lexeme) (scr_ty_to_llvm_ty (snd hd) context) context in
-         let _ = add_symbol id tok (Variable (snd hd)) (Some alloca) (Option.get context._module) context in
+         let _ = add_symbol id tok (Variable (snd hd)) (Some alloca) context._module context in
          aux tl (acc @ [alloca]) context in
 
     (* Position the builder *)
@@ -561,22 +582,21 @@ module Emit = struct
     let local_var = Llvm.build_alloca llvm_ty id.lexeme context.builder in
     let value, context = compile_expr expr context in
     let _ = Llvm.build_store value local_var context.builder in
-    let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) (Option.get context._module) context in
+    let _ = add_symbol id.lexeme id (Variable ty) (Some local_var) context._module context in
 
     context
 
   and compile_stmt_module (Ast.{id} : Ast.stmt_module) context : context =
-    {context with _module = Some id}
+    {context with _module = id.lexeme}
 
   and compile_stmt_import (Ast.{filepath} : Ast.stmt_import) context : context =
+    let old_module_name = context._module in
     let filepath = filepath.lexeme in
     let src_code = Utils.file_to_str filepath |> String.to_seq |> List.of_seq in
     let tokens = Lexer.lex_file filepath src_code 1 1 in
     let ast = Parser.produce_ast tokens in
-    let import_context_module = Ast.get_module_name ast in
     let import_context = emit_ir filepath ast in
-    (* let _ = Hashtbl.add context.imports import_context_module import_context in *)
-    import_context
+    {import_context with _module = old_module_name}
 
   and compile_stmt_struct stmt context : context =
     failwith "todo: compile_stmt_struct"
@@ -599,7 +619,7 @@ module Emit = struct
 
     let _ = Llvm.add_function_attr proc_decl (create_attr context "nounwind") (Llvm.AttrIndex.Function) in
     (* let _ = Llvm.add_function_attr proc_decl (create_attr context "nocapture") (Llvm.AttrIndex.Param 0) in *)
-    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_decl) (Option.get context._module) context in
+    let _ = add_symbol id.lexeme id (Function {rettype; variadic}) (Some proc_decl) context._module context in
     context
 
   and compile_stmt stmt context : context =
@@ -629,11 +649,12 @@ module Emit = struct
     let md = Llvm.create_module ctx src_filename in
     let bl = Llvm.builder ctx in
     let symtbl = [Hashtbl.create 10] in
+    let _module = Ast.get_module_name program in
     let context = {func=None;
                    builder=bl;
                    symtbl;
                    last_sym=None;
-                   _module=None;
+                   _module;
                    ctx;
                    md;
                    imports=Hashtbl.create 3} in
@@ -645,10 +666,8 @@ module Emit = struct
          let context = compile_toplvl_stmt hd context in
          aux tl context in
 
-
-
     let context = aux program context in
-    (* let _ = print_endline @@ Llvm.string_of_llmodule md in *)
+    let _ = print_endline @@ Llvm.string_of_llmodule md in
     Llvm_analysis.assert_valid_module context.md;
     context
 end
