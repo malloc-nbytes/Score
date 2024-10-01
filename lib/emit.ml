@@ -196,7 +196,10 @@ module Emit = struct
       | Function f -> f.rettype
       | Variable ty -> ty) context in
     match sym.value with
-    | Some value -> Llvm.build_load ty value sym.tok.lexeme context.builder, context
+    | Some value ->
+      (match sym.ty with
+        | Variable (Array _) -> value, context
+        | _ -> Llvm.build_load ty value sym.tok.lexeme context.builder, context)
     | None -> failwith @@ Printf.sprintf "%s: value is None" __FUNCTION__
 
   and compile_expr_proc_call (Ast.{lhs; args} : Ast.expr_proc_call) (module_name : string option) (context : context) : Llvm.llvalue * context =
@@ -277,29 +280,21 @@ module Emit = struct
 
   and compile_expr_brace_initializer_list exprs context =
     let open Token in
-    let rec aux lst acc context =
-      match lst with
-      | [] -> acc, context
-      | hd :: tl ->
-         let value, context = compile_expr hd context in
-         aux tl (acc @ [value]) context in
+    let element_type = scr_ty_to_llvm_ty I32 context in
+    let array_length = List.length exprs in
+    let array_type = Llvm.array_type element_type array_length in
 
-    let values, context = aux exprs [] context in
-    let ty = Llvm.type_of (List.hd values) in
-    let arr = Llvm.const_array ty (Array.of_list values) in
-    let alloca = Llvm.build_alloca (Llvm.array_type ty (List.length values)) "arr" context.builder in
-    let _ = Llvm.build_store arr alloca context.builder in
+    let alloca = Llvm.build_alloca array_type "brace-initializer" context.builder in
+    (* let _ = Llvm.set_alignment 16 alloca in *)
+    (* Printf.printf "arraytype: %s\n" (Llvm.string_of_lltype array_type); *)
 
-    (* let const_values = [|Llvm.const_int (Llvm.i32_type context.ctx) 1; *)
-    (*                      Llvm.const_int (Llvm.i32_type context.ctx) 2; *)
-    (*                      Llvm.const_int (Llvm.i32_type context.ctx) 3;|] in *)
-
-    (* let const_array = Llvm.const_array (Llvm.array_type (Llvm.i32_type context.ctx) 3) const_values in *)
-    (* let global_var = Llvm.define_global "array" const_array context.md in *)
-
-    (* Llvm.set_linkage (Llvm.Linkage.Private) global_var; *)
-    (* Llvm.set_unnamed_addr true global_var; *)
-    (* Llvm.set_alignment 16 global_var; *)
+    let _ =
+      List.iteri (fun i expr ->
+        let value, context = compile_expr expr context in
+        let element_ptr = Llvm.build_gep array_type alloca [| Llvm.const_int (Llvm.i32_type context.ctx) i |] "element_ptr" context.builder in
+        let _ = Llvm.build_store value element_ptr context.builder in
+        ()
+      ) exprs in
 
     alloca, context
 
@@ -361,15 +356,14 @@ module Emit = struct
         let index_value, context = compile_expr idx context in
 
         (match whole_ty with
-         | Array _ -> failwith "todo: array mutation"
-         | Pointer _ ->
-            (* Get the pointer to the indexed element *)
-            let pointer = Llvm.build_in_bounds_gep stripped_llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
-
-            (* Compile the right-hand side expression to get the new value *)
+         | Array _ ->
+            let gep = Llvm.build_in_bounds_gep (Llvm.type_of accessor_value) accessor_value [|index_value|] "gep" context.builder in
             let right_value, context = compile_expr right context in
-
-            (* Store the new value at the indexed pointer *)
+            let _ = Llvm.build_store right_value gep context.builder in
+            context
+          | Pointer _ ->
+            let pointer = Llvm.build_in_bounds_gep stripped_llvm_ty accessor_value [|index_value|] "indexptr" context.builder in
+            let right_value, context = compile_expr right context in
             let _ = Llvm.build_store right_value pointer context.builder in
             context
          | _ -> failwith "unreachable")
