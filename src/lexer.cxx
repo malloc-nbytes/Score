@@ -27,11 +27,29 @@ void lexer::dump(lexer::t &lexer) {
     }
 }
 
-token::t *lexer::peek(t &lexer) {
+token::t *lexer::peek(lexer::t &lexer) {
     return lexer.hd ? lexer.hd.get() : nullptr;
 }
 
-void lexer::append(t &lexer, sh_ptr<token::t> tok) {
+sh_ptr<token::t> lexer::next(lexer::t &lexer) {
+    if (!lexer.hd)
+        return nullptr;
+
+    auto t = std::move(lexer.hd);
+    lexer.hd = t->next;
+
+    if (!lexer.hd)
+        lexer.tl = nullptr;
+
+    return t;
+}
+
+void lexer::discard(lexer::t &lexer) {
+    if (lexer.hd)
+        lexer.hd = lexer.hd->next;
+}
+
+void lexer::append(lexer::t &lexer, sh_ptr<token::t> tok) {
     if(!lexer.hd) {
         lexer.hd = tok;
         lexer.tl = lexer.hd.get();
@@ -87,7 +105,7 @@ static str parse_str(const str &s, size_t &sz_actual) {
     return cleaned;
 }
 
-std::string lexer::file_to_str(const std::string& file_path) {
+str lexer::file_to_str(const str &file_path) {
     std::ifstream file(file_path);
 
     if (!file) {
@@ -120,8 +138,8 @@ lexer::t lexer::lex(str &src, str fp) {
         {"!=", token::type::Bang_Equals},
         {"(", token::type::LParen},
         {")", token::type::RParen},
-        {"{", token::type::RBrace},
-        {"}", token::type::LBrace},
+        {"{", token::type::LBrace},
+        {"}", token::type::RBrace},
         {":", token::type::Colon},
         {";", token::type::Semicolon},
     };
@@ -141,15 +159,18 @@ lexer::t lexer::lex(str &src, str fp) {
             while (src[i] != '\n')
                 ++c, ++i;
         }
+
         // Ignorable
         else if (src[i] == '\n' || src[i] == '\r') {
             c = 0;
             ++r, ++i;
         }
+
         // Ignorable
         else if (src[i] == '\t' || src[i] == ' ') {
             ++c, ++i;
         }
+
         // Identifiers keywords, or primitive types
         else if (src[i] == '_' || std::isalpha(src[i])) {
             str buf = "";
@@ -164,8 +185,10 @@ lexer::t lexer::lex(str &src, str fp) {
                 tok = std::make_shared<token::t>(buf, token::type::Type, r, c, fp);
             else
                 tok = std::make_shared<token::t>(buf, token::type::Ident, r, c, fp);
+
             lexer::append(lexer, std::move(tok));
         }
+
         // Numbers
         else if (isdigit(src[i])) {
             str num = "";
@@ -175,6 +198,7 @@ lexer::t lexer::lex(str &src, str fp) {
             auto tok = std::make_shared<token::t>(num, token::type::Intlit, r, c, fp);
             lexer::append(lexer, std::move(tok));
         }
+
         // Strings
         else if (src[i] == '"') {
             size_t sz_actual = 0;
@@ -186,6 +210,7 @@ lexer::t lexer::lex(str &src, str fp) {
             i += sz_actual + 1 + 1;
             c += sz_actual + 1 + 1;
         }
+
         // Symbols
         else {
             std::string buf = "";

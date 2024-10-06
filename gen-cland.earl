@@ -1,0 +1,13 @@
+module Main
+
+import "std/system.earl"; as sys
+import "std/io.earl"; as io
+
+let cwd = sys::cmdstr("pwd");
+cwd.pop(len(cwd)-1);
+
+let s = "CompileFlags:\n  Add:\n";
+s += "    - \"-std=c++17\"\n";
+s += "    - \"-I"+cwd+"/src/include\"";
+
+io::write_to_file(s, "./.clangd");

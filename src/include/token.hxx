@@ -67,7 +67,7 @@ namespace token {
         t(str lx, token::type ty, unsigned row, unsigned col, str fp);
     };
 
-    str type_to_cxxstr(type ty);
+    str type_to_cxxstr(token::type ty);
 }
 
 #endif // TOKEN_HXX

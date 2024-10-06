@@ -6,6 +6,7 @@
 
 #include "token.hxx"
 #include "utils.hxx"
+#include "types.hxx"
 
 namespace stmt { struct t; };
 
@@ -25,6 +26,20 @@ namespace stmt {
         While,
         For,
         Block,
+        Return,
+        Module,
+    };
+
+    struct _return {
+        un_ptr<expr::t> expr;
+        _return(un_ptr<expr::t> expr);
+        ~_return() = default;
+    };
+
+    struct _module {
+        sh_ptr<token::t> tok;
+        _module(sh_ptr<token::t> tok);
+        ~_module() = default;
     };
 
     struct block {
@@ -58,7 +73,7 @@ namespace stmt {
         std::optional<un_ptr<stmt::block>> _else;
         _if(un_ptr<expr::t> cond,
             un_ptr<stmt::block> block,
-            std::optional<un_ptr<stmt::block>> _else);
+            optional<un_ptr<stmt::block>> _else);
         ~_if() = default;
     };
 
@@ -80,28 +95,32 @@ namespace stmt {
     struct proc {
         struct parameter {
             sh_ptr<token::t> id;
-            sh_ptr<token::t> ty;
-            parameter(sh_ptr<token::t> id, sh_ptr<token::t> ty);
+            sh_ptr<scr_type::t> ty;
+            parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty);
             ~parameter() = default;
         };
 
         sh_ptr<token::t> id;
-        vec<parameter> params;
-        sh_ptr<token::t> rettype;
+        vec<un_ptr<parameter>> params;
+        sh_ptr<scr_type::t> rettype;
+        un_ptr<stmt::block> block;
 
         proc(sh_ptr<token::t> id,
-             vec<parameter> params,
-             sh_ptr<token::t> rettype);
+             vec<un_ptr<parameter>> params,
+             sh_ptr<scr_type::t> rettype,
+             un_ptr<stmt::block> block);
         ~proc() = default;
     };
 
-    using vt = std::variant<sh_ptr<stmt::proc>,
-                            sh_ptr<stmt::let>,
-                            sh_ptr<stmt::mut>,
-                            sh_ptr<stmt::_if>,
-                            sh_ptr<stmt::_while>,
-                            sh_ptr<stmt::_for>,
-                            sh_ptr<stmt::block>>;
+    using vt = std::variant<un_ptr<stmt::proc>,
+                            un_ptr<stmt::let>,
+                            un_ptr<stmt::mut>,
+                            un_ptr<stmt::_if>,
+                            un_ptr<stmt::_while>,
+                            un_ptr<stmt::_for>,
+                            un_ptr<stmt::block>,
+                            un_ptr<stmt::_module>,
+                            un_ptr<stmt::_return>>;
     struct t {
         vt actual;
         stmt::type ty;
@@ -134,6 +153,14 @@ namespace expr::term {
         Ident,
         Int_Literal,
         Str_Literal,
+        Proc_Call,
+    };
+
+    struct proc_call {
+        un_ptr<expr::t> lhs;
+        vec<un_ptr<expr::t>> args;
+        proc_call(un_ptr<expr::t> lhs, vec<un_ptr<expr::t>> args);
+        ~proc_call() = default;
     };
 
     struct identifier {
@@ -154,9 +181,10 @@ namespace expr::term {
         ~int_literal() = default;
     };
 
-    using vt = std::variant<sh_ptr<expr::term::identifier>,
-                            sh_ptr<expr::term::str_literal>,
-                            sh_ptr<expr::term::int_literal>>;
+    using vt = std::variant<un_ptr<expr::term::identifier>,
+                            un_ptr<expr::term::str_literal>,
+                            un_ptr<expr::term::int_literal>,
+                            un_ptr<expr::term::proc_call>>;
     struct t {
         vt actual;
         expr::term::type ty;
@@ -172,14 +200,22 @@ namespace expr {
         Unary,
     };
 
-    using vt = std::variant<sh_ptr<expr::term::t>,
-                            sh_ptr<expr::binary::t>,
-                            sh_ptr<expr::unary::t>>;
+    using vt = std::variant<un_ptr<expr::term::t>,
+                            un_ptr<expr::binary::t>,
+                            un_ptr<expr::unary::t>>;
 
     struct t {
         vt actual;
         expr::type ty;
         t(vt actual, expr::type ty);
+        ~t() = default;
+    };
+};
+
+namespace program {
+    struct t {
+        vec<un_ptr<stmt::t>> stmts;
+        t(vec<un_ptr<stmt::t>> stmts);
         ~t() = default;
     };
 };

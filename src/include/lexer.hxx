@@ -6,6 +6,8 @@
 #include "token.hxx"
 #include "utils.hxx"
 
+#define lexer_speek(l) lexer::peek(l) && lexer::peek(l)
+
 namespace lexer {
     struct t {
         sh_ptr<token::t> hd;
