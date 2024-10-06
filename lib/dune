@@ -1,9 +1,0 @@
-(library
- (libraries
-  llvm
-  llvm.analysis
-  llvm.executionengine
-  llvm.target
-  unix
- )
- (name Lib))

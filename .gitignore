@@ -8,6 +8,7 @@
 *.cmxs
 *.cmxa
 
+.clangd
 main
 input.txt
 input.bak
