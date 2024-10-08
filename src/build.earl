@@ -6,10 +6,11 @@ set_flag("--show-lets", "--show-bash");
 
 let run = len(argv()) > 1 && argv()[1] == "run";
 let CXX_FILES = "*.cxx";
+let LLVM_CONFIG = "llvm-config --cxxflags --ldflags --system-libs --libs core";
 let CXX_FLAGS = "-Iinclude/ -pedantic -ggdb -DDEBUG -std=c++17 -o main";
-let CXX = "g++";
+let CXX = "clang++";
 
-$f"{CXX} {CXX_FLAGS} {CXX_FILES}";
+$f"{CXX} -I/usr/local/include/llvm/ {CXX_FLAGS} {CXX_FILES} `{LLVM_CONFIG}`";
 
 if run {
     $"./main";

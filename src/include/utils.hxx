@@ -1,6 +1,7 @@
 #ifndef UTILS_HXX
 #define UTILS_HXX
 
+#include <map>
 #include <memory>
 #include <vector>
 #include <optional>
@@ -13,6 +14,7 @@ template <typename T> using vec = std::vector<T>;
 template <typename T> using optional = std::optional<T>;
 template <typename T, typename K> using pair = std::pair<T, K>;
 template <typename T, typename K> using vec_pair = vec<pair<T, K>>;
+template <typename K, typename V> using map = std::map<K, V>;
 using str = std::string;
 
 template <typename T, typename... Args>

@@ -20,9 +20,12 @@
 #define COMMON_SCR_ELSE "else"
 #define COMMON_SCR_MODULE "module"
 #define COMMON_SCR_WHERE "where"
+#define COMMON_SCR_DEF "def"
 #define COMMON_SCR_KEYWORDS {COMMON_SCR_PROC, COMMON_SCR_LET, COMMON_SCR_RETURN, \
                              COMMON_SCR_CONST, COMMON_SCR_IMPORT, COMMON_SCR_EXTERN, \
                              COMMON_SCR_FOR, COMMON_SCR_WHILE, COMMON_SCR_IF, \
-                             COMMON_SCR_ELSE, COMMON_SCR_MODULE, COMMON_SCR_WHERE}
+                             COMMON_SCR_ELSE, COMMON_SCR_MODULE, COMMON_SCR_WHERE, \
+                             COMMON_SCR_DEF}
+
 
 #endif // COMMON_HXX

@@ -28,6 +28,24 @@ namespace stmt {
         Block,
         Return,
         Module,
+        Def,
+    };
+
+    struct parameter {
+        sh_ptr<token::t> id;
+        sh_ptr<scr_type::t> ty;
+        parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty);
+        ~parameter() = default;
+    };
+
+    struct def {
+        sh_ptr<token::t> id;
+        vec<un_ptr<stmt::parameter>> params;
+        un_ptr<scr_type::t> rettype;
+        def(sh_ptr<token::t> id,
+            vec<un_ptr<stmt::parameter>> params,
+            un_ptr<scr_type::t> rettype);
+        ~def() = default;
     };
 
     struct _return {
@@ -93,13 +111,6 @@ namespace stmt {
     };
 
     struct proc {
-        struct parameter {
-            sh_ptr<token::t> id;
-            sh_ptr<scr_type::t> ty;
-            parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty);
-            ~parameter() = default;
-        };
-
         sh_ptr<token::t> id;
         vec<un_ptr<parameter>> params;
         sh_ptr<scr_type::t> rettype;
@@ -120,7 +131,8 @@ namespace stmt {
                             un_ptr<stmt::_for>,
                             un_ptr<stmt::block>,
                             un_ptr<stmt::_module>,
-                            un_ptr<stmt::_return>>;
+                            un_ptr<stmt::_return>,
+                            un_ptr<stmt::def>>;
     struct t {
         vt actual;
         stmt::type ty;
@@ -157,9 +169,9 @@ namespace expr::term {
     };
 
     struct proc_call {
-        un_ptr<expr::t> lhs;
+        str id;
         vec<un_ptr<expr::t>> args;
-        proc_call(un_ptr<expr::t> lhs, vec<un_ptr<expr::t>> args);
+        proc_call(str id, vec<un_ptr<expr::t>> args);
         ~proc_call() = default;
     };
 

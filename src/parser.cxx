@@ -2,7 +2,9 @@
 #include <iostream>
 #include <cassert>
 #include <memory>
+#include <variant>
 
+#include "grammar.hxx"
 #include "lexer.hxx"
 #include "parser.hxx"
 #include "token.hxx"
@@ -65,10 +67,10 @@ static un_ptr<scr_type::t> expect_type(lexer::t &lexer) {
  * Will parse parameters in the form of:
  *   `(x1: <type>, x2: <type>, ..., xN: <type>)`.
  */
-static vec<un_ptr<stmt::proc::parameter>> parse_proc_parameters(lexer::t &lexer) {
+static vec<un_ptr<stmt::parameter>> parse_proc_parameters(lexer::t &lexer) {
     ignore(expect(lexer, token::type::LParen));
 
-    vec<un_ptr<stmt::proc::parameter>> params = {};
+    vec<un_ptr<stmt::parameter>> params = {};
 
     if (lexer_speek(lexer)->ty == token::type::Type) {
         auto ty = expect_type(lexer);
@@ -84,7 +86,7 @@ static vec<un_ptr<stmt::proc::parameter>> parse_proc_parameters(lexer::t &lexer)
         ignore(expect(lexer, token::type::Colon));
 
         auto ty = expect_type(lexer);
-        auto param = std::make_unique<stmt::proc::parameter>(
+        auto param = std::make_unique<stmt::parameter>(
             std::move(id),
             std::move(ty)
         );
@@ -159,8 +161,19 @@ static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
             }
             // Proc Call
             else {
+                str id = "";
+                std::visit([&](auto &&f) {
+                    using T = std::decay_t<decltype(f)>;
+                    if constexpr (std::is_same_v<T, un_ptr<expr::term::str_literal>>) {
+                        id = f->tok->lx;
+                    }
+                    else {
+                        std::cerr << "proc calls can only be used with identifiers right now" << std::endl;
+                        std::exit(1);
+                    }
+                }, left->actual);
                 auto args = parse_comma_sep_exprs(lexer, token::type::LParen, token::type::RParen);
-                auto proc_call = std::make_unique<expr::term::proc_call>(std::move(left), std::move(args));
+                auto proc_call = std::make_unique<expr::term::proc_call>(std::move(id), std::move(args));
                 auto term = std::make_unique<expr::term::t>(std::move(proc_call), expr::term::type::Proc_Call);
                 left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
             }
@@ -286,6 +299,20 @@ static un_ptr<stmt::proc> parse_stmt_proc(lexer::t &lexer) {
                                         std::move(block));
 }
 
+static un_ptr<stmt::def> parse_stmt_def(lexer::t &lexer) {
+    lexer::discard(lexer); // def
+    auto id = expect(lexer, token::type::Ident);
+    auto params = parse_proc_parameters(lexer);
+    ignore(expect(lexer, token::type::Colon));
+    auto rettype = expect_type(lexer);
+    ignore(expect(lexer, token::type::Semicolon));
+    return std::make_unique<stmt::def>(
+        std::move(id),
+        std::move(params),
+        std::move(rettype)
+    );
+}
+
 static un_ptr<stmt::let> parse_stmt_let(lexer::t &lexer) {
     lexer::discard(lexer); // let
     auto id = expect(lexer, token::type::Ident);
@@ -322,6 +349,8 @@ static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
                 return std::make_unique<stmt::t>(parse_stmt_let(lexer), stmt::type::Let);
             if (top->lx == COMMON_SCR_PROC)
                 return std::make_unique<stmt::t>(parse_stmt_proc(lexer), stmt::type::Proc);
+            if (top->lx == COMMON_SCR_DEF)
+                return std::make_unique<stmt::t>(parse_stmt_def(lexer), stmt::type::Def);
             if (top->lx == COMMON_SCR_RETURN)
                 return std::make_unique<stmt::t>(parse_stmt_return(lexer), stmt::type::Return);
             if (top->lx == COMMON_SCR_MODULE)

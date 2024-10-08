@@ -1,6 +1,11 @@
 #include "grammar.hxx"
 #include "utils.hxx"
 
+stmt::def::def(sh_ptr<token::t> id,
+               vec<un_ptr<stmt::parameter>> params,
+               un_ptr<scr_type::t> rettype)
+    : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)) {}
+
 stmt::_return::_return(un_ptr<expr::t> expr)
     : expr(std::move(expr)) {}
 
@@ -13,7 +18,7 @@ stmt::mut::mut(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op)
 stmt::proc::proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params, sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block)
     : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)), block(std::move(block)) {}
 
-stmt::proc::parameter::parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty)
+stmt::parameter::parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty)
     : id(std::move(id)), ty(std::move(ty)) {}
 
 stmt::_module::_module(sh_ptr<token::t> tok)
@@ -42,8 +47,8 @@ expr::unary::t::t(un_ptr<expr::t> rhs, sh_ptr<token::t> op)
 expr::binary::t::t(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op)
     : lhs(std::move(lhs)), rhs(std::move(rhs)), op(std::move(op)) {}
 
-expr::term::proc_call::proc_call(un_ptr<expr::t> lhs, vec<un_ptr<expr::t>> args)
-    : lhs(std::move(lhs)), args(std::move(args)) {}
+expr::term::proc_call::proc_call(str id, vec<un_ptr<expr::t>> args)
+    : id(std::move(id)), args(std::move(args)) {}
 
 expr::term::identifier::identifier(sh_ptr<token::t> tok)
     : tok(std::move(tok)) {}
