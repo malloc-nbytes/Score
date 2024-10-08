@@ -205,7 +205,7 @@ namespace expr {
                             un_ptr<expr::unary::t>>;
 
     struct t {
-        vt actual;
+        expr::vt actual;
         expr::type ty;
         t(vt actual, expr::type ty);
         ~t() = default;

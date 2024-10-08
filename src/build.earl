@@ -2,5 +2,15 @@
 
 module Main
 
-$"g++ -Iinclude/ -pedantic -ggdb -DDEBUG -std=c++17 -o main *.cxx";
+set_flag("--show-lets", "--show-bash");
 
+let run = len(argv()) > 1 && argv()[1] == "run";
+let CXX_FILES = "*.cxx";
+let CXX_FLAGS = "-Iinclude/ -pedantic -ggdb -DDEBUG -std=c++17 -o main";
+let CXX = "g++";
+
+$f"{CXX} {CXX_FLAGS} {CXX_FILES}";
+
+if run {
+    $"./main";
+}

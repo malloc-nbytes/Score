@@ -11,9 +11,10 @@
 #include "err.hxx"
 #include "common.hxx"
 
+static un_ptr<expr::t> parse_expr(lexer::t &lexer);
 static un_ptr<stmt::t> parse_stmt(lexer::t &lexer);
 
-static sh_ptr<token::t> expect(lexer::t &lexer, token::type ty) {
+static sh_ptr<token::t> expect(lexer::t &lexer, token::type ty) { 
     if (!lexer::peek(lexer))
         ERR("expect: ran out of tokens");
 
@@ -74,7 +75,7 @@ static vec<un_ptr<stmt::proc::parameter>> parse_proc_parameters(lexer::t &lexer)
         if (scr_type::is_void(ty.get()))
             goto done;
         else
-            ERRW("expected `void` but got `%s`", scr_type::to_cxxstr(ty.get()));
+            ERRW("expected `void` but got `%s`", scr_type::to_cxxstr(ty.get()).c_str());
     }
 
     while (lexer_speek(lexer)->ty != token::type::RParen) {
@@ -104,7 +105,22 @@ static vec<un_ptr<stmt::proc::parameter>> parse_proc_parameters(lexer::t &lexer)
 static vec<un_ptr<expr::t>> parse_comma_sep_exprs(lexer::t &lexer,
                                                   token::type start,
                                                   token::type end) {
-    assert(false);
+    vec<un_ptr<expr::t>> exprs = {};
+    lexer::discard(lexer); // (, [, {, etc
+
+    while (lexer::peek(lexer)->ty != end) {
+        un_ptr<expr::t> expr = parse_expr(lexer);
+        exprs.push_back(std::move(expr));
+        if (lexer_speek(lexer)->ty == token::type::Comma) {
+            lexer::discard(lexer);
+        }
+        else {
+            ignore(expect(lexer, end));
+            break;
+        }
+    }
+
+    return exprs;
 }
 
 static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
@@ -130,12 +146,24 @@ static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
             left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
         } break;
         case token::type::LParen: {
-            if (!left)
-                ERR("invalid primary expression for proc call, left expression is not valid");
-            auto args = parse_comma_sep_exprs(lexer, token::type::LParen, token::type::RParen);
-            auto proc_call = std::make_unique<expr::term::proc_call>(std::move(left), std::move(args));
-            auto term = std::make_unique<expr::term::t>(std::move(proc_call), expr::term::type::Proc_Call);
-            left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
+            // Math
+            if (!left) {
+                auto lhs = parse_expr(lexer);
+                auto op = lexer::next(lexer); // op checking done in codegen
+                auto rhs = parse_expr(lexer);
+                ignore(expect(lexer, token::type::RParen));
+                auto bin = std::make_unique<expr::binary::t>(std::move(lhs),
+                                                             std::move(rhs),
+                                                             std::move(op));
+                left = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
+            }
+            // Proc Call
+            else {
+                auto args = parse_comma_sep_exprs(lexer, token::type::LParen, token::type::RParen);
+                auto proc_call = std::make_unique<expr::term::proc_call>(std::move(left), std::move(args));
+                auto term = std::make_unique<expr::term::t>(std::move(proc_call), expr::term::type::Proc_Call);
+                left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
+            }
         } break;
         default: return std::move(left);
         }
@@ -266,6 +294,9 @@ static un_ptr<stmt::let> parse_stmt_let(lexer::t &lexer) {
     ignore(expect(lexer, token::type::Equals));
     auto expr = parse_expr(lexer);
     ignore(expect(lexer, token::type::Semicolon));
+
+    std::cout << scr_type::to_cxxstr(ty.get()) << std::endl;
+
     return std::make_unique<stmt::let>(std::move(id), std::move(expr));
 }
 

@@ -3,6 +3,7 @@
 #include "lexer.hxx"
 #include "grammar.hxx"
 #include "parser.hxx"
+#include "codegen.hxx"
 
 int main(void) {
     std::string fp = "input.scr";
@@ -10,6 +11,7 @@ int main(void) {
 
     lexer::t lexer = lexer::lex(content, fp);
     auto program = parser::parse(lexer);
+    codegen::gen(std::move(program));
 
     return 0;
 }
