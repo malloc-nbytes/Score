@@ -1,22 +1,22 @@
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
-#include <cassert>
 #include <memory>
 #include <variant>
 
+#include "common.hxx"
+#include "err.hxx"
 #include "grammar.hxx"
 #include "lexer.hxx"
 #include "parser.hxx"
 #include "token.hxx"
 #include "types.hxx"
 #include "utils.hxx"
-#include "err.hxx"
-#include "common.hxx"
 
 static un_ptr<expr::t> parse_expr(lexer::t &lexer);
 static un_ptr<stmt::t> parse_stmt(lexer::t &lexer);
 
-static sh_ptr<token::t> expect(lexer::t &lexer, token::type ty) { 
+static sh_ptr<token::t> expect(lexer::t &lexer, token::type ty) {
     if (!lexer::peek(lexer))
         ERR("expect: ran out of tokens");
 
@@ -24,7 +24,7 @@ static sh_ptr<token::t> expect(lexer::t &lexer, token::type ty) {
 
     if (t->ty != ty) {
         const str got = token::type_to_cxxstr(t->ty),
-                  exp = token::type_to_cxxstr(ty);
+            exp = token::type_to_cxxstr(ty);
         err::wtok(t.get());
         ERRW("expected %s but got %s", exp.c_str(), got.c_str());
     }
@@ -40,12 +40,13 @@ static sh_ptr<token::t> expect_keyword(lexer::t &lexer, const std::string &kw) {
 
     if (t->ty != token::type::Keyword) {
         const str got = token::type_to_cxxstr(t->ty),
-                  exp = token::type_to_cxxstr(token::type::Keyword);
+            exp = token::type_to_cxxstr(token::type::Keyword);
         ERRW("expected %s but got %s", exp.c_str(), got.c_str());
     }
 
     if (t->lx != kw)
-        ERRW("expected keyword `%s` but got keyword `%s`", kw.c_str(), t->lx.c_str());
+        ERRW("expected keyword `%s` but got keyword `%s`", kw.c_str(),
+             t->lx.c_str());
 
     return t;
 }
@@ -57,7 +58,7 @@ static un_ptr<scr_type::t> expect_type(lexer::t &lexer) {
     auto next_ty = lexer::peek(lexer)->ty;
     if (next_ty != token::type::Type) {
         const str got = token::type_to_cxxstr(next_ty),
-                  exp = token::type_to_cxxstr(token::type::Type);
+            exp = token::type_to_cxxstr(token::type::Type);
         ERRW("expected %s but got %s", exp.c_str(), got.c_str());
     }
     return scr_type::parse(lexer);
@@ -67,7 +68,8 @@ static un_ptr<scr_type::t> expect_type(lexer::t &lexer) {
  * Will parse parameters in the form of:
  *   `(x1: <type>, x2: <type>, ..., xN: <type>)`.
  */
-static vec<un_ptr<stmt::parameter>> parse_proc_parameters(lexer::t &lexer) {
+static vec<un_ptr<stmt::parameter>> parse_proc_parameters(lexer::t &lexer,
+                                                          bool &variadic) {
     ignore(expect(lexer, token::type::LParen));
 
     vec<un_ptr<stmt::parameter>> params = {};
@@ -77,19 +79,24 @@ static vec<un_ptr<stmt::parameter>> parse_proc_parameters(lexer::t &lexer) {
         if (scr_type::is_void(ty.get()))
             goto done;
         else
-            ERRW("expected `void` but got `%s`", scr_type::to_cxxstr(ty.get()).c_str());
+            ERRW("expected `void` but got `%s`",
+                 scr_type::to_cxxstr(ty.get()).c_str());
     }
 
     while (lexer_speek(lexer)->ty != token::type::RParen) {
+        if (lexer::peek(lexer)->ty == token::type::TriplePeriod) {
+            lexer::discard(lexer);
+            variadic = true;
+            goto done;
+        }
+
         auto id = expect(lexer, token::type::Ident);
 
         ignore(expect(lexer, token::type::Colon));
 
         auto ty = expect_type(lexer);
-        auto param = std::make_unique<stmt::parameter>(
-            std::move(id),
-            std::move(ty)
-        );
+        auto param =
+            std::make_unique<stmt::parameter>(std::move(id), std::move(ty));
 
         params.push_back(std::move(param));
 
@@ -104,9 +111,8 @@ static vec<un_ptr<stmt::parameter>> parse_proc_parameters(lexer::t &lexer) {
     return std::move(params);
 }
 
-static vec<un_ptr<expr::t>> parse_comma_sep_exprs(lexer::t &lexer,
-                                                  token::type start,
-                                                  token::type end) {
+static vec<un_ptr<expr::t>>
+parse_comma_sep_exprs(lexer::t &lexer, token::type start, token::type end) {
     vec<un_ptr<expr::t>> exprs = {};
     lexer::discard(lexer); // (, [, {, etc
 
@@ -115,8 +121,7 @@ static vec<un_ptr<expr::t>> parse_comma_sep_exprs(lexer::t &lexer,
         exprs.push_back(std::move(expr));
         if (lexer_speek(lexer)->ty == token::type::Comma) {
             lexer::discard(lexer);
-        }
-        else {
+        } else {
             ignore(expect(lexer, end));
             break;
         }
@@ -134,17 +139,22 @@ static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
         switch (lexer::peek(lexer)->ty) {
         case token::type::Ident: {
             auto ident = std::make_unique<expr::term::identifier>(lexer::next(lexer));
-            auto term = std::make_unique<expr::term::t>(std::move(ident), expr::term::type::Ident);
+            auto term = std::make_unique<expr::term::t>(std::move(ident),
+                                                        expr::term::type::Ident);
             left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
         } break;
         case token::type::Intlit: {
-            auto intlit = std::make_unique<expr::term::int_literal>(lexer::next(lexer));
-            auto term = std::make_unique<expr::term::t>(std::move(intlit), expr::term::type::Ident);
+            auto intlit =
+                std::make_unique<expr::term::int_literal>(lexer::next(lexer));
+            auto term = std::make_unique<expr::term::t>(std::move(intlit),
+                                                        expr::term::type::Ident);
             left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
         } break;
         case token::type::Strlit: {
-            auto strlit = std::make_unique<expr::term::str_literal>(lexer::next(lexer));
-            auto term = std::make_unique<expr::term::t>(std::move(strlit), expr::term::type::Ident);
+            auto strlit =
+                std::make_unique<expr::term::str_literal>(lexer::next(lexer));
+            auto term = std::make_unique<expr::term::t>(std::move(strlit),
+                                                        expr::term::type::Ident);
             left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
         } break;
         case token::type::LParen: {
@@ -154,39 +164,51 @@ static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
                 auto op = lexer::next(lexer); // op checking done in codegen
                 auto rhs = parse_expr(lexer);
                 ignore(expect(lexer, token::type::RParen));
-                auto bin = std::make_unique<expr::binary::t>(std::move(lhs),
-                                                             std::move(rhs),
-                                                             std::move(op));
+                auto bin = std::make_unique<expr::binary::t>(
+                                                             std::move(lhs), std::move(rhs), std::move(op));
                 left = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
             }
             // Proc Call
             else {
                 str id = "";
-                std::visit([&](auto &&f) {
-                    using T = std::decay_t<decltype(f)>;
-                    if constexpr (std::is_same_v<T, un_ptr<expr::term::t>>) {
-                        std::visit([&](auto &&g) {
-                            using G = std::decay_t<decltype(g)>;
-                            if constexpr (std::is_same_v<G, un_ptr<expr::term::identifier>>) {
-                                id = g->tok->lx;  // Extract the lexeme from the identifier
-                            } else {
-                                std::cerr << "proc calls can only be used with identifiers right now" << std::endl;
-                                std::exit(1);
-                            }
-                        }, f->actual);
-                    }
-                    else {
-                        std::cerr << "proc calls can only be used with identifiers right now" << std::endl;
-                        std::exit(1);
-                    }
-                }, left->actual);
-                auto args = parse_comma_sep_exprs(lexer, token::type::LParen, token::type::RParen);
-                auto proc_call = std::make_unique<expr::term::proc_call>(std::move(id), std::move(args));
-                auto term = std::make_unique<expr::term::t>(std::move(proc_call), expr::term::type::Proc_Call);
+                std::visit(
+                           [&](auto &&f) {
+                               using T = std::decay_t<decltype(f)>;
+                               if constexpr (std::is_same_v<T, un_ptr<expr::term::t>>) {
+                                   std::visit(
+                                              [&](auto &&g) {
+                                                  using G = std::decay_t<decltype(g)>;
+                                                  if constexpr (std::is_same_v<
+                                                                G, un_ptr<expr::term::identifier>>) {
+                                                      id = g->tok
+                                                          ->lx; // Extract the lexeme from the identifier
+                                                  } else {
+                                                      std::cerr << "proc calls can only be used with "
+                                                          "identifiers right now"
+                                                                << std::endl;
+                                                      std::exit(1);
+                                                  }
+                                              },
+                                              f->actual);
+                               } else {
+                                   std::cerr
+                                       << "proc calls can only be used with identifiers right now"
+                                       << std::endl;
+                                   std::exit(1);
+                               }
+                           },
+                           left->actual);
+                auto args = parse_comma_sep_exprs(lexer, token::type::LParen,
+                                                  token::type::RParen);
+                auto proc_call = std::make_unique<expr::term::proc_call>(
+                                                                         std::move(id), std::move(args));
+                auto term = std::make_unique<expr::term::t>(
+                                                            std::move(proc_call), expr::term::type::Proc_Call);
                 left = std::make_unique<expr::t>(std::move(term), expr::type::Term);
             }
         } break;
-        default: return std::move(left);
+        default:
+            return std::move(left);
         }
     }
 
@@ -197,16 +219,13 @@ static un_ptr<expr::t> parse_multiplicative_expr(lexer::t &lexer) {
     auto lhs = parse_primary_expr(lexer);
     auto cur = lexer::peek(lexer);
 
-    while (cur && (cur->ty == token::type::Asterisk
-                   || cur->ty == token::type::Forwardslash
-                   || cur->ty == token::type::Percent)) {
+    while (cur && (cur->ty == token::type::Asterisk ||
+                   cur->ty == token::type::Forwardslash ||
+                   cur->ty == token::type::Percent)) {
         auto op = lexer::next(lexer);
         auto rhs = parse_primary_expr(lexer);
-        auto bin = std::make_unique<expr::binary::t>(
-            std::move(lhs),
-            std::move(rhs),
-            std::move(op)
-        );
+        auto bin = std::make_unique<expr::binary::t>(std::move(lhs), std::move(rhs),
+                                                     std::move(op));
         lhs = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
         cur = lexer::peek(lexer);
     }
@@ -218,15 +237,12 @@ static un_ptr<expr::t> parse_additive_expr(lexer::t &lexer) {
     auto lhs = parse_multiplicative_expr(lexer);
     auto cur = lexer::peek(lexer);
 
-    while (cur && (cur->ty == token::type::Plus
-                   || cur->ty == token::type::Minus)) {
+    while (cur &&
+           (cur->ty == token::type::Plus || cur->ty == token::type::Minus)) {
         auto op = lexer::next(lexer);
         auto rhs = parse_multiplicative_expr(lexer);
-        auto bin = std::make_unique<expr::binary::t>(
-            std::move(lhs),
-            std::move(rhs),
-            std::move(op)
-        );
+        auto bin = std::make_unique<expr::binary::t>(std::move(lhs), std::move(rhs),
+                                                     std::move(op));
         lhs = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
         cur = lexer::peek(lexer);
     }
@@ -238,19 +254,16 @@ static un_ptr<expr::t> parse_equalitive_expr(lexer::t &lexer) {
     auto lhs = parse_additive_expr(lexer);
     auto cur = lexer::peek(lexer);
 
-    while (cur && (cur->ty == token::type::Double_Equals
-                   || cur->ty == token::type::Greaterthan_Equals
-                   || cur->ty == token::type::Greaterthan
-                   || cur->ty == token::type::Lessthan_Equals
-                   || cur->ty == token::type::Lessthan
-                   || cur->ty == token::type::Bang_Equals)) {
+    while (cur && (cur->ty == token::type::Double_Equals ||
+                   cur->ty == token::type::Greaterthan_Equals ||
+                   cur->ty == token::type::Greaterthan ||
+                   cur->ty == token::type::Lessthan_Equals ||
+                   cur->ty == token::type::Lessthan ||
+                   cur->ty == token::type::Bang_Equals)) {
         auto op = lexer::next(lexer);
         auto rhs = parse_additive_expr(lexer);
-        auto bin = std::make_unique<expr::binary::t>(
-            std::move(lhs),
-            std::move(rhs),
-            std::move(op)
-        );
+        auto bin = std::make_unique<expr::binary::t>(std::move(lhs), std::move(rhs),
+                                                     std::move(op));
         lhs = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
         cur = lexer::peek(lexer);
     }
@@ -262,15 +275,12 @@ static un_ptr<expr::t> parse_logical_expr(lexer::t &lexer) {
     auto lhs = parse_equalitive_expr(lexer);
     auto cur = lexer::peek(lexer);
 
-    while (cur && (cur->ty == token::type::Double_Ampersand
-                   || cur->ty == token::type::Double_Pipe)) {
+    while (cur && (cur->ty == token::type::Double_Ampersand ||
+                   cur->ty == token::type::Double_Pipe)) {
         auto op = lexer::next(lexer);
         auto rhs = parse_equalitive_expr(lexer);
-        auto bin = std::make_unique<expr::binary::t>(
-            std::move(lhs),
-            std::move(rhs),
-            std::move(op)
-        );
+        auto bin = std::make_unique<expr::binary::t>(std::move(lhs), std::move(rhs),
+                                                     std::move(op));
         lhs = std::make_unique<expr::t>(std::move(bin), expr::type::Binary);
         cur = lexer::peek(lexer);
     }
@@ -297,28 +307,26 @@ static un_ptr<stmt::block> parse_stmt_block(lexer::t &lexer) {
 static un_ptr<stmt::proc> parse_stmt_proc(lexer::t &lexer) {
     lexer::discard(lexer); // proc
     auto id = expect(lexer, token::type::Ident);
-    auto params = parse_proc_parameters(lexer);
+    bool variadic = false;
+    auto params = parse_proc_parameters(lexer, variadic);
     ignore(expect(lexer, token::type::Colon));
     auto rettype = expect_type(lexer);
     auto block = parse_stmt_block(lexer);
-    return std::make_unique<stmt::proc>(std::move(id),
-                                        std::move(params),
-                                        std::move(rettype),
-                                        std::move(block));
+    return std::make_unique<stmt::proc>(std::move(id), std::move(params),
+                                        std::move(rettype), std::move(block),
+                                        variadic);
 }
 
 static un_ptr<stmt::def> parse_stmt_def(lexer::t &lexer) {
     lexer::discard(lexer); // def
     auto id = expect(lexer, token::type::Ident);
-    auto params = parse_proc_parameters(lexer);
+    bool variadic = false;
+    auto params = parse_proc_parameters(lexer, variadic);
     ignore(expect(lexer, token::type::Colon));
     auto rettype = expect_type(lexer);
     ignore(expect(lexer, token::type::Semicolon));
-    return std::make_unique<stmt::def>(
-        std::move(id),
-        std::move(params),
-        std::move(rettype)
-    );
+    return std::make_unique<stmt::def>(std::move(id), std::move(params),
+                                       std::move(rettype), variadic);
 }
 
 static un_ptr<stmt::let> parse_stmt_let(lexer::t &lexer) {
@@ -330,7 +338,8 @@ static un_ptr<stmt::let> parse_stmt_let(lexer::t &lexer) {
     auto expr = parse_expr(lexer);
     ignore(expect(lexer, token::type::Semicolon));
 
-    return std::make_unique<stmt::let>(std::move(id), std::move(expr), std::move(ty));
+    return std::make_unique<stmt::let>(std::move(id), std::move(expr),
+                                       std::move(ty));
 }
 
 static un_ptr<stmt::_return> parse_stmt_return(lexer::t &lexer) {
@@ -354,49 +363,59 @@ static un_ptr<stmt::_if> parse_stmt_if(lexer::t &lexer) {
     optional<un_ptr<stmt::block>> _else = {};
 
     // `else` case
-    if (lexer_speek(lexer)->ty == token::type::Keyword
-        && lexer::peek(lexer)->lx == COMMON_SCR_ELSE) {
+    if (lexer_speek(lexer)->ty == token::type::Keyword &&
+        lexer::peek(lexer)->lx == COMMON_SCR_ELSE) {
         lexer::discard(lexer);
 
         // `else if` case
-        if (lexer_speek(lexer)->ty == token::type::Keyword
-            && lexer::peek(lexer)->lx == COMMON_SCR_IF) {
+        if (lexer_speek(lexer)->ty == token::type::Keyword &&
+            lexer::peek(lexer)->lx == COMMON_SCR_IF) {
             assert(false && "`else if` unimplemented");
-        }
-        else {
+        } else {
             _else = parse_stmt_block(lexer);
         }
     }
 
-    return std::make_unique<stmt::_if>(
-        std::move(cond),
-        std::move(block),
-        std::move(_else)
-    );
+    return std::make_unique<stmt::_if>(std::move(cond), std::move(block),
+                                       std::move(_else));
+}
+
+static un_ptr<expr::t> parse_stmt_expr(lexer::t &lexer) {
+    return parse_expr(lexer);
 }
 
 static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
     auto top = lexer::peek(lexer);
     switch (top->ty) {
-        case token::type::Keyword: {
-            if (top->lx == COMMON_SCR_LET)
-                return std::make_unique<stmt::t>(parse_stmt_let(lexer), stmt::type::Let);
-            if (top->lx == COMMON_SCR_PROC)
-                return std::make_unique<stmt::t>(parse_stmt_proc(lexer), stmt::type::Proc);
-            if (top->lx == COMMON_SCR_DEF)
-                return std::make_unique<stmt::t>(parse_stmt_def(lexer), stmt::type::Def);
-            if (top->lx == COMMON_SCR_RETURN)
-                return std::make_unique<stmt::t>(parse_stmt_return(lexer), stmt::type::Return);
-            if (top->lx == COMMON_SCR_MODULE)
-                return std::make_unique<stmt::t>(parse_stmt_module(lexer), stmt::type::Module);
-            if (top->lx == COMMON_SCR_IF)
-                return std::make_unique<stmt::t>(parse_stmt_if(lexer), stmt::type::If);
-            ERRW("invalid statement: `%s`", top->lx.c_str());
-        } break;
-        default: {
-            std::cerr << "invalid statement at token: " << token::type_to_cxxstr(lexer::peek(lexer)->ty) << std::endl;
-            std::exit(EXIT_FAILURE);
-        } break;
+    case token::type::Keyword: {
+        if (top->lx == COMMON_SCR_LET)
+            return std::make_unique<stmt::t>(parse_stmt_let(lexer), stmt::type::Let);
+        if (top->lx == COMMON_SCR_PROC)
+            return std::make_unique<stmt::t>(parse_stmt_proc(lexer),
+                                             stmt::type::Proc);
+        if (top->lx == COMMON_SCR_DEF)
+            return std::make_unique<stmt::t>(parse_stmt_def(lexer), stmt::type::Def);
+        if (top->lx == COMMON_SCR_RETURN)
+            return std::make_unique<stmt::t>(parse_stmt_return(lexer),
+                                             stmt::type::Return);
+        if (top->lx == COMMON_SCR_MODULE)
+            return std::make_unique<stmt::t>(parse_stmt_module(lexer),
+                                             stmt::type::Module);
+        if (top->lx == COMMON_SCR_IF)
+            return std::make_unique<stmt::t>(parse_stmt_if(lexer), stmt::type::If);
+        ERRW("invalid statement: `%s`", top->lx.c_str());
+    } break;
+    case token::type::Ident: {
+        auto res = std::make_unique<stmt::t>(parse_stmt_expr(lexer), stmt::type::Expr);
+        ignore(expect(lexer, token::type::Semicolon));
+        return res;
+    } break;
+    default: {
+        err::wtok(lexer::peek(lexer));
+        std::cerr << "invalid statement at token: "
+                  << token::type_to_cxxstr(lexer::peek(lexer)->ty) << std::endl;
+        std::exit(EXIT_FAILURE);
+    } break;
     }
     return nullptr; // unreachable
 }

@@ -1,10 +1,10 @@
 #include "grammar.hxx"
 #include "utils.hxx"
 
-stmt::def::def(sh_ptr<token::t> id,
-               vec<un_ptr<stmt::parameter>> params,
-               un_ptr<scr_type::t> rettype)
-    : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)) {}
+stmt::def::def(sh_ptr<token::t> id, vec<un_ptr<stmt::parameter>> params,
+               un_ptr<scr_type::t> rettype, bool variadic)
+    : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)),
+      variadic(variadic) {}
 
 stmt::_return::_return(un_ptr<expr::t> expr)
     : expr(std::move(expr)) {}
@@ -15,8 +15,11 @@ stmt::let::let(sh_ptr<token::t> id, un_ptr<expr::t> expr, un_ptr<scr_type::t> ty
 stmt::mut::mut(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op)
     : lhs(std::move(lhs)), rhs(std::move(rhs)), op(std::move(op)) {}
 
-stmt::proc::proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params, sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block)
-    : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)), block(std::move(block)) {}
+stmt::proc::proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params,
+                 sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block,
+                 bool variadic)
+    : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)),
+      block(std::move(block)), variadic(variadic) {}
 
 stmt::parameter::parameter(sh_ptr<token::t> id, un_ptr<scr_type::t> ty)
     : id(std::move(id)), ty(std::move(ty)) {}

@@ -29,6 +29,7 @@ namespace stmt {
         Return,
         Module,
         Def,
+        Expr,
     };
 
     struct parameter {
@@ -42,9 +43,10 @@ namespace stmt {
         sh_ptr<token::t> id;
         vec<un_ptr<stmt::parameter>> params;
         un_ptr<scr_type::t> rettype;
+        bool variadic;
         def(sh_ptr<token::t> id,
             vec<un_ptr<stmt::parameter>> params,
-            un_ptr<scr_type::t> rettype);
+            un_ptr<scr_type::t> rettype, bool variadic);
         ~def() = default;
     };
 
@@ -116,11 +118,11 @@ namespace stmt {
         vec<un_ptr<parameter>> params;
         sh_ptr<scr_type::t> rettype;
         un_ptr<stmt::block> block;
+        bool variadic;
 
-        proc(sh_ptr<token::t> id,
-             vec<un_ptr<parameter>> params,
-             sh_ptr<scr_type::t> rettype,
-             un_ptr<stmt::block> block);
+        proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params,
+             sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block,
+             bool variadic);
         ~proc() = default;
     };
 
@@ -133,7 +135,8 @@ namespace stmt {
                             un_ptr<stmt::block>,
                             un_ptr<stmt::_module>,
                             un_ptr<stmt::_return>,
-                            un_ptr<stmt::def>>;
+                            un_ptr<stmt::def>,
+                            un_ptr<expr::t>>;
     struct t {
         vt actual;
         stmt::type ty;

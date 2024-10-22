@@ -143,6 +143,7 @@ lexer::t lexer::lex(str &src, str fp) {
         {":", token::type::Colon},
         {";", token::type::Semicolon},
         {",", token::type::Comma},
+        {"...", token::type::TriplePeriod}
     };
 
     unsigned r = 1, c = 0;

@@ -50,6 +50,7 @@ str token::type_to_cxxstr(token::type ty) {
     case token::type::Ident:              return "Ident";
     case token::type::Keyword:            return "Keyword";
     case token::type::Type:               return "Type";
+    case token::type::TriplePeriod:       return "TriplePeriod";
     default: ERRW("unknown token type `%d`", ty);
     }
     return ""; // unreachable

@@ -13,11 +13,11 @@ str scr_type::to_cxxstr(scr_type::t *ty) {
     if (!ty)
         return "";
     switch (ty->base) {
-        case scr_type::base::I32:  return COMMON_SCR_I32  + scr_type::to_cxxstr(ty->next.get());
-        case scr_type::base::Str:  return COMMON_SCR_STR  + scr_type::to_cxxstr(ty->next.get());
-        case scr_type::base::Void: return COMMON_SCR_VOID + scr_type::to_cxxstr(ty->next.get());
-        case scr_type::base::Ptr:  return "Ptr<"          + scr_type::to_cxxstr(ty->next.get()) + ">";
-        default: ERRW("invalid base type `%d`", (int)ty->base);
+    case scr_type::base::I32:  return COMMON_SCR_I32  + scr_type::to_cxxstr(ty->next.get());
+    case scr_type::base::Str:  return COMMON_SCR_STR  + scr_type::to_cxxstr(ty->next.get());
+    case scr_type::base::Void: return COMMON_SCR_VOID + scr_type::to_cxxstr(ty->next.get());
+    case scr_type::base::Ptr:  return "Ptr<"          + scr_type::to_cxxstr(ty->next.get()) + ">";
+    default: ERRW("invalid base type `%d`", (int)ty->base);
     }
 }
 

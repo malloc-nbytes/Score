@@ -36,6 +36,7 @@ namespace token {
         Backtick,
         Tilde,
         Colon,
+        TriplePeriod,
 
         Double_Ampersand,
         Double_Pipe,
