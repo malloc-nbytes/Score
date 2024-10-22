@@ -33,8 +33,8 @@ namespace stmt {
 
     struct parameter {
         sh_ptr<token::t> id;
-        sh_ptr<scr_type::t> ty;
-        parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty);
+        un_ptr<scr_type::t> ty;
+        parameter(sh_ptr<token::t> id, un_ptr<scr_type::t> ty);
         ~parameter() = default;
     };
 
@@ -88,7 +88,7 @@ namespace stmt {
     struct _if {
         un_ptr<expr::t> cond;
         un_ptr<stmt::block> block;
-        std::optional<un_ptr<stmt::block>> _else;
+        optional<un_ptr<stmt::block>> _else;
         _if(un_ptr<expr::t> cond,
             un_ptr<stmt::block> block,
             optional<un_ptr<stmt::block>> _else);
@@ -106,7 +106,8 @@ namespace stmt {
     struct let {
         sh_ptr<token::t> id;
         un_ptr<expr::t> expr;
-        let(sh_ptr<token::t> id, un_ptr<expr::t> expr);
+        un_ptr<scr_type::t> ty;
+        let(sh_ptr<token::t> id, un_ptr<expr::t> expr, un_ptr<scr_type::t> ty);
         ~let() = default;
     };
 

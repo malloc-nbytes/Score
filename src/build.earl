@@ -7,10 +7,10 @@ set_flag("--show-lets", "--show-bash");
 let run = len(argv()) > 1 && argv()[1] == "run";
 let CXX_FILES = "*.cxx";
 let LLVM_CONFIG = "llvm-config --cxxflags --ldflags --system-libs --libs core";
-let CXX_FLAGS = "-Iinclude/ -pedantic -ggdb -DDEBUG -O0 -std=c++17 -o main";
+let CXX_FLAGS = "-I/usr/local/include/llvm/ -Iinclude/ -pedantic -ggdb -DDEBUG -O0 -std=c++17 -o main";
 let CXX = "clang++";
 
-$f"{CXX} -I/usr/local/include/llvm/ {CXX_FLAGS} {CXX_FILES} `{LLVM_CONFIG}`";
+$f"{CXX} {CXX_FLAGS} {CXX_FILES} `{LLVM_CONFIG}`";
 
 if run {
     $"./main";

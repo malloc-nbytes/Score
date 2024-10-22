@@ -9,8 +9,8 @@ stmt::def::def(sh_ptr<token::t> id,
 stmt::_return::_return(un_ptr<expr::t> expr)
     : expr(std::move(expr)) {}
 
-stmt::let::let(sh_ptr<token::t> id, un_ptr<expr::t> expr)
-    : id(std::move(id)), expr(std::move(expr)) {}
+stmt::let::let(sh_ptr<token::t> id, un_ptr<expr::t> expr, un_ptr<scr_type::t> ty)
+    : id(std::move(id)), expr(std::move(expr)), ty(std::move(ty)) {}
 
 stmt::mut::mut(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op)
     : lhs(std::move(lhs)), rhs(std::move(rhs)), op(std::move(op)) {}
@@ -18,7 +18,7 @@ stmt::mut::mut(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op)
 stmt::proc::proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params, sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block)
     : id(std::move(id)), params(std::move(params)), rettype(std::move(rettype)), block(std::move(block)) {}
 
-stmt::parameter::parameter(sh_ptr<token::t> id, sh_ptr<scr_type::t> ty)
+stmt::parameter::parameter(sh_ptr<token::t> id, un_ptr<scr_type::t> ty)
     : id(std::move(id)), ty(std::move(ty)) {}
 
 stmt::_module::_module(sh_ptr<token::t> tok)

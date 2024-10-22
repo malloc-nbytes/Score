@@ -164,8 +164,16 @@ static un_ptr<expr::t> parse_primary_expr(lexer::t &lexer) {
                 str id = "";
                 std::visit([&](auto &&f) {
                     using T = std::decay_t<decltype(f)>;
-                    if constexpr (std::is_same_v<T, un_ptr<expr::term::str_literal>>) {
-                        id = f->tok->lx;
+                    if constexpr (std::is_same_v<T, un_ptr<expr::term::t>>) {
+                        std::visit([&](auto &&g) {
+                            using G = std::decay_t<decltype(g)>;
+                            if constexpr (std::is_same_v<G, un_ptr<expr::term::identifier>>) {
+                                id = g->tok->lx;  // Extract the lexeme from the identifier
+                            } else {
+                                std::cerr << "proc calls can only be used with identifiers right now" << std::endl;
+                                std::exit(1);
+                            }
+                        }, f->actual);
                     }
                     else {
                         std::cerr << "proc calls can only be used with identifiers right now" << std::endl;
@@ -322,9 +330,7 @@ static un_ptr<stmt::let> parse_stmt_let(lexer::t &lexer) {
     auto expr = parse_expr(lexer);
     ignore(expect(lexer, token::type::Semicolon));
 
-    std::cout << scr_type::to_cxxstr(ty.get()) << std::endl;
-
-    return std::make_unique<stmt::let>(std::move(id), std::move(expr));
+    return std::make_unique<stmt::let>(std::move(id), std::move(expr), std::move(ty));
 }
 
 static un_ptr<stmt::_return> parse_stmt_return(lexer::t &lexer) {
@@ -341,6 +347,34 @@ static un_ptr<stmt::_module> parse_stmt_module(lexer::t &lexer) {
     return std::make_unique<stmt::_module>(std::move(id));
 }
 
+static un_ptr<stmt::_if> parse_stmt_if(lexer::t &lexer) {
+    lexer::discard(lexer); // if
+    auto cond = parse_expr(lexer);
+    auto block = parse_stmt_block(lexer);
+    optional<un_ptr<stmt::block>> _else = {};
+
+    // `else` case
+    if (lexer_speek(lexer)->ty == token::type::Keyword
+        && lexer::peek(lexer)->lx == COMMON_SCR_ELSE) {
+        lexer::discard(lexer);
+
+        // `else if` case
+        if (lexer_speek(lexer)->ty == token::type::Keyword
+            && lexer::peek(lexer)->lx == COMMON_SCR_IF) {
+            assert(false && "`else if` unimplemented");
+        }
+        else {
+            _else = parse_stmt_block(lexer);
+        }
+    }
+
+    return std::make_unique<stmt::_if>(
+        std::move(cond),
+        std::move(block),
+        std::move(_else)
+    );
+}
+
 static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
     auto top = lexer::peek(lexer);
     switch (top->ty) {
@@ -355,6 +389,8 @@ static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
                 return std::make_unique<stmt::t>(parse_stmt_return(lexer), stmt::type::Return);
             if (top->lx == COMMON_SCR_MODULE)
                 return std::make_unique<stmt::t>(parse_stmt_module(lexer), stmt::type::Module);
+            if (top->lx == COMMON_SCR_IF)
+                return std::make_unique<stmt::t>(parse_stmt_if(lexer), stmt::type::If);
             ERRW("invalid statement: `%s`", top->lx.c_str());
         } break;
         default: {
