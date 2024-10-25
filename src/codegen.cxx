@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iostream>
 #include <llvm/IR/Instructions.h>
+#include <llvm/Support/raw_ostream.h>
 #include <variant>
 #include <map>
 
@@ -184,8 +185,18 @@ static llvm::Value *gen_expr_identifier(expr::term::identifier *id, context &con
         std::cerr << "variable `" << id->tok->lx << "` does not exist" << std::endl;
         std::exit(1);
     }
-    var *v = scope_get_var(id->tok->lx, context);
-    return v->value;
+
+    // Retrieve the variable from the current scope
+    auto var_entry = scope_get_var(id->tok->lx, context);
+    if (!var_entry) {
+        std::cerr << "failed to retrieve variable " << id->tok->lx << std::endl;
+        std::exit(1);
+    }
+
+    // Load the value from the variable's allocated space
+    llvm::Value *loaded_value = context.bl->CreateLoad(var_entry->value->getType(), var_entry->value, id->tok->lx.c_str());
+
+    return loaded_value;
 }
 
 static llvm::Value *gen_expr_proc_call(expr::term::proc_call *pc, context &context) {
@@ -238,13 +249,16 @@ static llvm::Value *gen_expr_unary(expr::unary::t *un, context &context) {
 static llvm::Value *gen_expr_binary(expr::binary::t *bin, context &context) {
     llvm::Value *l = gen_expr(bin->lhs.get(), context);
     llvm::Value *r = gen_expr(bin->rhs.get(), context);
-    if (!l || !r) {
+
+    if (!l || !r)
         return nullptr;
-    }
+
     switch (bin->op->ty) {
-    case token::type::Plus:     return context.bl->CreateAdd(l, r, "addtmp");
-    case token::type::Minus:    return context.bl->CreateSub(l, r, "subtmp");
-    case token::type::Asterisk: return context.bl->CreateMul(l, r, "multmp");
+    case token::type::Plus:        return context.bl->CreateAdd(l, r, "addtmp");
+    case token::type::Minus:       return context.bl->CreateSub(l, r, "subtmp");
+    case token::type::Asterisk:    return context.bl->CreateMul(l, r, "multmp");
+    case token::type::Lessthan:    return context.bl->CreateICmpSLT(l, r, "lesstmp");
+    case token::type::Greaterthan: return context.bl->CreateICmpSGT(l, r, "greattmp");
     default: {
         std::cerr << "unhandled binop `" << bin->op->lx << "`";
         std::exit(1);
@@ -303,10 +317,26 @@ static llvm::Function *gen_stmt_def(stmt::def *stmt, context &context) {
 }
 
 static void gen_stmt_let(stmt::let *stmt, context &context) {
-    const std::string &id = stmt->id->lx;
-    llvm::Value *value = gen_expr(stmt->expr.get(), context);
-    auto v = std::make_unique<var>(stmt->id, std::move(stmt->ty), value, "");
-    scope_add_var(std::move(v), context);
+    // Generate LLVM type from the variable's type
+    llvm::Type *llvm_type = scr_type_to_llvm_type(stmt->ty.get(), context);
+
+    // Create an alloca instruction for the new variable
+    llvm::AllocaInst *alloca_inst = context.bl->CreateAlloca(llvm_type, nullptr, stmt->id->lx);
+
+    // Generate code for the initial value expression
+    llvm::Value *initial_value = gen_expr(stmt->expr.get(), context);
+    if (!initial_value) {
+        std::cerr << "failed to generate expression for `let` initialization" << std::endl;
+        std::exit(1);
+    }
+
+    // Create a new variable and add it to the current scope
+    auto new_var = std::make_unique<var>(stmt->id, std::move(stmt->ty), alloca_inst, "module_name");
+    scope_add_var(std::move(new_var), context);
+
+
+    // Store the initial value into the allocated space
+    context.bl->CreateStore(initial_value, alloca_inst);
 }
 
 static void gen_stmt_block(stmt::block *stmt, context &context) {
@@ -357,11 +387,88 @@ static void gen_stmt_module(stmt::_module *stmt, context &context) {
 }
 
 static void gen_stmt_mut(stmt::mut *stmt, context &context) {
-    assert(false);
+    std::visit([&](auto &&left) {
+        using T = std::decay_t<decltype(left)>;
+        if constexpr (std::is_same_v<T, un_ptr<expr::term::t>>) {
+            std::visit([&](auto &&term) {
+                using Tx = std::decay_t<decltype(term)>;
+                if constexpr (std::is_same_v<Tx, un_ptr<expr::term::identifier>>) {
+                    // Get the identifier from the left-hand side
+                    auto identifier = term.get();
+
+                    // Generate code for the right-hand side expression
+                    llvm::Value *rhs_value = gen_expr(stmt->rhs.get(), context);
+                    if (!rhs_value) {
+                        std::cerr << "failed to generate expression for `mut` statement" << std::endl;
+                        std::exit(1);
+                    }
+
+                    // Resolve the variable identifier to an LLVM value
+                    auto var_iter = context.var_tbl.back().find(identifier->tok->lx);
+                    if (var_iter == context.var_tbl.back().end()) {
+                        std::cerr << "failed to resolve identifier: " << identifier->tok->lx << std::endl;
+                        std::exit(1);
+                    }
+
+                    // Get the pointer to the variable, not just the value
+                    llvm::Value *lhs_pointer = var_iter->second->value;
+
+                    if (!lhs_pointer) {
+                        std::cerr << "identifier not found in context: " << identifier->tok->lx << std::endl;
+                        std::exit(1);
+                    }
+
+                    // Check the type of the value being stored and the pointer
+                    // if (lhs_pointer->getType() != rhs_value->getType()->getPointerTo()) {
+                    //     std::cerr << "type mismatch in store operation" << std::endl;
+                    //     std::exit(1);
+                    // }
+
+                    // Use the IRBuilder to create the store instruction
+                    context.bl->CreateStore(rhs_value, lhs_pointer);
+
+                } else {
+                    assert(false && "unimplemented mutate type");
+                }
+            }, left->actual);
+        } else {
+            assert(false && "mutate type must be a term");
+        }
+    }, stmt->lhs->actual);
 }
 
 static void gen_stmt_while(stmt::_while *stmt, context &context) {
-    assert(false);
+    // Create the basic blocks for the loop
+    llvm::BasicBlock *cond_bb = llvm::BasicBlock::Create(*(context.ctx), "while_cond", context.bl->GetInsertBlock()->getParent());
+    llvm::BasicBlock *body_bb = llvm::BasicBlock::Create(*(context.ctx), "while_body", context.bl->GetInsertBlock()->getParent());
+    llvm::BasicBlock *after_bb = llvm::BasicBlock::Create(*(context.ctx), "while_after", context.bl->GetInsertBlock()->getParent());
+
+    // Insert the branch to the condition block
+    context.bl->CreateBr(cond_bb);
+
+    // Generate the loop condition
+    context.bl->SetInsertPoint(cond_bb);
+    llvm::Value *cond = gen_expr(stmt->cond.get(), context);
+    if (!cond) {
+        std::cerr << "failed to generate condition expression for `while` statement" << std::endl;
+        std::exit(1);
+    }
+
+    // Ensure condition is of type i1 (boolean)
+    cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(context.ctx)), 0), "condtmp");
+
+    // Create the conditional branch (if condition is true, jump to body, else to after)
+    context.bl->CreateCondBr(cond, body_bb, after_bb);
+
+    // Generate the body of the loop
+    context.bl->SetInsertPoint(body_bb);
+    gen_stmt_block(stmt->block.get(), context);
+
+    // At the end of the body, jump back to the condition block
+    context.bl->CreateBr(cond_bb);
+
+    // Set the insert point to the after block (exit of the loop)
+    context.bl->SetInsertPoint(after_bb);
 }
 
 static void gen_stmt_for(stmt::_for *stmt, context &context) {
@@ -461,11 +568,11 @@ static void gen_stmt(stmt::t *stmt, context &context) {
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_module>>) {
             assert(false);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::mut>>) {
-            assert(false);
+            gen_stmt_mut(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_if>>) {
             gen_stmt_if(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_while>>) {
-            assert(false);
+            gen_stmt_while(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_for>>) {
             assert(false);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_return>>) {

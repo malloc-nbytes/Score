@@ -27,8 +27,14 @@ void lexer::dump(lexer::t &lexer) {
     }
 }
 
-token::t *lexer::peek(lexer::t &lexer) {
-    return lexer.hd ? lexer.hd.get() : nullptr;
+token::t *lexer::peek(lexer::t &lexer, size_t i) {
+    auto it = lexer.hd.get();
+    while (it && i != 0) {
+        if (it)
+            it = it->next.get();
+        ++i;
+    }
+    return it;
 }
 
 sh_ptr<token::t> lexer::next(lexer::t &lexer) {

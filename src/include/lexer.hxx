@@ -15,7 +15,7 @@ namespace lexer {
         t();
     };
 
-    token::t *peek(t &lexer);
+    token::t *peek(t &lexer, size_t i = 0);
     void append(t &lexer, sh_ptr<token::t> tok);
     sh_ptr<token::t> next(t &lexer);
     void discard(t &lexer);

@@ -384,6 +384,21 @@ static un_ptr<expr::t> parse_stmt_expr(lexer::t &lexer) {
     return parse_expr(lexer);
 }
 
+static un_ptr<stmt::_while> parse_stmt_while(lexer::t &lexer) {
+    lexer::discard(lexer); // while
+    auto expr = parse_expr(lexer);
+    auto block = parse_stmt_block(lexer);
+    return std::make_unique<stmt::_while>(std::move(expr), std::move(block));
+}
+
+static un_ptr<stmt::mut> parse_stmt_mut(lexer::t &lexer) {
+    auto left = parse_expr(lexer);
+    auto op = lexer::next(lexer);
+    auto right = parse_expr(lexer);
+    return std::make_unique<stmt::mut>(std::move(left), std::move(right),
+                                       std::move(op));
+}
+
 static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
     auto top = lexer::peek(lexer);
     switch (top->ty) {
@@ -401,14 +416,27 @@ static un_ptr<stmt::t> parse_stmt(lexer::t &lexer) {
         if (top->lx == COMMON_SCR_MODULE)
             return std::make_unique<stmt::t>(parse_stmt_module(lexer),
                                              stmt::type::Module);
+
+        if (top->lx == COMMON_SCR_WHILE)
+            return std::make_unique<stmt::t>(parse_stmt_while(lexer),
+                                             stmt::type::Module);
+
         if (top->lx == COMMON_SCR_IF)
             return std::make_unique<stmt::t>(parse_stmt_if(lexer), stmt::type::If);
         ERRW("invalid statement: `%s`", top->lx.c_str());
     } break;
     case token::type::Ident: {
-        auto res = std::make_unique<stmt::t>(parse_stmt_expr(lexer), stmt::type::Expr);
+        auto left = parse_expr(lexer);
+        if (lexer_speek(lexer)->ty == token::type::Equals) {
+            auto op = lexer::next(lexer);
+            auto right = parse_expr(lexer);
+            ignore(expect(lexer, token::type::Semicolon));
+            auto mut = std::make_unique<stmt::mut>(
+                std::move(left), std::move(right), std::move(op));
+            return std::make_unique<stmt::t>(std::move(mut), stmt::type::Mut);
+        }
         ignore(expect(lexer, token::type::Semicolon));
-        return res;
+        return std::make_unique<stmt::t>(std::move(left), stmt::type::Expr);
     } break;
     default: {
         err::wtok(lexer::peek(lexer));

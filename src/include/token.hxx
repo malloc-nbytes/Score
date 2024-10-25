@@ -46,6 +46,12 @@ namespace token {
         Bang_Equals,
         Double_Colon,
 
+        Plus_Equals,
+        Minus_Equals,
+        Asterisk_Equals,
+        Forwardslash_Equals,
+        Percent_Equals,
+
         // Other
         Eof,
         Intlit,
