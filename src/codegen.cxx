@@ -34,10 +34,11 @@ struct var {
     sh_ptr<token::t> id;
     un_ptr<scr_type::t> ty;
     llvm::Value *value;
+    llvm::Value *alloc;
     std::string mod;
 
-    var(sh_ptr<token::t> id, un_ptr<scr_type::t> ty, llvm::Value *value, std::string mod)
-        : id(std::move(id)), ty(std::move(ty)), value(value), mod(mod) {}
+    var(sh_ptr<token::t> id, un_ptr<scr_type::t> ty, llvm::Value *value, llvm::Value *alloc, std::string mod)
+        : id(std::move(id)), ty(std::move(ty)), value(value), alloc(alloc), mod(mod) {}
 };
 
 struct context {
@@ -46,11 +47,13 @@ struct context {
     un_ptr<llvm::Module> md;
     vec<map<str, un_ptr<var>>> var_tbl;
     vec<map<str, un_ptr<fun>>> fun_tbl;
+    bool needs_alloc;
 
     context() {
         ctx = std::make_unique<llvm::LLVMContext>();
         md = std::make_unique<llvm::Module>("main", *ctx);
         bl = std::make_unique<llvm::IRBuilder<>>(*ctx);
+        needs_alloc = true;
     }
 };
 
@@ -193,10 +196,11 @@ static llvm::Value *gen_expr_identifier(expr::term::identifier *id, context &con
         std::exit(1);
     }
 
-    // Load the value from the variable's allocated space
-    llvm::Value *loaded_value = context.bl->CreateLoad(var_entry->value->getType(), var_entry->value, id->tok->lx.c_str());
-
-    return loaded_value;
+    if (context.needs_alloc) {
+        llvm::Value *loaded_value = context.bl->CreateLoad(var_entry->value->getType(), var_entry->alloc, id->tok->lx.c_str());
+        return loaded_value;
+    }
+    return var_entry->value;
 }
 
 static llvm::Value *gen_expr_proc_call(expr::term::proc_call *pc, context &context) {
@@ -250,19 +254,18 @@ static llvm::Value *gen_expr_binary(expr::binary::t *bin, context &context) {
     llvm::Value *l = gen_expr(bin->lhs.get(), context);
     llvm::Value *r = gen_expr(bin->rhs.get(), context);
 
-    if (!l || !r)
-        return nullptr;
+    if (!l || !r) return nullptr;
 
     switch (bin->op->ty) {
-    case token::type::Plus:        return context.bl->CreateAdd(l, r, "addtmp");
-    case token::type::Minus:       return context.bl->CreateSub(l, r, "subtmp");
-    case token::type::Asterisk:    return context.bl->CreateMul(l, r, "multmp");
-    case token::type::Lessthan:    return context.bl->CreateICmpSLT(l, r, "lesstmp");
-    case token::type::Greaterthan: return context.bl->CreateICmpSGT(l, r, "greattmp");
-    default: {
-        std::cerr << "unhandled binop `" << bin->op->lx << "`";
-        std::exit(1);
-    }
+        case token::type::Plus:        return context.bl->CreateAdd(l, r, "addtmp");
+        case token::type::Minus:       return context.bl->CreateSub(l, r, "subtmp");
+        case token::type::Asterisk:    return context.bl->CreateMul(l, r, "multmp");
+        case token::type::Lessthan:    return context.bl->CreateICmpSLT(l, r, "lessthan");
+        case token::type::Greaterthan:  return context.bl->CreateICmpSGT(l, r, "greaterthan");
+        default: {
+            std::cerr << "Unhandled binop `" << bin->op->lx << "`" << std::endl;
+            std::exit(1);
+        }
     }
     return nullptr; // unreachable
 }
@@ -331,7 +334,7 @@ static void gen_stmt_let(stmt::let *stmt, context &context) {
     }
 
     // Create a new variable and add it to the current scope
-    auto new_var = std::make_unique<var>(stmt->id, std::move(stmt->ty), alloca_inst, "module_name");
+    auto new_var = std::make_unique<var>(stmt->id, std::move(stmt->ty), initial_value, alloca_inst, "module_name");
     scope_add_var(std::move(new_var), context);
 
 
@@ -368,7 +371,7 @@ static llvm::Function *gen_stmt_proc(stmt::proc *stmt, context &context) {
     for (auto &arg : existing_function->args()) {
         un_ptr<var> v = std::make_unique<var>(
             stmt->params.at(arg.getArgNo())->id,
-            std::move(stmt->params.at(arg.getArgNo())->ty), &arg, "");
+            std::move(stmt->params.at(arg.getArgNo())->ty), nullptr, &arg, "");
 
         scope_add_var(std::move(v), context);
     }
@@ -411,21 +414,17 @@ static void gen_stmt_mut(stmt::mut *stmt, context &context) {
                     }
 
                     // Get the pointer to the variable, not just the value
-                    llvm::Value *lhs_pointer = var_iter->second->value;
+                    // llvm::Value *lhs_pointer = var_iter->second->alloc;
+                    llvm::Value *lhs_pointer = gen_expr_identifier(identifier, context);
 
                     if (!lhs_pointer) {
                         std::cerr << "identifier not found in context: " << identifier->tok->lx << std::endl;
                         std::exit(1);
                     }
 
-                    // Check the type of the value being stored and the pointer
-                    // if (lhs_pointer->getType() != rhs_value->getType()->getPointerTo()) {
-                    //     std::cerr << "type mismatch in store operation" << std::endl;
-                    //     std::exit(1);
-                    // }
+                    var_iter->second->value = rhs_value;
 
-                    // Use the IRBuilder to create the store instruction
-                    context.bl->CreateStore(rhs_value, lhs_pointer);
+                    context.bl->CreateStore(rhs_value, var_iter->second->alloc);
 
                 } else {
                     assert(false && "unimplemented mutate type");
@@ -454,8 +453,11 @@ static void gen_stmt_while(stmt::_while *stmt, context &context) {
         std::exit(1);
     }
 
-    // Ensure condition is of type i1 (boolean)
-    cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(context.ctx)), 0), "condtmp");
+    // Ensure condition is of type i1 (boolean).
+    // If cond is not already of type i1, you may need to convert it
+    if (cond->getType() != llvm::Type::getInt1Ty(*(context.ctx))) {
+        cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "condtmp");
+    }
 
     // Create the conditional branch (if condition is true, jump to body, else to after)
     context.bl->CreateCondBr(cond, body_bb, after_bb);
