@@ -335,6 +335,8 @@ static void gen_stmt_let(stmt::let *stmt, context &context) {
 
     // Create a new variable and add it to the current scope
     auto new_var = std::make_unique<var>(stmt->id, std::move(stmt->ty), initial_value, alloca_inst, "module_name");
+
+    std::cout << "adding var: " << new_var->id->lx << std::endl;
     scope_add_var(std::move(new_var), context);
 
 
@@ -407,11 +409,16 @@ static void gen_stmt_mut(stmt::mut *stmt, context &context) {
                     }
 
                     // Resolve the variable identifier to an LLVM value
-                    auto var_iter = context.var_tbl.back().find(identifier->tok->lx);
-                    if (var_iter == context.var_tbl.back().end()) {
+                    // auto var_iter = context.var_tbl.back().find(identifier->tok->lx);
+                    // if (var_iter == context.var_tbl.back().end()) {
+                    //     std::cerr << "failed to resolve identifier: " << identifier->tok->lx << std::endl;
+                    //     std::exit(1);
+                    // }
+                    if (!scope_contains_var(identifier->tok->lx, context)) {
                         std::cerr << "failed to resolve identifier: " << identifier->tok->lx << std::endl;
                         std::exit(1);
                     }
+                    auto var_iter = scope_get_var(identifier->tok->lx, context);
 
                     // Get the pointer to the variable, not just the value
                     // llvm::Value *lhs_pointer = var_iter->second->alloc;
@@ -422,9 +429,9 @@ static void gen_stmt_mut(stmt::mut *stmt, context &context) {
                         std::exit(1);
                     }
 
-                    var_iter->second->value = rhs_value;
+                    var_iter->value = rhs_value;
 
-                    context.bl->CreateStore(rhs_value, var_iter->second->alloc);
+                    context.bl->CreateStore(rhs_value, var_iter->alloc);
 
                 } else {
                     assert(false && "unimplemented mutate type");
@@ -455,9 +462,8 @@ static void gen_stmt_while(stmt::_while *stmt, context &context) {
 
     // Ensure condition is of type i1 (boolean).
     // If cond is not already of type i1, you may need to convert it
-    if (cond->getType() != llvm::Type::getInt1Ty(*(context.ctx))) {
+    if (cond->getType() != llvm::Type::getInt1Ty(*(context.ctx)))
         cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "condtmp");
-    }
 
     // Create the conditional branch (if condition is true, jump to body, else to after)
     context.bl->CreateCondBr(cond, body_bb, after_bb);
@@ -474,6 +480,8 @@ static void gen_stmt_while(stmt::_while *stmt, context &context) {
 }
 
 static void gen_stmt_for(stmt::_for *stmt, context &context) {
+    scope_push(context);
+
     // Step 1: Generate the initialization statement.
     gen_stmt(stmt->init.get(), context);
 
@@ -492,8 +500,9 @@ static void gen_stmt_for(stmt::_for *stmt, context &context) {
         std::cerr << "failed to generate condition expression for `for` statement" << std::endl;
         std::exit(1);
     }
-    // Ensure condition is of type i1 (boolean).
-    cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(context.ctx)), 0), "condtmp");
+
+    if (cond->getType() != llvm::Type::getInt1Ty(*(context.ctx)))
+        cond = context.bl->CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "condtmp");
 
     // Step 5: Create the conditional branch (if condition is true, jump to body, else to after).
     context.bl->CreateCondBr(cond, body_bb, after_bb);
@@ -512,6 +521,8 @@ static void gen_stmt_for(stmt::_for *stmt, context &context) {
 
     // Step 9: Set the insert point to the after block, which is the exit of the loop.
     context.bl->SetInsertPoint(after_bb);
+
+    scope_pop(context);
 }
 
 static void gen_stmt_return(stmt::_return *stmt, context &context) {
@@ -576,7 +587,7 @@ static void gen_stmt(stmt::t *stmt, context &context) {
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_while>>) {
             gen_stmt_while(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_for>>) {
-            assert(false);
+            gen_stmt_for(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<stmt::_return>>) {
             gen_stmt_return(st.get(), context);
         } else if constexpr (std::is_same_v<T, un_ptr<expr::t>>) {
