@@ -22,6 +22,7 @@ typedef enum {
         STMT_TYPE_LET,
         STMT_TYPE_PROC,
         STMT_TYPE_BLOCK,
+        STMT_TYPE_RETURN,
 } Stmt_Type;
 
 typedef struct Expr_Proc_Call Expr_Proc_Call;
@@ -34,6 +35,7 @@ typedef struct Expr_Un Expr_Un;
 typedef struct Expr_Bin Expr_Bin;
 typedef struct Expr Expr;
 
+typedef struct Stmt_Return Stmt_Return;
 typedef struct Stmt_Proc Stmt_Proc;
 typedef struct Stmt_Block Stmt_Block;
 typedef struct Stmt_Let Stmt_Let;
@@ -110,6 +112,11 @@ typedef struct Stmt_Block {
         size_t len, cap;
 } Stmt_Block;
 
+typedef struct Stmt_Return {
+        Stmt base;
+        Expr *e;
+} Stmt_Return;
+
 typedef struct Stmt_Proc {
         Stmt base;
         Token *id;
@@ -139,6 +146,7 @@ typedef struct {
         size_t len, cap;
 } Program;
 
+Stmt_Return *stmt_return_alloc(Expr *e);
 Stmt_Expr *stmt_expr_alloc(Expr *e);
 Stmt_Block *stmt_block_alloc(Stmt **stmts, size_t len, size_t cap);
 Stmt_Proc *stmt_proc_alloc(Token *id,

@@ -29,24 +29,44 @@ Scr_Type::Scr_Type(void) {
         this->ptrn = nullptr;
 }
 
-Scr_Type::Scr_Type(const Scr_Type &other) {
-        this->base = other.base;
-        this->ptrn = other.ptrn;
+Scr_Type::Scr_Type(const Scr_Type &other) : base(other.base), ptrn(nullptr) {
+    if (other.ptrn) {
+        ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
+        *ptrn = *other.ptrn;
+        Scr_Type *current = ptrn;
+        Scr_Type *other_current = other.ptrn->ptrn;
+
+        while (other_current) {
+            current->ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
+            *current->ptrn = *other_current;
+            current = current->ptrn;
+            other_current = other_current->ptrn;
+        }
+    }
 }
 
 Scr_Type &Scr_Type::operator=(const Scr_Type &other) {
-        if (this == &other) {
-                return *this;
+    if (this != &other) {
+        this->~Scr_Type();
+
+        base = other.base;
+        ptrn = nullptr;
+
+        if (other.ptrn) {
+            ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
+            *ptrn = *other.ptrn;
+            Scr_Type *current = ptrn;
+            Scr_Type *other_current = other.ptrn->ptrn;
+
+            while (other_current) {
+                current->ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
+                *current->ptrn = *other_current;
+                current = current->ptrn;
+                other_current = other_current->ptrn;
+            }
         }
-        auto tmp = this->ptrn;
-        while (tmp) {
-                auto next = tmp->ptrn;
-                delete tmp;
-                tmp = next;
-        }
-        this->base = other.base;
-        this->ptrn = other.ptrn;
-        return *this;
+    }
+    return *this;
 }
 
 Scr_Type::~Scr_Type(void) {

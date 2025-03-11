@@ -12,6 +12,13 @@
 // Statements /////
 ///////////////////
 
+Stmt_Return *stmt_return_alloc(Expr *e) {
+        Stmt_Return *r = new Stmt_Return;
+        r->base.ty = STMT_TYPE_RETURN;
+        r->e = e;
+        return r;
+}
+
 Stmt_Expr *stmt_expr_alloc(Expr *e) {
         Stmt_Expr *s = new Stmt_Expr;
         s->base.ty = STMT_TYPE_EXPR;
@@ -211,6 +218,12 @@ static void dump_stmt_expr(Stmt_Expr *s, int pad) {
         dump_expr(s->e);
 }
 
+static void dump_stmt_return(Stmt_Return *s, int pad) {
+        (void)pad;
+        printf("RETURN ");
+        dump_expr(s->e);
+}
+
 static void dump_stmt(Stmt *s, int pad) {
         spaces(pad);
 
@@ -226,6 +239,9 @@ static void dump_stmt(Stmt *s, int pad) {
         } break;
         case STMT_TYPE_BLOCK: {
                 dump_stmt_block((Stmt_Block *)s, pad);
+        } break;
+        case STMT_TYPE_RETURN: {
+                dump_stmt_return((Stmt_Return *)s, pad);
         } break;
         default: {
                 err_wargs("unhandled stmt type %d", (int)s->ty);

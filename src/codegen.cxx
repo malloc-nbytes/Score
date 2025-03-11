@@ -116,6 +116,12 @@ static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
         assert(0);
 }
 
+static void compile_stmt_return(Stmt_Return *s, Context *ctx) {
+        (void)s;
+        (void)ctx;
+        assert(0);
+}
+
 static void compile_stmt(Stmt *s, Context *ctx) {
         switch (s->ty) {
         case STMT_TYPE_LET: {
@@ -126,6 +132,9 @@ static void compile_stmt(Stmt *s, Context *ctx) {
         } break;
         case STMT_TYPE_BLOCK: {
                 compile_stmt_block((Stmt_Block *)s, ctx);
+        } break;
+        case STMT_TYPE_RETURN: {
+                compile_stmt_return((Stmt_Return *)s, ctx);
         } break;
         default: {
                 err_wargs("unknown statement: %d", (int)s->ty);
@@ -140,6 +149,8 @@ void codegen(Program *p) {
         ctx->bl = new llvm::IRBuilder<>(*ctx->llctx);
 
         for (size_t i = 0; i < p->len; ++i) {
+                // Guaranteed to be top level statements
+                // (guaranteed from the parser).
                 compile_stmt(p->stmts[i], ctx);
         }
 }

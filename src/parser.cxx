@@ -329,12 +329,21 @@ static Stmt_Proc *parse_stmt_proc(Lexer *lexer) {
                                ids.len, ids.cap, rtype, block);
 }
 
+Stmt_Return *parse_stmt_return(Lexer *lexer) {
+        lexer_discard(lexer); // return
+        Expr *e = parse_expr(lexer);
+        (void)expect(lexer, TOKEN_TYPE_SEMICOLON);
+        return stmt_return_alloc(e);
+}
+
 static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
         Token *hd = lexer_peek(lexer);
         if (!strcmp(hd->lx, KEYWORD_LET)) {
                 return (Stmt *)parse_stmt_let(lexer);
         } else if (!strcmp(hd->lx, KEYWORD_PROC)) {
                 return (Stmt *)parse_stmt_proc(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_RETURN)) {
+                return (Stmt *)parse_stmt_return(lexer);
         }
         assert(0);
 }
