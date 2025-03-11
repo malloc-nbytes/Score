@@ -312,7 +312,7 @@ static Stmt_Block *parse_stmt_block(Lexer *lexer) {
         return stmt_block_alloc(stmts.data, stmts.len, stmts.cap);
 }
 
-static Stmt_Proc *parse_stmt_proc(Lexer *lexer) {
+static Stmt_Proc *parse_stmt_proc(Lexer *lexer, bool is_proto) {
         lexer_discard(lexer); // proc
         Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
 
@@ -332,7 +332,10 @@ static Stmt_Proc *parse_stmt_proc(Lexer *lexer) {
 
         (void)expect(lexer, TOKEN_TYPE_COLON);
         Scr_Type rtype = parse_type(lexer);
-        Stmt_Block *block = parse_stmt_block(lexer);
+        Stmt_Block *block = nullptr;
+        if (!is_proto) {
+                block = parse_stmt_block(lexer);
+        }
 
         return stmt_proc_alloc(id, ids.data, types.data,
                                ids.len, ids.cap, rtype, block, variadic);
@@ -345,14 +348,22 @@ Stmt_Return *parse_stmt_return(Lexer *lexer) {
         return stmt_return_alloc(e);
 }
 
+static Stmt_Def *parse_stmt_def(Lexer *lexer) {
+        Stmt_Proc *p = parse_stmt_proc(lexer, /*is_proto=*/true);
+        (void)expect(lexer, TOKEN_TYPE_SEMICOLON);
+        return stmt_def_alloc(p);
+}
+
 static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
         Token *hd = lexer_peek(lexer);
         if (!strcmp(hd->lx, KEYWORD_LET)) {
                 return (Stmt *)parse_stmt_let(lexer);
         } else if (!strcmp(hd->lx, KEYWORD_PROC)) {
-                return (Stmt *)parse_stmt_proc(lexer);
+                return (Stmt *)parse_stmt_proc(lexer, /*is_proto=*/false);
         } else if (!strcmp(hd->lx, KEYWORD_RETURN)) {
                 return (Stmt *)parse_stmt_return(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_DEF)) {
+                return (Stmt *)parse_stmt_def(lexer);
         }
         assert(0);
 }

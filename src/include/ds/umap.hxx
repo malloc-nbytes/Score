@@ -36,15 +36,15 @@ struct Umap {
         }
 
         ~Umap(void) {
-                for (size_t i = 0; i < _tbl.cap; ++i) {
-                        Umap_Bucket<K, V> *current = _tbl.data[i];
-                        while (current) {
-                                Umap_Bucket<K, V> *next = current->next;
-                                delete current;
-                                current = next;
-                        }
-                }
-                delete[] _tbl.data;
+                // for (size_t i = 0; i < _tbl.cap; ++i) {
+                //         Umap_Bucket<K, V> *current = _tbl.data[i];
+                //         while (current) {
+                //                 Umap_Bucket<K, V> *next = current->next;
+                //                 delete current;
+                //                 current = next;
+                //         }
+                // }
+                // delete[] _tbl.data;
         }
 
         // TODO: check for duplicate

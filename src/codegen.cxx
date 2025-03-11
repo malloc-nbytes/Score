@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
         Token *id;
         Scr_Type ty;
+        llvm::Value *value;
 } Var;
 
 typedef struct {
@@ -44,6 +45,8 @@ typedef struct {
         llvm::IRBuilder<> *bl;
         llvm::Module *md;
 } Context;
+
+static void compile_stmt(Stmt *s, Context *ctx);
 
 static bool proc_in_scope(char *id, Context *ctx) {
         for (int i = (int)ctx->ps.length()-1; i >= 0; --i) {
@@ -144,16 +147,49 @@ static llvm::Function *gen_proc_proto(Stmt_Proc *s, Context *ctx) {
         return f;
 }
 
+static llvm::Value *gen_expr_int_lit(Expr_Int_Lit *e, Context *ctx) {
+        return llvm::ConstantInt::get(*(ctx->llctx),
+                                      llvm::APInt(/*bits=*/32, (uint32_t)e->i));
+}
+
+static llvm::Value *compile_expr(Expr *e, Context *ctx) {
+        switch (e->ty) {
+        case EXPR_TYPE_UNARY: {
+                assert(0 && "todo");
+        } break;
+        case EXPR_TYPE_MUT: {
+                assert(0 && "todo");
+        } break;
+        case EXPR_TYPE_IDENT: {
+                assert(0 && "todo");
+        } break;
+        case EXPR_TYPE_STR_LIT: {
+                assert(0 && "todo");
+        } break;
+        case EXPR_TYPE_INT_LIT: {
+                return gen_expr_int_lit((Expr_Int_Lit *)e, ctx);
+        } break;
+        case EXPR_TYPE_PROC_CALL: {
+                assert(0 && "todo");
+        } break;
+        default: {
+                err_wargs("unknown expression type %d", (int)e->ty);
+        } break;
+        }
+}
+
 static void compile_stmt_block(Stmt_Block *s, Context *ctx) {
-        (void)s;
-        (void)ctx;
-        assert(false);
+        push_scope(ctx);
+        for (size_t i = 0; i < s->len; ++i) {
+                compile_stmt(s->stmts[i], ctx);
+        }
+        pop_scope(ctx);
 }
 
 static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
         llvm::Function *existing_function = ctx->md->getFunction(s->id->lx);
 
-        if (existing_function) {
+        if (!existing_function) {
                 existing_function = gen_proc_proto(s, ctx);
         }
         if (!existing_function) {
@@ -169,7 +205,7 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
         push_scope(ctx);
 
         for (auto &arg : existing_function->args()) {
-                Var v = { s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()] };
+                Var v = { s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()], nullptr };
                 add_var_to_scope(&v, ctx);
         }
 
@@ -183,15 +219,30 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
 }
 
 static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
-        (void)s;
-        (void)ctx;
-        assert(0);
+        llvm::Type *llty = scr_type_to_llvm_type(s->type, ctx);
+
+        // Create an alloca instruction for the new variable
+        llvm::AllocaInst *alloca_inst = ctx->bl->CreateAlloca(llty, nullptr, s->id->lx);
+
+        // Gen code for initial value expression
+        llvm::Value *init_value = compile_expr(s->e, ctx);
+        if (!init_value) {
+                err_wargs("failed to compile expression for identifier %s", s->id->lx);
+        }
+
+        Var new_var = { s->id, s->type, init_value };
+        add_var_to_scope(&new_var, ctx);
+
+        ctx->bl->CreateStore(init_value, alloca_inst);
 }
 
 static void compile_stmt_return(Stmt_Return *s, Context *ctx) {
-        (void)s;
-        (void)ctx;
-        assert(0);
+        llvm::Value *v = compile_expr(s->e, ctx);
+        ctx->bl->CreateRet(v);
+}
+
+static llvm::Function *compile_stmt_def(Stmt_Def *s, Context *ctx) {
+        return gen_proc_proto(s->proto, ctx);
 }
 
 static void compile_stmt(Stmt *s, Context *ctx) {
@@ -207,6 +258,9 @@ static void compile_stmt(Stmt *s, Context *ctx) {
         } break;
         case STMT_TYPE_RETURN: {
                 compile_stmt_return((Stmt_Return *)s, ctx);
+        } break;
+        case STMT_TYPE_DEF: {
+                compile_stmt_def((Stmt_Def *)s, ctx);
         } break;
         default: {
                 err_wargs("unknown statement: %d", (int)s->ty);
@@ -225,4 +279,8 @@ void codegen(Program *p) {
                 // (guaranteed from the parser).
                 compile_stmt(p->stmts[i], ctx);
         }
+
+        llvm::verifyModule(*(ctx->md));
+        llvm::errs() << "Module contents";
+        ctx->md->print(llvm::errs(), nullptr);
 }

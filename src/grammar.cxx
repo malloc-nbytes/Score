@@ -12,6 +12,13 @@
 // Statements /////
 ///////////////////
 
+Stmt_Def *stmt_def_alloc(Stmt_Proc *proto) {
+        Stmt_Def *d = new Stmt_Def;
+        d->base.ty = STMT_TYPE_DEF;
+        d->proto = proto;
+        return d;
+}
+
 Stmt_Return *stmt_return_alloc(Expr *e) {
         Stmt_Return *r = new Stmt_Return;
         r->base.ty = STMT_TYPE_RETURN;
@@ -215,7 +222,9 @@ static void dump_stmt_proc(Stmt_Proc *s, int pad) {
         printf("): ");
         scr_type_dump(&s->rtype, false);
         putchar(' ');
-        dump_stmt_block(s->block, pad);
+        if (s->block) {
+                dump_stmt_block(s->block, pad);
+        }
 }
 
 static void dump_stmt_expr(Stmt_Expr *s, int pad) {
@@ -227,6 +236,11 @@ static void dump_stmt_return(Stmt_Return *s, int pad) {
         (void)pad;
         printf("RETURN ");
         dump_expr(s->e);
+}
+
+static void dump_stmt_def(Stmt_Def *s, int pad) {
+        printf("DEF ");
+        dump_stmt_proc(s->proto, pad);
 }
 
 static void dump_stmt(Stmt *s, int pad) {
@@ -247,6 +261,9 @@ static void dump_stmt(Stmt *s, int pad) {
         } break;
         case STMT_TYPE_RETURN: {
                 dump_stmt_return((Stmt_Return *)s, pad);
+        } break;
+        case STMT_TYPE_DEF: {
+                dump_stmt_def((Stmt_Def *)s, pad);
         } break;
         default: {
                 err_wargs("unhandled stmt type %d", (int)s->ty);

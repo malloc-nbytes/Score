@@ -5,12 +5,14 @@
 #define KEYWORD_IF "if"
 #define KEYWORD_PROC "proc"
 #define KEYWORD_RETURN "return"
+#define KEYWORD_DEF "def"
 
 #define KEYWORD_AS_CPL {                        \
                 KEYWORD_LET,                    \
                 KEYWORD_IF,                     \
                 KEYWORD_PROC,                   \
                 KEYWORD_RETURN,                 \
+                KEYWORD_DEF,                    \
 }
 
 #define PRIMITIVE_I8 "i8"
