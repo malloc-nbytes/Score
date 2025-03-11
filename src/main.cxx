@@ -8,7 +8,7 @@
 #include "utils.hxx"
 
 int main(void) {
-        const char *fp = "./input.scr";
+        const char *fp = "../src/input.scr";
         char *src = file_to_cstr(fp);
 
         Lexer lexer = lexer_init(fp, src);

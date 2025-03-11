@@ -233,8 +233,33 @@ static Expr *parse_bitwise_expr(Lexer *lexer) {
         assert(0 && "todo");
 }
 
+static Expr *parse_assignment_expr(Lexer *lexer) {
+        Expr *lhs = parse_logical_expr(lexer);
+
+        Token *cur = lexer_peek(lexer, 0);
+        if (!cur) return lhs;
+
+        switch (cur->ty) {
+        case TOKEN_TYPE_EQUALS:
+        case TOKEN_TYPE_PLUS_EQUALS:
+        case TOKEN_TYPE_MINUS_EQUALS:
+        case TOKEN_TYPE_ASTERISK_EQUALS:
+        case TOKEN_TYPE_FORWARD_SLASH_EQUALS:
+        case TOKEN_TYPE_PERCENT_EQUALS:
+        case TOKEN_TYPE_AMPERSAND_EQUALS:
+        case TOKEN_TYPE_PIPE_EQUALS:
+        case TOKEN_TYPE_CARET_EQUALS: {
+                Token *op = lexer_next(lexer);
+                Expr *rhs = parse_assignment_expr(lexer);
+                return (Expr *)expr_mut_alloc(lhs, op, rhs);
+        }
+        default:
+                return lhs;
+        }
+}
+
 static Expr *parse_expr(Lexer *lexer) {
-        return parse_logical_expr(lexer);
+        return parse_assignment_expr(lexer);
 }
 
 static Stmt_Let *parse_stmt_let(Lexer *lexer) {

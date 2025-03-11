@@ -32,6 +32,13 @@ static void init_operators(void) {
         operators.add("/", TOKEN_TYPE_FORWARD_SLASH);
         operators.add(",", TOKEN_TYPE_COMMA);
         operators.add("...", TOKEN_TYPE_TRIPLE_PERIOD);
+        operators.add("+=", TOKEN_TYPE_PLUS_EQUALS);
+        operators.add("-=", TOKEN_TYPE_MINUS_EQUALS);
+        operators.add("/=", TOKEN_TYPE_FORWARD_SLASH_EQUALS);
+        operators.add("%=", TOKEN_TYPE_PERCENT_EQUALS);
+        operators.add("&=", TOKEN_TYPE_AMPERSAND_EQUALS);
+        operators.add("|=", TOKEN_TYPE_PIPE_EQUALS);
+        operators.add("^=", TOKEN_TYPE_CARET_EQUALS);
 }
 
 static Token_Type determine_operator_type(const char *s, size_t end, size_t *len) {

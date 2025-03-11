@@ -13,11 +13,11 @@
 typedef enum {
         EXPR_TYPE_BIN = 0,
         EXPR_TYPE_UNARY,
-        EXPR_TYPE_MUT,
         EXPR_TYPE_IDENT,
         EXPR_TYPE_STR_LIT,
         EXPR_TYPE_INT_LIT,
         EXPR_TYPE_PROC_CALL,
+        EXPR_TYPE_MUT,
 } Expr_Type;
 
 typedef enum {
@@ -29,6 +29,7 @@ typedef enum {
         STMT_TYPE_DEF,
 } Stmt_Type;
 
+typedef struct Expr_Mut Expr_Mut;
 typedef struct Expr_Proc_Call Expr_Proc_Call;
 typedef struct Expr_Mut Expr_Mut;
 typedef struct Expr_Ident Expr_Ident;
@@ -97,6 +98,7 @@ typedef struct Expr_Bin {
         Token *op;
 } Expr_Bin;
 
+Expr_Mut *expr_mut_alloc(Expr *l, Token *op, Expr *r);
 Expr_Proc_Call *expr_proc_call_alloc(Expr *left, Expr **exprs, size_t len, size_t cap);
 Expr_Ident *expr_ident_alloc(Token *id);
 Expr_Str_Lit *expr_str_lit_alloc(Token *s);

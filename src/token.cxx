@@ -41,6 +41,14 @@ const char *token_type_to_cstr(Token_Type ty) {
         case TOKEN_TYPE_BANG: return "TOKEN_TYPE_BANG";
         case TOKEN_TYPE_COMMA: return "TOKEN_TYPE_COMMA";
         case TOKEN_TYPE_TRIPLE_PERIOD: return "TOKEN_TYPE_TRIPLE_PERIOD";
+        case TOKEN_TYPE_PLUS_EQUALS: return "TOKEN_TYPE_PLUS_EQUALS";
+        case TOKEN_TYPE_MINUS_EQUALS: return "TOKEN_TYPE_MINUS_EQUALS";
+        case TOKEN_TYPE_ASTERISK_EQUALS: return "TOKEN_TYPE_ASTERISK_EQUALS";
+        case TOKEN_TYPE_FORWARD_SLASH_EQUALS: return "TOKEN_TYPE_FORWARD_SLASH_EQUALS";
+        case TOKEN_TYPE_PERCENT_EQUALS: return "TOKEN_TYPE_PERCENT_EQUALS";
+        case TOKEN_TYPE_AMPERSAND_EQUALS: return "TOKEN_TYPE_AMPERSAND_EQUALS";
+        case TOKEN_TYPE_PIPE_EQUALS: return "TOKEN_TYPE_PIPE_EQUALS";
+        case TOKEN_TYPE_CARET_EQUALS: return "TOKEN_TYPE_CARET_EQUALS";
         default: {
                 err_wargs("unknown token type: %d", (int)ty);
         } break;

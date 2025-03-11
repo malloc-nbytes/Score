@@ -47,6 +47,7 @@ typedef struct {
 } Context;
 
 static void compile_stmt(Stmt *s, Context *ctx);
+static llvm::Value *compile_expr(Expr *e, Context *ctx);
 
 static bool proc_in_scope(char *id, Context *ctx) {
         for (int i = (int)ctx->ps.length()-1; i >= 0; --i) {
@@ -128,7 +129,7 @@ static llvm::Function *gen_proc_proto(Stmt_Proc *s, Context *ctx) {
         std::vector<llvm::Type *> types;
 
         for (size_t i = 0; i < s->args.len; ++i) {
-                llvm::Type *llty = scr_type_to_llvm_type(s->rtype, ctx);
+                llvm::Type *llty = scr_type_to_llvm_type(s->args.types[i], ctx);
                 types.push_back(llty);
         }
 
@@ -147,9 +148,197 @@ static llvm::Function *gen_proc_proto(Stmt_Proc *s, Context *ctx) {
         return f;
 }
 
-static llvm::Value *gen_expr_int_lit(Expr_Int_Lit *e, Context *ctx) {
+static llvm::Value *compile_expr_int_lit(Expr_Int_Lit *e, Context *ctx) {
         return llvm::ConstantInt::get(*(ctx->llctx),
                                       llvm::APInt(/*bits=*/32, (uint32_t)e->i));
+}
+
+static llvm::Value *compile_expr_proc_call(Expr_Proc_Call *e, Context *ctx) {
+        llvm::Value *callee = compile_expr(e->left, ctx);
+        if (!callee) {
+                err("failed to compile function expression in procedure call");
+        }
+
+        std::vector<llvm::Value *> args;
+        for (size_t i = 0; i < e->args.len; ++i) {
+                llvm::Value *arg = compile_expr(e->args.exprs[i], ctx);
+                if (!arg) {
+                        err_wargs("failed to compile argument %zu in procedure call", i);
+                }
+                args.push_back(arg);
+        }
+
+        llvm::Function *func = llvm::dyn_cast<llvm::Function>(callee);
+        if (!func) {
+                err("callee is not a directly callable function");
+        }
+
+        return ctx->bl->CreateCall(func, args);
+}
+
+static llvm::Value *compile_expr_ident(Expr_Ident *e, Context *ctx) {
+        char *id = e->id->lx;
+
+        // Check variables in scope
+        for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
+                if (ctx->vs[i].has(id)) {
+                        Var *var = ctx->vs[i].get(id);
+                        // Return the pointer (e.g., AllocaInst*) directly, not the loaded value
+                        return var->value;  // Should be the allocation or parameter pointer
+                }
+        }
+
+        // Check procedures in scope
+        for (int i = (int)ctx->ps.length() - 1; i >= 0; --i) {
+                if (ctx->ps[i].has(id)) {
+                        Proc *proc = ctx->ps[i].get(id);
+                        return proc->value;  // Function pointer
+                }
+        }
+
+        // Check module-level functions
+        if (llvm::Function *func = ctx->md->getFunction(id)) {
+                return func;
+        }
+
+        err_wargs("undefined identifier '%s'", id);
+        return nullptr;
+}
+
+static llvm::Value *compile_expr_str_lit(Expr_Str_Lit *e, Context *ctx) {
+        const char *str = e->s->lx;
+
+        // Create a global constant string
+        llvm::Constant *str_constant = llvm::ConstantDataArray::getString(
+                *ctx->llctx, str,
+                true  /* Add null terminator */);
+
+        // Create a global variable to hold the string
+        llvm::GlobalVariable *gv = new llvm::GlobalVariable(
+                *ctx->md,                          // Module
+                str_constant->getType(),            // Type of the string array
+                true,                              // isConstant
+                llvm::GlobalValue::PrivateLinkage, // Linkage
+                str_constant,                       // Initializer
+                ""                                 // Name
+                );
+
+        // Get a pointer to the start of the string (i8*)
+        llvm::Constant *zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), 0);
+        std::vector<llvm::Constant*> indices = {zero, zero};
+        llvm::Constant *str_ptr = llvm::ConstantExpr::getGetElementPtr(str_constant->getType(), gv, indices);
+
+        return str_ptr;
+}
+
+static llvm::Value *compile_expr_mut(Expr_Mut *e, Context *ctx) {
+        llvm::Value *left = nullptr;
+        if (e->l->ty == EXPR_TYPE_IDENT) {
+                left = compile_expr_ident((Expr_Ident *)e->l, ctx);
+        } else {
+                // For now, only support identifiers as lvalues; TODO: extend later
+                left = compile_expr(e->l, ctx);
+        }
+        if (!left) {
+                err("failed to compile left operand of assignment");
+                return nullptr;
+        }
+
+        // Ensure left is a pointer (lvalue) that we can store to
+        if (!left->getType()->isPointerTy()) {
+                err("left operand of assignment must be an lvalue");
+                return nullptr;
+        }
+
+        // Compile the right-hand side (the value to assign)
+        llvm::Value *right = compile_expr(e->r, ctx);
+        if (!right) {
+                err("failed to compile right operand of assignment");
+                return nullptr;
+        }
+
+        const char *op = e->op->lx;
+
+        if (!strcmp(op, "=")) {
+                ctx->bl->CreateStore(right, left);
+                return right;
+        } else {
+                // For compound assignments, we need to load the current value
+                llvm::Type *valType = nullptr;
+                if (e->l->ty == EXPR_TYPE_IDENT) {
+                        char *id = ((Expr_Ident *)e->l)->id->lx;
+                        for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
+                                if (ctx->vs[i].has(id)) {
+                                        Var *var = ctx->vs[i].get(id);
+                                        valType = scr_type_to_llvm_type(var->ty, ctx);
+                                        break;
+                                }
+                        }
+                        if (!valType) {
+                                err_wargs("could not determine type of identifier '%s' for compound assignment", id);
+                                return nullptr;
+                        }
+                } else {
+                        err("compound assignment only supported for identifiers with known types");
+                        return nullptr;
+                }
+
+                llvm::Value *current = ctx->bl->CreateLoad(valType, left, "loadtmp");
+
+                llvm::Value *result = nullptr;
+                if (!strcmp(op, "+=")) {
+                        result = ctx->bl->CreateAdd(current, right, "addtmp");
+                } else if (!strcmp(op, "-=")) {
+                        result = ctx->bl->CreateSub(current, right, "subtmp");
+                } else if (!strcmp(op, "*=")) {
+                        result = ctx->bl->CreateMul(current, right, "multmp");
+                } else if (!strcmp(op, "/=")) {
+                        result = ctx->bl->CreateSDiv(current, right, "divtmp");
+                } else {
+                        err_wargs("unsupported assignment operator '%s'", op);
+                        return nullptr;
+                }
+
+                ctx->bl->CreateStore(result, left);
+                return result;
+        }
+
+        assert(0 && "unreachable");
+}
+
+static llvm::Value *compile_expr_bin(Expr_Bin *e, Context *ctx) {
+        llvm::Value *left = compile_expr(e->l, ctx);
+        if (!left) {
+                err("failed to compile left operand of binary expression");
+        }
+
+        llvm::Value *right = compile_expr(e->r, ctx);
+        if (!right) {
+                err("failed to compile right operand of binary expression");
+        }
+
+        const char *op = e->op->lx;
+
+        // For now, assume both operands are i32; TODO: extend type checking later
+        llvm::Type *i32Ty = llvm::Type::getInt32Ty(*(ctx->llctx));
+        if (left->getType() != i32Ty || right->getType() != i32Ty) {
+                err_wargs("binary operator '%s' requires i32 operands", op);
+        }
+
+        if (!strcmp(op, "+")) {
+                return ctx->bl->CreateAdd(left, right, "addtmp");
+        } else if (!strcmp(op, "-")) {
+                return ctx->bl->CreateSub(left, right, "subtmp");
+        } else if (!strcmp(op, "*")) {
+                return ctx->bl->CreateMul(left, right, "multmp");
+        } else if (!strcmp(op, "/")) {
+                return ctx->bl->CreateSDiv(left, right, "sdivtmp");
+        } else {
+                err_wargs("unsupported binary operator '%s'", op);
+        }
+
+        assert(0 && "unreachable");
+        return nullptr;
 }
 
 static llvm::Value *compile_expr(Expr *e, Context *ctx) {
@@ -157,25 +346,45 @@ static llvm::Value *compile_expr(Expr *e, Context *ctx) {
         case EXPR_TYPE_UNARY: {
                 assert(0 && "todo");
         } break;
+        case EXPR_TYPE_BIN: {
+                return compile_expr_bin((Expr_Bin *)e, ctx);
+        } break;
         case EXPR_TYPE_MUT: {
-                assert(0 && "todo");
+                return compile_expr_mut((Expr_Mut *)e, ctx);
         } break;
         case EXPR_TYPE_IDENT: {
-                assert(0 && "todo");
+                llvm::Value *val = compile_expr_ident((Expr_Ident *)e, ctx);
+                if (!val) return nullptr;
+                // Check if it's a variable (needs loading) or a function (return directly)
+                if (val->getType()->isPointerTy()) {
+                        char *id = ((Expr_Ident *)e)->id->lx;
+                        // Check if it's a variable in scope
+                        for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
+                                if (ctx->vs[i].has(id)) {
+                                        Var *var = ctx->vs[i].get(id);
+                                        return ctx->bl->CreateLoad(scr_type_to_llvm_type(var->ty, ctx), val, id);
+                                }
+                        }
+                        // If not a variable, it’s likely a function pointer—return it directly
+                        return val;
+                }
+                return val; // Non-pointer values
         } break;
         case EXPR_TYPE_STR_LIT: {
-                assert(0 && "todo");
+                return compile_expr_str_lit((Expr_Str_Lit *)e, ctx);
         } break;
         case EXPR_TYPE_INT_LIT: {
-                return gen_expr_int_lit((Expr_Int_Lit *)e, ctx);
+                return compile_expr_int_lit((Expr_Int_Lit *)e, ctx);
         } break;
         case EXPR_TYPE_PROC_CALL: {
-                assert(0 && "todo");
+                return compile_expr_proc_call((Expr_Proc_Call *)e, ctx);
         } break;
         default: {
                 err_wargs("unknown expression type %d", (int)e->ty);
         } break;
         }
+        assert(0 && "unreachable");
+        return nullptr;
 }
 
 static void compile_stmt_block(Stmt_Block *s, Context *ctx) {
@@ -220,17 +429,14 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
 
 static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
         llvm::Type *llty = scr_type_to_llvm_type(s->type, ctx);
-
-        // Create an alloca instruction for the new variable
         llvm::AllocaInst *alloca_inst = ctx->bl->CreateAlloca(llty, nullptr, s->id->lx);
 
-        // Gen code for initial value expression
         llvm::Value *init_value = compile_expr(s->e, ctx);
         if (!init_value) {
                 err_wargs("failed to compile expression for identifier %s", s->id->lx);
         }
 
-        Var new_var = { s->id, s->type, init_value };
+        Var new_var = { s->id, s->type, alloca_inst };
         add_var_to_scope(&new_var, ctx);
 
         ctx->bl->CreateStore(init_value, alloca_inst);
@@ -261,6 +467,9 @@ static void compile_stmt(Stmt *s, Context *ctx) {
         } break;
         case STMT_TYPE_DEF: {
                 compile_stmt_def((Stmt_Def *)s, ctx);
+        } break;
+        case STMT_TYPE_EXPR: {
+                (void)compile_expr(((Stmt_Expr *)s)->e, ctx);
         } break;
         default: {
                 err_wargs("unknown statement: %d", (int)s->ty);

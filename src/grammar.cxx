@@ -76,6 +76,15 @@ Stmt_Let *stmt_let_alloc(Token *id, Scr_Type type, Expr *e) {
 // Expressions ////
 ///////////////////
 
+Expr_Mut *expr_mut_alloc(Expr *l, Token *op, Expr *r) {
+        Expr_Mut *e = new Expr_Mut;
+        e->base.ty = EXPR_TYPE_MUT;
+        e->l = l;
+        e->op = op;
+        e->r = r;
+        return e;
+}
+
 Expr_Proc_Call *expr_proc_call_alloc(Expr *left,
                                      Expr **exprs,
                                      size_t len,
@@ -161,6 +170,12 @@ static void dump_expr_proc_call(Expr_Proc_Call *e) {
         putchar(')');
 }
 
+static void dump_expr_mut(Expr_Mut *e) {
+        dump_expr(e->l);
+        printf(" %s ", e->op->lx);
+        dump_expr(e->r);
+}
+
 static void dump_expr(Expr *e) {
         switch (e->ty) {
         case EXPR_TYPE_BIN: {
@@ -170,7 +185,7 @@ static void dump_expr(Expr *e) {
                 assert(0);
         } break;
         case EXPR_TYPE_MUT: {
-                assert(0);
+                dump_expr_mut((Expr_Mut *)e);
         } break;
         case EXPR_TYPE_IDENT: {
                 dump_expr_str_lit((Expr_Ident *)e);
