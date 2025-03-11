@@ -1,28 +1,20 @@
 #ifndef LEXER_HXX
 #define LEXER_HXX
 
-#include <string>
-
 #include "token.hxx"
-#include "utils.hxx"
 
-#define lexer_speek(l) lexer::peek(l) && lexer::peek(l)
+typedef struct {
+        Token *hd;
+        Token *tl;
+} Lexer;
 
-namespace lexer {
-    struct t {
-        sh_ptr<token::t> hd;
-        token::t *tl;
-        t();
-    };
+#define lexer_speek(l, i) lexer_peek((l), 0) && lexer_peek((l), 0)
 
-    token::t *peek(t &lexer, size_t i = 0);
-    void append(t &lexer, sh_ptr<token::t> tok);
-    sh_ptr<token::t> next(t &lexer);
-    void discard(t &lexer);
-    void dump(t &lexer);
-
-    std::string file_to_str(const std::string &file_path);
-    lexer::t lex(str &src_code, str fp);
-}
+Lexer lexer_init(const char *fp, char *src);
+void lexer_append(Lexer *lexer, Token *tok);
+Token *lexer_peek(Lexer *lexer, size_t p = 0);
+Token *lexer_next(Lexer *lexer);
+void lexer_discard(Lexer *lexer);
+void lexer_dbg_dump(const Lexer *lexer);
 
 #endif // LEXER_HXX

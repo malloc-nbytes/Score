@@ -1,11 +1,9 @@
 #ifndef PARSER_HXX
 #define PARSER_HXX
 
-#include "grammar.hxx"
 #include "lexer.hxx"
+#include "grammar.hxx"
 
-namespace parser {
-    un_ptr<program::t> parse(lexer::t &lexer);
-};
+Program parse(Lexer *lexer);
 
 #endif // PARSER_HXX

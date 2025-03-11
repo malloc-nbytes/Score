@@ -1,11 +1,30 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "utils.hxx"
 
-template <typename T, typename... Args>
-std::shared_ptr<T> msh_ptr(Args&&... args) {
-    return std::make_shared<T>(std::forward<Args>(args)...);
-}
+char *file_to_cstr(const char *filename) {
+    FILE *file = fopen(filename, "rb");
 
-template <typename T, typename... Args>
-std::unique_ptr<T> mun_ptr(Args&&... args) {
-    return std::make_unique<T>(std::forward<Args>(args)...);
+    if (!file) {
+        perror("Failed to open file");
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    rewind(file);
+
+    char *buffer = (char *)malloc(length + 1);
+    if (!buffer) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return NULL;
+    }
+
+    fread(buffer, 1, length, file);
+    fclose(file);
+
+    buffer[length] = '\0';
+    return buffer;
 }

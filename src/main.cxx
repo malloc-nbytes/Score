@@ -1,17 +1,21 @@
-#include <iostream>
+#include <stdio.h>
 
 #include "lexer.hxx"
-#include "grammar.hxx"
+#include "token.hxx"
 #include "parser.hxx"
 #include "codegen.hxx"
+#include "grammar.hxx"
+#include "utils.hxx"
 
 int main(void) {
-    std::string fp = "input.scr";
-    std::string content = lexer::file_to_str(fp);
+        const char *fp = "./input.scr";
+        char *src = file_to_cstr(fp);
 
-    lexer::t lexer = lexer::lex(content, fp);
-    auto program = parser::parse(lexer);
-    codegen::gen(std::move(program));
+        Lexer lexer = lexer_init(fp, src);
+        //lexer_dbg_dump(&lexer);
+        Program program = parse(&lexer);
+        program_dump(&program);
+        codegen(&program);
 
-    return 0;
+        return 0;
 }

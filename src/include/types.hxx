@@ -1,27 +1,33 @@
 #ifndef TYPES_HXX
 #define TYPES_HXX
 
-#include "lexer.hxx"
-#include "utils.hxx"
+typedef enum {
+        SCR_BASE_TYPE_I8 = 0,
+        SCR_BASE_TYPE_I16,
+        SCR_BASE_TYPE_I32,
+        SCR_BASE_TYPE_I64,
 
-namespace scr_type {
-    enum class base {
-        I32,
-        Str,
-        Void,
-        Ptr,
-    };
+        SCR_BASE_TYPE_U8,
+        SCR_BASE_TYPE_U16,
+        SCR_BASE_TYPE_U32,
+        SCR_BASE_TYPE_U64,
 
-    struct t {
-        scr_type::base base;
-        un_ptr<scr_type::t> next;
-        t(scr_type::base base, un_ptr<scr_type::t> next);
-    };
+        SCR_BASE_TYPE_STR,
+        SCR_BASE_TYPE_VOID,
 
-    un_ptr<scr_type::t> parse(lexer::t &lexer);
-    bool is_void(scr_type::t *ty);
-    void to_pointer(scr_type::t *ty);
-    str to_cxxstr(scr_type::t *ty);
-}
+        SCR_BASE_TYPE_PTR,
+} Scr_Base_Type;
+
+typedef struct Scr_Type {
+        Scr_Base_Type base;
+        Scr_Type *ptrn;
+
+        Scr_Type(void);
+        Scr_Type(const Scr_Type &other);
+        Scr_Type &operator=(const Scr_Type &other);
+        ~Scr_Type(void);
+} Scr_Type;
+
+void scr_type_dump(Scr_Type *ty, bool newline = true);
 
 #endif // TYPES_HXX

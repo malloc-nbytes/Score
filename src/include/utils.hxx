@@ -1,26 +1,51 @@
 #ifndef UTILS_HXX
 #define UTILS_HXX
 
-#include <map>
-#include <memory>
-#include <vector>
-#include <optional>
+/*
+#define da_append(arr, len, cap, ty, value)                       \
+    do {                                                          \
+         if ((len) >= (cap)) {                                     \
+             (cap) = !(cap) ? 2 : (cap) * 2;                       \
+             (arr) = (ty)realloc((arr), (cap) * sizeof((arr)[0])); \
+         }                                                         \
+         (arr)[(len)] = (value);                                   \
+         (len) += 1;                                               \
+     } while (0)
+*/
 
-#define ignore(x) (void)(x)
+/*
+#define da_append(arr, len, cap, ty, value)                       \
+   do {                                                          \
+       if ((len) >= (cap)) {                                      \
+           (cap) = !(cap) ? 2 : (cap) * 2;                        \
+           ty *tmp = new ty[(cap)];                               \
+           for (size_t i = 0; i < (len); ++i) {                   \
+               new (&tmp[i]) ty((arr)[i]);                        \
+               (arr)[i].~ty();                                    \
+           }                                                      \
+           delete[] (arr);                                        \
+           (arr) = tmp;                                           \
+       }                                                         \
+       new (&(arr)[(len)]) ty(value);                            \
+       (len) += 1;                                               \
+   } while (0)
+*/
 
-template <typename T> using sh_ptr = std::shared_ptr<T>;
-template <typename T> using un_ptr = std::unique_ptr<T>;
-template <typename T> using vec = std::vector<T>;
-template <typename T> using optional = std::optional<T>;
-template <typename T, typename K> using pair = std::pair<T, K>;
-template <typename T, typename K> using vec_pair = vec<pair<T, K>>;
-template <typename K, typename V> using map = std::map<K, V>;
-using str = std::string;
+#define da_append(arr, len, cap, ty, value)                       \
+        do { \
+                if ((len) >= (cap)) { \
+                        (cap) = !(cap) ? 2 : (cap) * 2; \
+                        ty *__tmp = new ty[(cap)]; \
+                        for (size_t __i = 0; __i < (len); ++__i) { \
+                                __tmp[__i] = (arr)[__i];             \
+                        } \
+                        if ((arr)) delete[] (arr); \
+                        (arr) = __tmp; \
+                } \
+                (arr)[(len)] = (value); \
+                (len) += 1; \
+        } while (0)
 
-template <typename T, typename... Args>
-std::shared_ptr<T> msh_ptr(Args&&... args);
-
-template <typename T, typename... Args>
-std::unique_ptr<T> mun_ptr(Args&&... args);
+char *file_to_cstr(const char *filename);
 
 #endif // UTILS_HXX

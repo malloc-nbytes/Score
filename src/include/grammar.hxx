@@ -1,239 +1,155 @@
 #ifndef GRAMMAR_HXX
 #define GRAMMAR_HXX
 
-#include <optional>
-#include <variant>
-
 #include "token.hxx"
-#include "utils.hxx"
 #include "types.hxx"
+#include "ds/array.hxx"
 
-namespace stmt { struct t; };
+#define IS_TOPLVL_STMT(s) ((s).ty == STMT_TYPE_LET || (s).ty == STMT_TYPE_PROC)
 
-namespace expr {
-    struct t;
-    namespace term { struct t; };
-    namespace binary { struct t; };
-    namespace unary { struct t; };
-}
+typedef enum {
+        EXPR_TYPE_BIN = 0,
+        EXPR_TYPE_UNARY,
+        EXPR_TYPE_MUT,
+        EXPR_TYPE_IDENT,
+        EXPR_TYPE_STR_LIT,
+        EXPR_TYPE_INT_LIT,
+        EXPR_TYPE_PROC_CALL,
+} Expr_Type;
 
-namespace stmt {
-    enum class type {
-        Proc = 0,
-        Let,
-        Mut,
-        If,
-        While,
-        For,
-        Block,
-        Return,
-        Module,
-        Def,
-        Expr,
-    };
+typedef enum {
+        STMT_TYPE_EXPR = 0,
+        STMT_TYPE_LET,
+        STMT_TYPE_PROC,
+        STMT_TYPE_BLOCK,
+} Stmt_Type;
 
-    struct parameter {
-        sh_ptr<token::t> id;
-        un_ptr<scr_type::t> ty;
-        parameter(sh_ptr<token::t> id, un_ptr<scr_type::t> ty);
-        ~parameter() = default;
-    };
+typedef struct Expr_Proc_Call Expr_Proc_Call;
+typedef struct Expr_Mut Expr_Mut;
+typedef struct Expr_Ident Expr_Ident;
+typedef struct Expr_Str_Lit Expr_Str_Lit;
+typedef struct Expr_Int_Lit Expr_Int_Lit;
+typedef struct Expr_Term Expr_Term;
+typedef struct Expr_Un Expr_Un;
+typedef struct Expr_Bin Expr_Bin;
+typedef struct Expr Expr;
 
-    struct def {
-        sh_ptr<token::t> id;
-        vec<un_ptr<stmt::parameter>> params;
-        un_ptr<scr_type::t> rettype;
-        bool variadic;
-        def(sh_ptr<token::t> id,
-            vec<un_ptr<stmt::parameter>> params,
-            un_ptr<scr_type::t> rettype, bool variadic);
-        ~def() = default;
-    };
+typedef struct Stmt_Proc Stmt_Proc;
+typedef struct Stmt_Block Stmt_Block;
+typedef struct Stmt_Let Stmt_Let;
+typedef struct Stmt Stmt;
 
-    struct _return {
-        un_ptr<expr::t> expr;
-        _return(un_ptr<expr::t> expr);
-        ~_return() = default;
-    };
+///////////////////
+// Expressions ////
+///////////////////
 
-    struct _module {
-        sh_ptr<token::t> tok;
-        _module(sh_ptr<token::t> tok);
-        ~_module() = default;
-    };
+typedef struct Expr {
+        Expr_Type ty;
+} Expr;
 
-    struct block {
-        vec<un_ptr<stmt::t>> stmts;
-        block(vec<un_ptr<stmt::t>> stmts);
-        ~block() = default;
-    };
+typedef struct Expr_Proc_Call {
+        Expr base;
+        Expr *left;
+        struct {
+                Expr **exprs;
+                size_t len, cap;
+        } args;
+} Expr_Proc_Call;
 
-    struct _for {
-        un_ptr<stmt::t> init;
-        un_ptr<expr::t> cond;
-        un_ptr<stmt::t> after;
-        un_ptr<stmt::block> block;
-        _for(un_ptr<stmt::t> init,
-             un_ptr<expr::t> cond,
-             un_ptr<stmt::t> after,
-             un_ptr<stmt::block> block);
-        ~_for() = default;
-    };
+typedef struct Expr_Mut {
+        Expr base;
+        Expr *l;
+        Token *op;
+        Expr *r;
+} Expr_Mut;
 
-    struct _while {
-        un_ptr<expr::t> cond;
-        un_ptr<stmt::block> block;
-        _while(un_ptr<expr::t> cond, un_ptr<stmt::block> block);
-        ~_while() = default;
-    };
+typedef struct Expr_Ident {
+        Expr base;
+        Token *id;
+} Expr_Ident;
 
-    struct _if {
-        un_ptr<expr::t> cond;
-        un_ptr<stmt::block> block;
-        optional<un_ptr<stmt::block>> _else;
-        _if(un_ptr<expr::t> cond,
-            un_ptr<stmt::block> block,
-            optional<un_ptr<stmt::block>> _else);
-        ~_if() = default;
-    };
+typedef struct Expr_Str_Lit {
+        Expr base;
+        Token *s;
+} Expr_Str_Lit;
 
-    struct mut {
-        un_ptr<expr::t> lhs;
-        un_ptr<expr::t> rhs;
-        sh_ptr<token::t> op;
-        mut(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op);
-        ~mut() = default;
-    };
+typedef struct Expr_Int_Lit {
+        Expr base;
+        int i;
+} Expr_Int_Lit;
 
-    struct let {
-        sh_ptr<token::t> id;
-        un_ptr<expr::t> expr;
-        un_ptr<scr_type::t> ty;
-        let(sh_ptr<token::t> id, un_ptr<expr::t> expr, un_ptr<scr_type::t> ty);
-        ~let() = default;
-    };
+typedef struct Expr_Un {
+        Expr base;
+        Token *op;
+        Expr *e;
+} Expr_Un;
 
-    struct proc {
-        sh_ptr<token::t> id;
-        vec<un_ptr<parameter>> params;
-        sh_ptr<scr_type::t> rettype;
-        un_ptr<stmt::block> block;
-        bool variadic;
+typedef struct Expr_Bin {
+        Expr base;
+        Expr *l, *r;
+        Token *op;
+} Expr_Bin;
 
-        proc(sh_ptr<token::t> id, vec<un_ptr<parameter>> params,
-             sh_ptr<scr_type::t> rettype, un_ptr<stmt::block> block,
-             bool variadic);
-        ~proc() = default;
-    };
+Expr_Proc_Call *expr_proc_call_alloc(Expr *left, Expr **exprs, size_t len, size_t cap);
+Expr_Ident *expr_ident_alloc(Token *id);
+Expr_Str_Lit *expr_str_lit_alloc(Token *s);
+Expr_Int_Lit *expr_int_lit_alloc(Token *i);
+Expr_Bin *expr_bin_alloc(Expr *l, Token *op, Expr *r);
 
-    using vt = std::variant<un_ptr<stmt::proc>,
-                            un_ptr<stmt::let>,
-                            un_ptr<stmt::mut>,
-                            un_ptr<stmt::_if>,
-                            un_ptr<stmt::_while>,
-                            un_ptr<stmt::_for>,
-                            un_ptr<stmt::block>,
-                            un_ptr<stmt::_module>,
-                            un_ptr<stmt::_return>,
-                            un_ptr<stmt::def>,
-                            un_ptr<expr::t>>;
-    struct t {
-        vt actual;
-        stmt::type ty;
-        t(vt actual, stmt::type ty);
-        ~t() = default;
-    };
-};
+///////////////////
+// Statements /////
+///////////////////
 
-namespace expr::unary {
-    struct t {
-        un_ptr<expr::t> rhs;
-        sh_ptr<token::t> op;
-        t(un_ptr<expr::t> rhs, sh_ptr<token::t> op);
-        ~t() = default;
-    };
-};
+typedef struct Stmt {
+        Stmt_Type ty;
+} Stmt;
 
-namespace expr::binary {
-    struct t {
-        un_ptr<expr::t> lhs;
-        un_ptr<expr::t> rhs;
-        sh_ptr<token::t> op;
-        t(un_ptr<expr::t> lhs, un_ptr<expr::t> rhs, sh_ptr<token::t> op);
-        ~t() = default;
-    };
-};
+typedef struct Stmt_Block {
+        Stmt base;
+        Stmt **stmts;
+        size_t len, cap;
+} Stmt_Block;
 
-namespace expr::term {
-    enum class type {
-        Ident,
-        Int_Literal,
-        Str_Literal,
-        Proc_Call,
-    };
+typedef struct Stmt_Proc {
+        Stmt base;
+        Token *id;
+        struct {
+                Token **ids;
+                Scr_Type *types;
+                size_t len, cap;
+        } args;
+        Scr_Type rtype;
+        Stmt_Block *block;
+} Stmt_Proc;
 
-    struct proc_call {
-        str id;
-        vec<un_ptr<expr::t>> args;
-        proc_call(str id, vec<un_ptr<expr::t>> args);
-        ~proc_call() = default;
-    };
+typedef struct Stmt_Let {
+        Stmt base;
+        Token *id;
+        Scr_Type type;
+        Expr *e;
+} Stmt_Let;
 
-    struct identifier {
-        sh_ptr<token::t> tok;
-        identifier(sh_ptr<token::t> tok);
-        ~identifier() = default;
-    };
+typedef struct Stmt_Expr {
+        Stmt base;
+        Expr *e;
+} Stmt_Expr;
 
-    struct str_literal {
-        sh_ptr<token::t> tok;
-        str_literal(sh_ptr<token::t> tok);
-        ~str_literal() = default;
-    };
+typedef struct {
+        Stmt **stmts;
+        size_t len, cap;
+} Program;
 
-    struct int_literal {
-        sh_ptr<token::t> tok;
-        int_literal(sh_ptr<token::t> tok);
-        ~int_literal() = default;
-    };
+Stmt_Expr *stmt_expr_alloc(Expr *e);
+Stmt_Block *stmt_block_alloc(Stmt **stmts, size_t len, size_t cap);
+Stmt_Proc *stmt_proc_alloc(Token *id,
+                           Token **ids,
+                           Scr_Type *id_types,
+                           size_t len,
+                           size_t cap,
+                           Scr_Type rtype,
+                           Stmt_Block *block);
+Stmt_Let *stmt_let_alloc(Token *id, Scr_Type type, Expr *e);
 
-    using vt = std::variant<un_ptr<expr::term::identifier>,
-                            un_ptr<expr::term::str_literal>,
-                            un_ptr<expr::term::int_literal>,
-                            un_ptr<expr::term::proc_call>>;
-    struct t {
-        vt actual;
-        expr::term::type ty;
-        t(vt actual, expr::term::type ty);
-        ~t() = default;
-    };
-};
-
-namespace expr {
-    enum class type {
-        Term,
-        Binary,
-        Unary,
-    };
-
-    using vt = std::variant<un_ptr<expr::term::t>,
-                            un_ptr<expr::binary::t>,
-                            un_ptr<expr::unary::t>>;
-
-    struct t {
-        expr::vt actual;
-        expr::type ty;
-        t(vt actual, expr::type ty);
-        ~t() = default;
-    };
-};
-
-namespace program {
-    struct t {
-        vec<un_ptr<stmt::t>> stmts;
-        t(vec<un_ptr<stmt::t>> stmts);
-        ~t() = default;
-    };
-};
+void program_dump(Program *p);
 
 #endif // GRAMMAR_HXX

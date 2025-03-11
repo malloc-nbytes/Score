@@ -1,66 +1,88 @@
-#include <string>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "utils.hxx"
 #include "token.hxx"
+#include "mem.hxx"
 #include "err.hxx"
+#include "utils.hxx"
 
-str token::type_to_cxxstr(token::type ty) {
-    switch (ty) {
-    case token::type::LParen:              return "LParen";
-    case token::type::RParen:              return "RParen";
-    case token::type::LBracket:            return "LBracket";
-    case token::type::RBracket:            return "RBracket";
-    case token::type::LBrace:              return "LBrace";
-    case token::type::RBrace:              return "RBrace";
-    case token::type::Hash:                return "Hash";
-    case token::type::Period:              return "Period";
-    case token::type::Semicolon:           return "Semicolon";
-    case token::type::Comma:               return "Comma";
-    case token::type::Greaterthan:         return "Greaterthan";
-    case token::type::Lessthan:            return "Lessthan";
-    case token::type::Equals:              return "Equals";
-    case token::type::Ampersand:           return "Ampersand";
-    case token::type::Asterisk:            return "Asterisk";
-    case token::type::Plus:                return "Plus";
-    case token::type::Minus:               return "Minus";
-    case token::type::Forwardslash:        return "Forwardslash";
-    case token::type::Pipe:                return "Pipe";
-    case token::type::Caret:               return "Caret";
-    case token::type::Questionmark:        return "Questionmark";
-    case token::type::Backwardslash:       return "Backwardslash";
-    case token::type::Bang:                return "Bang";
-    case token::type::At:                  return "At";
-    case token::type::Dollarsign:          return "Dollarsign";
-    case token::type::Percent:             return "Percent";
-    case token::type::Backtick:            return "Backtick";
-    case token::type::Tilde:               return "Tilde";
-    case token::type::Colon:               return "Colon";
-    case token::type::Double_Ampersand:    return "Double_Ampersand";
-    case token::type::Double_Pipe:         return "Double_Pipe";
-    case token::type::Greaterthan_Equals:  return "Greaterthan_Equals";
-    case token::type::Lessthan_Equals:     return "Lessthan_Equals";
-    case token::type::Double_Equals:       return "Double_Equals";
-    case token::type::Bang_Equals:         return "Bang_Equals";
-    case token::type::Double_Colon:        return "Double_Colon";
-    case token::type::Plus_Equals:         return "Plus_Equals";
-    case token::type::Minus_Equals:        return "Minus_Equals";
-    case token::type::Asterisk_Equals:     return "Asterisk_Equals";
-    case token::type::Forwardslash_Equals: return "Forwardslash_Equals";
-    case token::type::Percent_Equals:      return "Percent_Equals";
-    case token::type::Eof:                 return "Eof";
-    case token::type::Intlit:              return "Intlit";
-    case token::type::Strlit:              return "Strlit";
-    case token::type::Charlit:             return "Charlit";
-    case token::type::Floatlit:            return "Floatlit";
-    case token::type::Ident:               return "Ident";
-    case token::type::Keyword:             return "Keyword";
-    case token::type::Type:                return "Type";
-    case token::type::TriplePeriod:        return "TriplePeriod";
-    default: ERRW("unknown token type `%d`", ty);
-    }
-    return ""; // unreachable
+const char *token_type_to_cstr(Token_Type ty) {
+        switch (ty) {
+        case TOKEN_TYPE_EOF: return "TOKEN_TYPE_EOF";
+        case TOKEN_TYPE_INTEGER_LITERAL: return "TOKEN_TYPE_INTEGER_LITERAL";
+        case TOKEN_TYPE_STRING_LITERAL: return "TOKEN_TYPE_STRING_LITERAL";
+        case TOKEN_TYPE_IDENTIFIER: return "TOKEN_TYPE_IDENTIFIER";
+        case TOKEN_TYPE_KEYWORD: return "TOKEN_TYPE_KEYWORD";
+        case TOKEN_TYPE_TYPE: return "TOKEN_TYPE_TYPE";
+        case TOKEN_TYPE_LEFT_PARENTHESIS: return "TOKEN_TYPE_LEFT_PARENTHESIS";
+        case TOKEN_TYPE_RIGHT_PARENTHESIS: return "TOKEN_TYPE_RIGHT_PARENTHESIS";
+        case TOKEN_TYPE_LEFT_CURLY_BRACKET: return "TOKEN_TYPE_LEFT_CURLY_BRACKET";
+        case TOKEN_TYPE_RIGHT_CURLY_BRACKET: return "TOKEN_TYPE_RIGHT_CURLY_BRACKET";
+        case TOKEN_TYPE_LEFT_SQUARE_BRACKET: return "TOKEN_TYPE_LEFT_SQUARE_BRACKET";
+        case TOKEN_TYPE_RIGHT_SQUARE_BRACKET: return "TOKEN_TYPE_RIGHT_SQUARE_BRACKET";
+        case TOKEN_TYPE_EQUALS: return "TOKEN_TYPE_EQUALS";
+        case TOKEN_TYPE_SEMICOLON: return "TOKEN_TYPE_SEMICOLON";
+        case TOKEN_TYPE_UNKNOWN: return "TOKEN_TYPE_UNKNOWN";
+        case TOKEN_TYPE_COLON: return "TOKEN_TYPE_COLON";
+        case TOKEN_TYPE_ASTERISK: return "TOKEN_TYPE_ASTERISK";
+        case TOKEN_TYPE_DOUBLE_AMPERSAND: return "TOKEN_TYPE_DOUBLE_AMPERSAND";
+        case TOKEN_TYPE_DOUBLE_PIPE: return "TOKEN_TYPE_DOUBLE_PIPE";
+        case TOKEN_TYPE_DOUBLE_EQUALS: return "TOKEN_TYPE_DOUBLE_EQUALS";
+        case TOKEN_TYPE_GREATERTHAN_EQUALS: return "TOKEN_TYPE_GREATERTHAN_EQUALS";
+        case TOKEN_TYPE_GREATERTHAN: return "TOKEN_TYPE_GREATERTHAN";
+        case TOKEN_TYPE_LESSTHAN_EQUALS: return "TOKEN_TYPE_LESSTHAN_EQUALS";
+        case TOKEN_TYPE_LESSTHAN: return "TOKEN_TYPE_LESSTHAN";
+        case TOKEN_TYPE_BANG_EQUALS: return "TOKEN_TYPE_BANG_EQUALS";
+        case TOKEN_TYPE_PLUS: return "TOKEN_TYPE_PLUS";
+        case TOKEN_TYPE_MINUS: return "TOKEN_TYPE_MINUS";
+        case TOKEN_TYPE_FORWARD_SLASH: return "TOKEN_TYPE_FORWARD_SLASH";
+        case TOKEN_TYPE_PERCENT: return "TOKEN_TYPE_PERCENT";
+        case TOKEN_TYPE_BANG: return "TOKEN_TYPE_BANG";
+        case TOKEN_TYPE_COMMA: return "TOKEN_TYPE_COMMA";
+        default: {
+                err_wargs("unknown token type: %d", (int)ty);
+        } break;
+        }
 }
 
-token::t::t(str lx, token::type ty, unsigned row, unsigned col, str fp)
-    : lx(lx), ty(ty), row(row), col(col), fp(fp), next(nullptr) {}
+void token_dump(Token *t) {
+        printf("[Token (lx='%s', ty=%s, r=%zu, c=%zu)]\n",
+               t->lx, token_type_to_cstr(t->ty), t->r, t->c);
+}
 
+Token::~Token(void) {
+        free(this->lx);
+}
+
+Token *token_alloc(char *sstart,
+                   size_t send,
+                   Token_Type ty,
+                   size_t r,
+                   size_t c,
+                   const char *fp) {
+        Token *tok = new Token;
+
+        struct {
+                char *data;
+                size_t len, cap;
+        } buf = { NULL, 0, 0 };
+
+        size_t i = 0;
+        while (*(sstart + i) && i < send) {
+                da_append(buf.data, buf.len, buf.cap, char, *(sstart + i));
+                ++i;
+        }
+        da_append(buf.data, buf.len, buf.cap, char, '\0');
+
+        tok->lx = strdup(buf.data);
+        tok->ty = ty;
+        tok->r = r;
+        tok->c = c;
+        tok->fp = fp;
+        tok->next = NULL;
+
+        free(buf.data);
+
+        return tok;
+}
