@@ -1,3 +1,5 @@
+#include <vector>
+
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/APInt.h>
@@ -98,16 +100,86 @@ static void push_scope(Context *ctx) {
         ctx->vs.add(m);
 }
 
+static void pop_scope(Context *ctx) {
+        if (ctx->vs.length() == 0) {
+                err("cannot pop scope, out of length");
+        }
+        ctx->vs.pop_back();
+}
+
+static llvm::Type *scr_type_to_llvm_type(Scr_Type ty, Context *ctx) {
+        switch (ty.base) {
+        case SCR_BASE_TYPE_I32:
+                return llvm::Type::getInt32Ty(*(ctx->llctx));
+        case SCR_BASE_TYPE_STR:
+                return llvm::Type::getInt8PtrTy(*(ctx->llctx));
+        default: {
+                err_wargs("unhandled type %d", (int)ty.base);
+        }
+        }
+        return nullptr; // unreachable
+}
+
+static llvm::Function *gen_proc_proto(Stmt_Proc *s, Context *ctx) {
+        // std::vector sad :(
+        std::vector<llvm::Type *> types;
+
+        for (size_t i = 0; i < s->args.len; ++i) {
+                llvm::Type *llty = scr_type_to_llvm_type(s->rtype, ctx);
+                types.push_back(llty);
+        }
+
+        // If the function is variadic, set the last argument type to be a pointer type (e.g., void*)
+        llvm::FunctionType *ft = llvm::FunctionType::get(scr_type_to_llvm_type(s->rtype, ctx),
+                                                         types, true); // TODO: change to variadic
+
+        llvm::Function *f = llvm::Function::Create(
+                ft, llvm::Function::ExternalLinkage, s->id->lx, ctx->md);
+
+        size_t idx = 0;
+        for (auto &a : f->args()) {
+                a.setName(s->args.ids[idx++]->lx);
+        }
+
+        return f;
+}
+
 static void compile_stmt_block(Stmt_Block *s, Context *ctx) {
         (void)s;
         (void)ctx;
         assert(false);
 }
 
-static void compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
-        (void)s;
-        (void)ctx;
-        assert(0);
+static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
+        llvm::Function *existing_function = ctx->md->getFunction(s->id->lx);
+
+        if (existing_function) {
+                existing_function = gen_proc_proto(s, ctx);
+        }
+        if (!existing_function) {
+                return nullptr;
+        }
+        if (!existing_function->empty()) {
+                err_wargs("function %s cannot be redefined", s->id->lx);
+        }
+
+        llvm::BasicBlock *bb = llvm::BasicBlock::Create(*(ctx->llctx), "entry", existing_function);
+        ctx->bl->SetInsertPoint(bb);
+
+        push_scope(ctx);
+
+        for (auto &arg : existing_function->args()) {
+                Var v = { s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()] };
+                add_var_to_scope(&v, ctx);
+        }
+
+        compile_stmt_block(s->block, ctx);
+
+        pop_scope(ctx);
+
+        llvm::verifyFunction(*existing_function);
+
+        return existing_function;
 }
 
 static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
