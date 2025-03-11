@@ -40,6 +40,7 @@ const char *token_type_to_cstr(Token_Type ty) {
         case TOKEN_TYPE_PERCENT: return "TOKEN_TYPE_PERCENT";
         case TOKEN_TYPE_BANG: return "TOKEN_TYPE_BANG";
         case TOKEN_TYPE_COMMA: return "TOKEN_TYPE_COMMA";
+        case TOKEN_TYPE_TRIPLE_PERIOD: return "TOKEN_TYPE_TRIPLE_PERIOD";
         default: {
                 err_wargs("unknown token type: %d", (int)ty);
         } break;

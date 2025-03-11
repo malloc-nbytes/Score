@@ -127,6 +127,7 @@ typedef struct Stmt_Proc {
         } args;
         Scr_Type rtype;
         Stmt_Block *block;
+        bool variadic;
 } Stmt_Proc;
 
 typedef struct Stmt_Let {
@@ -155,7 +156,8 @@ Stmt_Proc *stmt_proc_alloc(Token *id,
                            size_t len,
                            size_t cap,
                            Scr_Type rtype,
-                           Stmt_Block *block);
+                           Stmt_Block *block,
+                           bool variadic);
 Stmt_Let *stmt_let_alloc(Token *id, Scr_Type type, Expr *e);
 
 void program_dump(Program *p);

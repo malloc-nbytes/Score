@@ -70,12 +70,12 @@ Scr_Type &Scr_Type::operator=(const Scr_Type &other) {
 }
 
 Scr_Type::~Scr_Type(void) {
-        auto it = this->ptrn;
-        while (it) {
-                auto tmp = it->ptrn;
-                free(it);
-                it = tmp;
-        }
+        // auto it = this->ptrn;
+        // while (it) {
+        //         auto tmp = it->ptrn;
+        //         free(it);
+        //         it = tmp;
+        // }
 }
 
 void scr_type_dump(Scr_Type *ty, bool newline) {

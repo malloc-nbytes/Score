@@ -41,7 +41,8 @@ Stmt_Proc *stmt_proc_alloc(Token *id,
                            size_t len,
                            size_t cap,
                            Scr_Type rtype,
-                           Stmt_Block *block) {
+                           Stmt_Block *block,
+                           bool variadic) {
         Stmt_Proc *p = new Stmt_Proc;
         p->base.ty = STMT_TYPE_PROC;
         p->id = id;
@@ -51,6 +52,7 @@ Stmt_Proc *stmt_proc_alloc(Token *id,
         p->args.cap = cap;
         p->rtype = rtype;
         p->block = block;
+        p->variadic = variadic;
         return p;
 }
 
@@ -206,6 +208,9 @@ static void dump_stmt_proc(Stmt_Proc *s, int pad) {
                 }
                 printf("%s: ", s->args.ids[i]->lx);
                 scr_type_dump(&s->args.types[i], false);
+        }
+        if (s->variadic) {
+                printf(", ...");
         }
         printf("): ");
         scr_type_dump(&s->rtype, false);

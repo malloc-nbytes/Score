@@ -254,7 +254,8 @@ static void parse_function_args(Lexer *lexer,
                                 size_t *ids_cap,
                                 Scr_Type **types,
                                 size_t *types_len,
-                                size_t *types_cap) {
+                                size_t *types_cap,
+                                bool *variadic) {
         expect(lexer, TOKEN_TYPE_LEFT_PARENTHESIS);
 
         if (lexer_speek(lexer, 0)->ty == TOKEN_TYPE_RIGHT_PARENTHESIS) {
@@ -269,6 +270,13 @@ static void parse_function_args(Lexer *lexer,
         }
 
         while (lexer_speek(lexer, 0)->ty != TOKEN_TYPE_RIGHT_PARENTHESIS) {
+                if (lexer_peek(lexer)->ty == TOKEN_TYPE_TRIPLE_PERIOD) {
+                        *variadic = true;
+                        lexer_discard(lexer); // ...
+                        (void)expect(lexer, TOKEN_TYPE_RIGHT_PARENTHESIS);
+                        break;
+                }
+
                 Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
                 da_append(*ids, *ids_len, *ids_cap, Token *, id);
 
@@ -318,15 +326,16 @@ static Stmt_Proc *parse_stmt_proc(Lexer *lexer) {
                 size_t len, cap;
         } types = { nullptr, 0, 0 };
 
+        bool variadic = false;
         parse_function_args(lexer, &ids.data, &ids.len, &ids.cap,
-                            &types.data, &types.len, &types.cap);
+                            &types.data, &types.len, &types.cap, &variadic);
 
         (void)expect(lexer, TOKEN_TYPE_COLON);
         Scr_Type rtype = parse_type(lexer);
         Stmt_Block *block = parse_stmt_block(lexer);
 
         return stmt_proc_alloc(id, ids.data, types.data,
-                               ids.len, ids.cap, rtype, block);
+                               ids.len, ids.cap, rtype, block, variadic);
 }
 
 Stmt_Return *parse_stmt_return(Lexer *lexer) {

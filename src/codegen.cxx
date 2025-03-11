@@ -131,7 +131,7 @@ static llvm::Function *gen_proc_proto(Stmt_Proc *s, Context *ctx) {
 
         // If the function is variadic, set the last argument type to be a pointer type (e.g., void*)
         llvm::FunctionType *ft = llvm::FunctionType::get(scr_type_to_llvm_type(s->rtype, ctx),
-                                                         types, true); // TODO: change to variadic
+                                                         types, s->variadic);
 
         llvm::Function *f = llvm::Function::Create(
                 ft, llvm::Function::ExternalLinkage, s->id->lx, ctx->md);

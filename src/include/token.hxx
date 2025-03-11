@@ -34,6 +34,7 @@ typedef enum {
         TOKEN_TYPE_PERCENT,
         TOKEN_TYPE_BANG,
         TOKEN_TYPE_COMMA,
+        TOKEN_TYPE_TRIPLE_PERIOD,
 
         TOKEN_TYPE_UNKNOWN,
 } Token_Type;

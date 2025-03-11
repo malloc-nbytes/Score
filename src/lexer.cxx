@@ -31,6 +31,7 @@ static void init_operators(void) {
         operators.add("+", TOKEN_TYPE_PLUS);
         operators.add("/", TOKEN_TYPE_FORWARD_SLASH);
         operators.add(",", TOKEN_TYPE_COMMA);
+        operators.add("...", TOKEN_TYPE_TRIPLE_PERIOD);
 }
 
 static Token_Type determine_operator_type(const char *s, size_t end, size_t *len) {
@@ -113,7 +114,13 @@ Lexer lexer_init(const char *fp, char *src) {
         while (src[i]) {
                 char ch = src[i];
 
-                if (ch == ' ' || ch == '\t') {
+                if (ch == '-' && src[i+1] && src[i+1] == '-') {
+                        ++i, ++col; // #
+                        size_t len = consume_while(src + i, [](int c) {
+                                return c != '\n';
+                        });
+                        i += len, col += len;
+                } else if (ch == ' ' || ch == '\t') {
                         ++col, ++i;
                 } else if (ch == '\n') {
                         col = 1, ++row, ++i;
