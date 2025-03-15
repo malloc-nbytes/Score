@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.25.1)
 project(scr VERSION 1.0.0)
 
+# Set default build type to Debug if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 # Define INSTALL_PREFIX and PROJECT_VERSION as cache variables
 set(INSTALL_PREFIX "" CACHE STRING "The installation prefix")
 set(PROJECT_VERSION ${PROJECT_VERSION} CACHE STRING "The project version")
@@ -44,20 +49,31 @@ file(GLOB_RECURSE SOURCES
 # Add executable
 add_executable(scr ${SOURCES})
 
-# Link LLVM libraries
-llvm_map_components_to_libnames(LLVM_LIBS core orcjit native)
-target_link_libraries(scr ${LLVM_LIBS})
+# Link LLVM libraries with all necessary components
+llvm_map_components_to_libnames(LLVM_LIBS
+    core
+    orcjit
+    native
+    support
+    mc
+    target
+    x86codegen    # For x86 targets
+    x86asmparser  # For assembly parsing
+    x86desc       # Target descriptions
+    x86info       # Target info
+)
+target_link_libraries(scr PRIVATE ${LLVM_LIBS})
 
 # Install targets
 install(TARGETS scr DESTINATION bin)
 
 # Uninstall target
 if(NOT TARGET uninstall)
-  configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-    IMMEDIATE @ONLY)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+        IMMEDIATE @ONLY)
 
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 endif()

@@ -12,6 +12,15 @@
 // Statements /////
 ///////////////////
 
+Stmt_If *stmt_if_alloc(Expr *e, Stmt *then, Stmt *else_) {
+        Stmt_If *s = new Stmt_If;
+        s->base.ty = STMT_TYPE_IF;
+        s->e = e;
+        s->then = then;
+        s->else_ = else_;
+        return s;
+}
+
 Stmt_Def *stmt_def_alloc(Stmt_Proc *proto) {
         Stmt_Def *d = new Stmt_Def;
         d->base.ty = STMT_TYPE_DEF;
@@ -177,6 +186,7 @@ static void dump_expr_mut(Expr_Mut *e) {
 }
 
 static void dump_expr(Expr *e) {
+        if (!e) return;
         switch (e->ty) {
         case EXPR_TYPE_BIN: {
                 dump_expr_bin((Expr_Bin *)e);
@@ -258,6 +268,17 @@ static void dump_stmt_def(Stmt_Def *s, int pad) {
         dump_stmt_proc(s->proto, pad);
 }
 
+static void dump_stmt_if(Stmt_If *s, int pad) {
+        printf("IF ");
+        dump_expr(s->e);
+        dump_stmt(s->then, pad);
+        if (s->else_) {
+                spaces(pad);
+                printf("ELSE");
+                dump_stmt(s->else_, pad);
+        }
+}
+
 static void dump_stmt(Stmt *s, int pad) {
         spaces(pad);
 
@@ -279,6 +300,9 @@ static void dump_stmt(Stmt *s, int pad) {
         } break;
         case STMT_TYPE_DEF: {
                 dump_stmt_def((Stmt_Def *)s, pad);
+        } break;
+        case STMT_TYPE_IF: {
+                dump_stmt_if((Stmt_If *)s, pad);
         } break;
         default: {
                 err_wargs("unhandled stmt type %d", (int)s->ty);

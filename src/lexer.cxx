@@ -29,9 +29,11 @@ static void init_operators(void) {
         operators.add(":", TOKEN_TYPE_COLON);
         operators.add("*", TOKEN_TYPE_ASTERISK);
         operators.add("+", TOKEN_TYPE_PLUS);
+        operators.add("-", TOKEN_TYPE_MINUS);
         operators.add("/", TOKEN_TYPE_FORWARD_SLASH);
         operators.add(",", TOKEN_TYPE_COMMA);
         operators.add("...", TOKEN_TYPE_TRIPLE_PERIOD);
+        operators.add("==", TOKEN_TYPE_DOUBLE_EQUALS);
         operators.add("+=", TOKEN_TYPE_PLUS_EQUALS);
         operators.add("-=", TOKEN_TYPE_MINUS_EQUALS);
         operators.add("/=", TOKEN_TYPE_FORWARD_SLASH_EQUALS);
@@ -107,7 +109,20 @@ Token *lexer_peek(Lexer *lexer, size_t p) {
 
 static size_t consume_while(char *s, std::function<int(int)> pred) {
         size_t i = 0;
-        while (s[i] && pred(s[i])) ++i;
+        bool skip = false;
+
+        for (i = 0; s[i]; ++i) {
+                if (!skip && !pred(s[i])) {
+                        return i;
+                }
+                if (skip && s[i] == '\\') {
+                        skip = false;
+                } else if (s[i] == '\\') {
+                        skip = true;
+                } else {
+                        skip = false;
+                }
+        }
         return i;
 }
 
@@ -129,7 +144,7 @@ Lexer lexer_init(const char *fp, char *src) {
                         i += len, col += len;
                 } else if (ch == ' ' || ch == '\t') {
                         ++col, ++i;
-                } else if (ch == '\n') {
+                } else if (ch == '\n' || ch == '\r') {
                         col = 1, ++row, ++i;
                 } else if (ch == '"') {
                         ++i, ++col; // "

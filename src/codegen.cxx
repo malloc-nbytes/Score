@@ -1,5 +1,16 @@
 #include <vector>
 
+// Building
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetOptions.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Host.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/CodeGen/TargetPassConfig.h>
+
+// main llvm api
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/APInt.h>
@@ -18,6 +29,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unordered_map>
 
 #include "codegen.hxx"
 #include "types.hxx"
@@ -39,19 +51,19 @@ typedef struct {
 } Var;
 
 typedef struct {
-        Array<Umap<char *, Var>> vs;
-        Array<Umap<char *, Proc>> ps;
+        Array<Umap<char *, Var *> *> vs;
+        Array<Umap<char *, Proc *> *> ps;
         llvm::LLVMContext *llctx;
         llvm::IRBuilder<> *bl;
         llvm::Module *md;
 } Context;
 
-static void compile_stmt(Stmt *s, Context *ctx);
+static llvm::Value *compile_stmt(Stmt *s, Context *ctx);
 static llvm::Value *compile_expr(Expr *e, Context *ctx);
 
 static bool proc_in_scope(char *id, Context *ctx) {
         for (int i = (int)ctx->ps.length()-1; i >= 0; --i) {
-                if (ctx->ps[i].has(id)) {
+                if (ctx->ps[i]->has(id)) {
                         return true;
                 }
         }
@@ -60,7 +72,7 @@ static bool proc_in_scope(char *id, Context *ctx) {
 
 static bool var_in_scope(char *id, Context *ctx) {
         for (int i = (int)ctx->vs.length()-1; i >= 0; --i) {
-                if (ctx->vs[i].has(id)) {
+                if (ctx->vs[i]->has(id)) {
                         return true;
                 }
         }
@@ -94,11 +106,12 @@ static void assert_var_not_in_scope(char *id, Context *ctx) {
 }
 
 static void add_var_to_scope(Var *v, Context *ctx) {
-        ctx->vs.back().add(v->id->lx, *v);
+        // ctx->vs.back().add(v->id->lx, v);
+        ctx->vs[ctx->vs.length()-1]->add(v->id->lx, v);
 }
 
 static void push_scope(Context *ctx) {
-        auto m = Umap<char *, Var>([](char *s0, char *s1) {
+        auto m = new Umap<char *, Var *>([](char *s0, char *s1) {
                 return !strcmp(s0, s1);
         });
         ctx->vs.add(m);
@@ -181,17 +194,17 @@ static llvm::Value *compile_expr_ident(Expr_Ident *e, Context *ctx) {
 
         // Check variables in scope
         for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
-                if (ctx->vs[i].has(id)) {
-                        Var *var = ctx->vs[i].get(id);
+                if (ctx->vs[i]->has(id)) {
+                        Var *var = *(ctx->vs[i]->get(id));
                         // Return the pointer (e.g., AllocaInst*) directly, not the loaded value
-                        return var->value;  // Should be the allocation or parameter pointer
+                        return var->value;
                 }
         }
 
         // Check procedures in scope
         for (int i = (int)ctx->ps.length() - 1; i >= 0; --i) {
-                if (ctx->ps[i].has(id)) {
-                        Proc *proc = ctx->ps[i].get(id);
+                if (ctx->ps[i]->has(id)) {
+                        Proc *proc = *(ctx->ps[i]->get(id));
                         return proc->value;  // Function pointer
                 }
         }
@@ -264,26 +277,24 @@ static llvm::Value *compile_expr_mut(Expr_Mut *e, Context *ctx) {
                 return right;
         } else {
                 // For compound assignments, we need to load the current value
-                llvm::Type *valType = nullptr;
+                llvm::Type *val_type = nullptr;
                 if (e->l->ty == EXPR_TYPE_IDENT) {
                         char *id = ((Expr_Ident *)e->l)->id->lx;
                         for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
-                                if (ctx->vs[i].has(id)) {
-                                        Var *var = ctx->vs[i].get(id);
-                                        valType = scr_type_to_llvm_type(var->ty, ctx);
+                                if (ctx->vs[i]->has(id)) {
+                                        Var *var = *(ctx->vs[i]->get(id));
+                                        val_type = scr_type_to_llvm_type(var->ty, ctx);
                                         break;
                                 }
                         }
-                        if (!valType) {
+                        if (!val_type) {
                                 err_wargs("could not determine type of identifier '%s' for compound assignment", id);
-                                return nullptr;
                         }
                 } else {
                         err("compound assignment only supported for identifiers with known types");
-                        return nullptr;
                 }
 
-                llvm::Value *current = ctx->bl->CreateLoad(valType, left, "loadtmp");
+                llvm::Value *current = ctx->bl->CreateLoad(val_type, left, "loadtmp");
 
                 llvm::Value *result = nullptr;
                 if (!strcmp(op, "+=")) {
@@ -319,12 +330,13 @@ static llvm::Value *compile_expr_bin(Expr_Bin *e, Context *ctx) {
 
         const char *op = e->op->lx;
 
-        // For now, assume both operands are i32; TODO: extend type checking later
+        // For now, assume both operands are i32 for arithmetic and comparisons
         llvm::Type *i32Ty = llvm::Type::getInt32Ty(*(ctx->llctx));
         if (left->getType() != i32Ty || right->getType() != i32Ty) {
                 err_wargs("binary operator '%s' requires i32 operands", op);
         }
 
+        // Arithmetic operations
         if (!strcmp(op, "+")) {
                 return ctx->bl->CreateAdd(left, right, "addtmp");
         } else if (!strcmp(op, "-")) {
@@ -333,12 +345,25 @@ static llvm::Value *compile_expr_bin(Expr_Bin *e, Context *ctx) {
                 return ctx->bl->CreateMul(left, right, "multmp");
         } else if (!strcmp(op, "/")) {
                 return ctx->bl->CreateSDiv(left, right, "sdivtmp");
+        }
+        // Comparison operations (return i1)
+        else if (!strcmp(op, "==")) {
+                return ctx->bl->CreateICmpEQ(left, right, "eqtmp");
+        } else if (!strcmp(op, "!=")) {
+                return ctx->bl->CreateICmpNE(left, right, "netmp");
+        } else if (!strcmp(op, ">=")) {
+                return ctx->bl->CreateICmpSGE(left, right, "sgetmp");
+        } else if (!strcmp(op, "<=")) {
+                return ctx->bl->CreateICmpSLE(left, right, "sletmp");
+        } else if (!strcmp(op, ">")) {
+                return ctx->bl->CreateICmpSGT(left, right, "sgttmp");
+        } else if (!strcmp(op, "<")) {
+                return ctx->bl->CreateICmpSLT(left, right, "slttmp");
         } else {
                 err_wargs("unsupported binary operator '%s'", op);
         }
 
-        assert(0 && "unreachable");
-        return nullptr;
+        return nullptr; // unreachable
 }
 
 static llvm::Value *compile_expr(Expr *e, Context *ctx) {
@@ -360,8 +385,8 @@ static llvm::Value *compile_expr(Expr *e, Context *ctx) {
                         char *id = ((Expr_Ident *)e)->id->lx;
                         // Check if it's a variable in scope
                         for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
-                                if (ctx->vs[i].has(id)) {
-                                        Var *var = ctx->vs[i].get(id);
+                                if (ctx->vs[i]->has(id)) {
+                                        Var *var = *(ctx->vs[i]->get(id));
                                         return ctx->bl->CreateLoad(scr_type_to_llvm_type(var->ty, ctx), val, id);
                                 }
                         }
@@ -387,12 +412,14 @@ static llvm::Value *compile_expr(Expr *e, Context *ctx) {
         return nullptr;
 }
 
-static void compile_stmt_block(Stmt_Block *s, Context *ctx) {
+static llvm::Value *compile_stmt_block(Stmt_Block *s, Context *ctx) {
+        llvm::Value *res = nullptr;
         push_scope(ctx);
         for (size_t i = 0; i < s->len; ++i) {
-                compile_stmt(s->stmts[i], ctx);
+                res = compile_stmt(s->stmts[i], ctx);
         }
         pop_scope(ctx);
+        return res;
 }
 
 static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
@@ -414,8 +441,8 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
         push_scope(ctx);
 
         for (auto &arg : existing_function->args()) {
-                Var v = { s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()], nullptr };
-                add_var_to_scope(&v, ctx);
+                Var *v = new Var{ s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()], nullptr };
+                add_var_to_scope(v, ctx);
         }
 
         compile_stmt_block(s->block, ctx);
@@ -427,7 +454,7 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
         return existing_function;
 }
 
-static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
+static llvm::Value *compile_stmt_let(Stmt_Let *s, Context *ctx) {
         llvm::Type *llty = scr_type_to_llvm_type(s->type, ctx);
         llvm::AllocaInst *alloca_inst = ctx->bl->CreateAlloca(llty, nullptr, s->id->lx);
 
@@ -436,40 +463,160 @@ static void compile_stmt_let(Stmt_Let *s, Context *ctx) {
                 err_wargs("failed to compile expression for identifier %s", s->id->lx);
         }
 
-        Var new_var = { s->id, s->type, alloca_inst };
-        add_var_to_scope(&new_var, ctx);
+        Var *new_var = new Var{ s->id, s->type, alloca_inst };
+        add_var_to_scope(new_var, ctx);
 
-        ctx->bl->CreateStore(init_value, alloca_inst);
+        return ctx->bl->CreateStore(init_value, alloca_inst);
 }
 
-static void compile_stmt_return(Stmt_Return *s, Context *ctx) {
+static llvm::Value *compile_stmt_return(Stmt_Return *s, Context *ctx) {
         llvm::Value *v = compile_expr(s->e, ctx);
-        ctx->bl->CreateRet(v);
+        return ctx->bl->CreateRet(v);
 }
 
 static llvm::Function *compile_stmt_def(Stmt_Def *s, Context *ctx) {
         return gen_proc_proto(s->proto, ctx);
 }
 
-static void compile_stmt(Stmt *s, Context *ctx) {
+static llvm::Value *compile_stmt_if(Stmt_If *s, Context *ctx) {
+        llvm::Value *cond = compile_expr(s->e, ctx);
+        if (!cond) {
+                err("compile_stmt_if: could not compile condition");
+        }
+
+        if (!cond->getType()->isIntegerTy(1)) {
+                cond = ctx->bl->CreateICmpNE(
+                        cond,
+                        llvm::ConstantInt::get(cond->getType(), 0),
+                        "tobool");
+        }
+
+        llvm::Function *parent_func = ctx->bl->GetInsertBlock()->getParent();
+        llvm::BasicBlock *then_bb = llvm::BasicBlock::Create(*ctx->llctx, "then", parent_func);
+        llvm::BasicBlock *else_bb = s->else_ ? llvm::BasicBlock::Create(*ctx->llctx, "else") : nullptr;
+        llvm::BasicBlock *merge_bb = llvm::BasicBlock::Create(*ctx->llctx, "ifcont");
+
+        ctx->bl->CreateCondBr(cond, then_bb, else_bb);
+
+        ctx->bl->SetInsertPoint(then_bb);
+
+        llvm::Value *then_value = compile_stmt(s->then, ctx);
+        assert(then_value);
+
+        ctx->bl->CreateBr(merge_bb);
+        then_bb = ctx->bl->GetInsertBlock();
+
+        // Emit else block
+        parent_func->insert(parent_func->end(), else_bb);
+        ctx->bl->SetInsertPoint(else_bb);
+
+        llvm::Value *else_value = compile_stmt(s->else_, ctx);
+        assert(else_value);
+
+        ctx->bl->CreateBr(merge_bb);
+        else_bb = ctx->bl->GetInsertBlock();
+
+        // Emit merge block
+        parent_func->insert(parent_func->end(), merge_bb);
+        ctx->bl->SetInsertPoint(merge_bb);
+        llvm::PHINode *pn = ctx->bl->CreatePHI(llvm::Type::getInt32Ty(*ctx->llctx), 2, "iftmp");
+
+        pn->addIncoming(then_value, then_bb);
+        pn->addIncoming(else_value, else_bb);
+
+        return pn;
+}
+
+// static llvm::BasicBlock *compile_stmt_if(Stmt_If *s, Context *ctx) {
+//         llvm::Value *cond = compile_expr(s->e, ctx);
+//         if (!cond) {
+//                 err("failed to compile if condition");
+//                 return nullptr;
+//         }
+
+//         // Ensure condition is a boolean (i1) type; convert if necessary
+//         if (!cond->getType()->isIntegerTy(1)) {
+//                 cond = ctx->bl->CreateICmpNE(
+//                         cond,
+//                         llvm::ConstantInt::get(cond->getType(), 0),
+//                         "tobool");
+//         }
+
+//         // Get the current function
+//         llvm::Function *parent_func = ctx->bl->GetInsertBlock()->getParent();
+
+//         // Create basic blocks for then, else (if present), and merge
+//         llvm::BasicBlock *then_bb = llvm::BasicBlock::Create(*ctx->llctx, "then", parent_func);
+//         llvm::BasicBlock *else_bb = s->else_ ? llvm::BasicBlock::Create(*ctx->llctx, "else") : nullptr;
+//         llvm::BasicBlock *merge_bb = llvm::BasicBlock::Create(*ctx->llctx, "ifcont");
+
+//         // Create the conditional branch
+//         ctx->bl->CreateCondBr(cond, then_bb, s->else_ ? else_bb : merge_bb);
+
+//         // Generate code for then block
+//         ctx->bl->SetInsertPoint(then_bb);
+//         compile_stmt(s->then, ctx);
+//         if (!then_bb->getTerminator()) {
+//                 ctx->bl->CreateBr(merge_bb);
+//         }
+
+//         // Generate code for else block if it exists
+//         if (s->else_) {
+//                 parent_func->insert(parent_func->end(), else_bb);
+//                 ctx->bl->SetInsertPoint(else_bb);
+//                 // Compile the else statement and get its merge point (if it’s an if statement)
+//                 if (s->else_->ty == STMT_TYPE_IF) {
+//                         llvm::BasicBlock *else_merge_bb = compile_stmt_if((Stmt_If *)s->else_, ctx);
+//                         if (else_merge_bb && !else_bb->getTerminator()) {
+//                                 ctx->bl->SetInsertPoint(else_bb);
+//                                 ctx->bl->CreateBr(else_merge_bb);
+//                         }
+//                         // If the else_merge_bb doesn’t have a terminator, connect it to merge_bb
+//                         if (else_merge_bb && !else_merge_bb->getTerminator()) {
+//                                 ctx->bl->SetInsertPoint(else_merge_bb);
+//                                 ctx->bl->CreateBr(merge_bb);
+//                         }
+//                 } else {
+//                         compile_stmt(s->else_, ctx);
+//                         if (!else_bb->getTerminator()) {
+//                                 ctx->bl->CreateBr(merge_bb);
+//                         }
+//                 }
+//         }
+
+//         // Add merge block to the function if not already inserted
+//         if (!merge_bb->getParent()) {
+//                 parent_func->insert(parent_func->end(), merge_bb);
+//         }
+//         ctx->bl->SetInsertPoint(merge_bb);
+
+//         return merge_bb; // Return the merge block for chaining
+// }
+
+static llvm::Value *compile_stmt(Stmt *s, Context *ctx) {
         switch (s->ty) {
         case STMT_TYPE_LET: {
-                compile_stmt_let((Stmt_Let *)s, ctx);
+                return compile_stmt_let((Stmt_Let *)s, ctx);
         } break;
         case STMT_TYPE_PROC: {
-                compile_stmt_proc((Stmt_Proc *)s, ctx);
+                (void)compile_stmt_proc((Stmt_Proc *)s, ctx);
+                return nullptr;
         } break;
         case STMT_TYPE_BLOCK: {
-                compile_stmt_block((Stmt_Block *)s, ctx);
+                return compile_stmt_block((Stmt_Block *)s, ctx);
         } break;
         case STMT_TYPE_RETURN: {
-                compile_stmt_return((Stmt_Return *)s, ctx);
+                return compile_stmt_return((Stmt_Return *)s, ctx);
         } break;
         case STMT_TYPE_DEF: {
-                compile_stmt_def((Stmt_Def *)s, ctx);
+                (void)compile_stmt_def((Stmt_Def *)s, ctx);
+                return nullptr;
         } break;
         case STMT_TYPE_EXPR: {
-                (void)compile_expr(((Stmt_Expr *)s)->e, ctx);
+                return compile_expr(((Stmt_Expr *)s)->e, ctx);
+        } break;
+        case STMT_TYPE_IF: {
+                return compile_stmt_if((Stmt_If *)s, ctx); // No need to store the return value unless needed
         } break;
         default: {
                 err_wargs("unknown statement: %d", (int)s->ty);
@@ -484,12 +631,66 @@ void codegen(Program *p) {
         ctx->bl = new llvm::IRBuilder<>(*ctx->llctx);
 
         for (size_t i = 0; i < p->len; ++i) {
-                // Guaranteed to be top level statements
-                // (guaranteed from the parser).
-                compile_stmt(p->stmts[i], ctx);
+                (void)compile_stmt(p->stmts[i], ctx);
         }
 
-        llvm::verifyModule(*(ctx->md));
-        llvm::errs() << "Module contents";
-        ctx->md->print(llvm::errs(), nullptr);
+        if (llvm::verifyModule(*(ctx->md), &llvm::errs())) {
+                llvm::errs() << "Error: Module verification failed\n";
+                llvm::errs() << "Module contents";
+                ctx->md->print(llvm::errs(), nullptr);
+                exit(1);
+        }
+
+        LLVMInitializeX86TargetInfo();
+        LLVMInitializeX86Target();
+        LLVMInitializeX86TargetMC();
+        LLVMInitializeX86AsmParser();
+        LLVMInitializeX86AsmPrinter();
+
+        std::string target_triple = llvm::sys::getDefaultTargetTriple();
+        ctx->md->setTargetTriple(target_triple);
+
+        std::string error;
+        const llvm::Target *target = llvm::TargetRegistry::lookupTarget(target_triple, error);
+        if (!target) {
+                llvm::errs() << "Error: " << error << "\n";
+                exit(1);
+        }
+
+        llvm::TargetOptions options;
+        auto cpu = "generic";
+        auto features = "";
+        llvm::TargetMachine *target_machine = target->createTargetMachine(target_triple, cpu,
+                                                                          features, options, llvm::Reloc::PIC_);
+        ctx->md->setDataLayout(target_machine->createDataLayout());
+
+        std::error_code ec;
+        llvm::raw_fd_ostream dest("scr_output.o", ec, llvm::sys::fs::OF_None);
+        if (ec) {
+                llvm::errs() << "Could not open file: " << ec.message() << "\n";
+                exit(1);
+        }
+
+        llvm::legacy::PassManager pass;
+        if (target_machine->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
+                llvm::errs() << "TargetMachine can't emit an object file\n";
+                exit(1);
+        }
+
+        pass.run(*(ctx->md));
+        dest.flush();
+        dest.close();
+
+        std::string link_command = "gcc -o scr_output scr_output.o";
+        int link_result = system(link_command.c_str());
+        if (link_result != 0) {
+                llvm::errs() << "Error: Linking failed\n";
+                exit(1);
+        }
+
+        // delete ctx->bl;
+        // delete ctx->md;
+        // delete ctx->llctx;
+        // delete ctx;
 }
+

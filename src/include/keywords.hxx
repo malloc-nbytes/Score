@@ -3,6 +3,7 @@
 
 #define KEYWORD_LET "let"
 #define KEYWORD_IF "if"
+#define KEYWORD_ELSE "else"
 #define KEYWORD_PROC "proc"
 #define KEYWORD_RETURN "return"
 #define KEYWORD_DEF "def"
@@ -10,6 +11,7 @@
 #define KEYWORD_AS_CPL {                        \
                 KEYWORD_LET,                    \
                 KEYWORD_IF,                     \
+                KEYWORD_ELSE,                   \
                 KEYWORD_PROC,                   \
                 KEYWORD_RETURN,                 \
                 KEYWORD_DEF,                    \

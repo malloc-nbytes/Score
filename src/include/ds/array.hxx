@@ -14,7 +14,7 @@ struct Array {
         T *_data;
         size_t _len, _cap;
 
-        Array(void) : _data(NULL), _len(0), _cap(0) {}
+        Array(void) : _data(nullptr), _len(0), _cap(0) {}
 
         Array(const Array &other) : _data(nullptr), _len(other._len), _cap(other._cap) {
                 if (_cap > 0) {
@@ -26,7 +26,7 @@ struct Array {
         }
 
         ~Array(void) {
-                delete[] _data;
+                // delete[] _data;
         }
 
         void add(T d) {
@@ -61,31 +61,30 @@ struct Array {
                 --_len;
         }
 
-        Array &operator=(const Array &other) {
-                if (this == &other) {
-                        return *this;
-                }
+        // Array &operator=(const Array &other) {
+        //         if (this == &other) {
+        //                 return *this;
+        //         }
 
-                // Free existing resources
-                delete[] _data;
+        //         // Free existing resources
+        //         delete[] _data;
 
-                // Copy size and capacity
-                _len = other._len;
-                _cap = other._cap;
+        //         // Copy size and capacity
+        //         _len = other._len;
+        //         _cap = other._cap;
 
-                // Allocate new memory and copy elements
-                if (_cap > 0) {
-                        _data = new T[_cap];
-                        for (size_t i = 0; i < _len; ++i) {
-                                _data[i] = other._data[i];
-                        }
-                } else {
-                        _data = nullptr;
-                }
+        //         // Allocate new memory and copy elements
+        //         if (_cap > 0) {
+        //                 _data = new T[_cap];
+        //                 for (size_t i = 0; i < _len; ++i) {
+        //                         _data[i] = other._data[i];
+        //                 }
+        //         } else {
+        //                 _data = nullptr;
+        //         }
 
-                return *this;
-        }
-
+        //         return *this;
+        // }
 
         T &operator[](size_t i) {
                 _assert_inbounds(i);
@@ -118,10 +117,10 @@ private:
         }
 
         void _assert_inbounds(size_t i) {
-                if (i >= _len) {
-                        err_wargs("index %zu is out of bounds of length %zu",
-                                  i, _len);
-                }
+                // if (i >= _len) {
+                //         err_wargs("index %zu is out of bounds of length %zu",
+                //                   i, _len);
+                // }
         }
 };
 

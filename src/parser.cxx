@@ -158,7 +158,11 @@ static Expr *parse_primary_expr(Lexer *lexer) {
                         left = (Expr *)expr_str_lit_alloc(lexer_next(lexer));
                 } break;
                 case TOKEN_TYPE_KEYWORD: {
-                        assert(0 && "keywords unimplemented");
+                        if (!strcmp(cur->lx, KEYWORD_ELSE)) {
+                                return left;
+                        } else {
+                                err_wargs("keyword %s in primary expression", cur->lx);
+                        }
                 } break;
                 default: return left;
                 }
@@ -379,6 +383,32 @@ static Stmt_Def *parse_stmt_def(Lexer *lexer) {
         return stmt_def_alloc(p);
 }
 
+static Stmt_If *parse_stmt_if(Lexer *lexer) {
+        (void)expectkw(lexer, KEYWORD_IF);
+
+        Expr *e = parse_expr(lexer);
+        Stmt *then = parse_stmt(lexer);
+        Stmt *else_ = nullptr;
+
+        Token *t1 = lexer_peek(lexer, 0);
+        Token *t2 = lexer_peek(lexer, 1);
+
+        bool t1_else = t1 && t1->ty == TOKEN_TYPE_KEYWORD && !strcmp(t1->lx, KEYWORD_ELSE);
+        bool t2_if = t2 && t2->ty == TOKEN_TYPE_KEYWORD && !strcmp(t2->lx, KEYWORD_IF);
+
+        if (t1_else && t2_if) {
+                lexer_discard(lexer); // else
+                Stmt_If *nested_if = parse_stmt_if(lexer);
+                else_ = (Stmt *)nested_if;
+        }
+        else if (t1_else) {
+                lexer_discard(lexer); // else
+                else_ = parse_stmt(lexer);
+        }
+
+        return stmt_if_alloc(e, then, else_);
+}
+
 static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
         Token *hd = lexer_peek(lexer);
         if (!strcmp(hd->lx, KEYWORD_LET)) {
@@ -389,6 +419,10 @@ static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
                 return (Stmt *)parse_stmt_return(lexer);
         } else if (!strcmp(hd->lx, KEYWORD_DEF)) {
                 return (Stmt *)parse_stmt_def(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_IF)) {
+                return (Stmt *)parse_stmt_if(lexer);
+        } else {
+                err_wargs("unhandled keyword for statement %s", hd->lx);
         }
         assert(0);
 }
@@ -405,6 +439,9 @@ static Stmt *parse_stmt(Lexer *lexer) {
         switch (hd->ty) {
         case TOKEN_TYPE_KEYWORD: {
                 return parse_stmt_from_keyword(lexer);
+        } break;
+        case TOKEN_TYPE_LEFT_CURLY_BRACKET: {
+                return (Stmt *)parse_stmt_block(lexer);
         } break;
         default: {
                 return (Stmt *)parse_stmt_expr(lexer);

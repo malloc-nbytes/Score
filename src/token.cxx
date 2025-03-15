@@ -78,9 +78,21 @@ Token *token_alloc(char *sstart,
         } buf = { NULL, 0, 0 };
 
         size_t i = 0;
-        while (*(sstart + i) && i < send) {
-                da_append(buf.data, buf.len, buf.cap, char, *(sstart + i));
-                ++i;
+        while (sstart[i] && i < send) {
+                char c =  sstart[i];
+                if (c == '\\' && sstart[i+1]) {
+                        switch (sstart[i+1]) {
+                        case 'n': da_append(buf.data, buf.len, buf.cap, char, '\n'); break;
+                        case 't': da_append(buf.data, buf.len, buf.cap, char, '\t'); break;
+                        case 'r': da_append(buf.data, buf.len, buf.cap, char, '\r'); break;
+                        case '\\': da_append(buf.data, buf.len, buf.cap, char, '\\'); break;
+                        default: err_wargs("unknown escape sequence \\", sstart[i+1]); break;
+                        }
+                        i += 2;
+                } else {
+                        da_append(buf.data, buf.len, buf.cap, char, sstart[i]);
+                        ++i;
+                }
         }
         da_append(buf.data, buf.len, buf.cap, char, '\0');
 
