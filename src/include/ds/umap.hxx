@@ -47,89 +47,6 @@ struct Umap {
                 // delete[] _tbl.data;
         }
 
-        // Umap(const Umap& other) : _hash(other._hash), _compar(other._compar) {
-        //         _tbl.cap = other._tbl.cap;
-        //         _tbl.len = other._tbl.len;
-        //         _tbl.data = new Umap_Bucket<K, V>*[_tbl.cap]();
-        //         // Deep copy the buckets
-        //         for (size_t i = 0; i < _tbl.cap; ++i) {
-        //                 Umap_Bucket<K, V>* src = other._tbl.data[i];
-        //                 Umap_Bucket<K, V>** dst = &_tbl.data[i];
-        //                 while (src) {
-        //                         *dst = new Umap_Bucket<K, V>{src->k, src->v, nullptr};
-        //                         dst = &(*dst)->next;
-        //                         src = src->next;
-        //                 }
-        //         }
-        // }
-
-        // Umap(Umap&& other) noexcept : _hash(other._hash), _compar(std::move(other._compar)) {
-        //         _tbl.data = other._tbl.data;
-        //         _tbl.len = other._tbl.len;
-        //         _tbl.cap = other._tbl.cap;
-        //         other._tbl.data = nullptr;
-        //         other._tbl.len = 0;
-        //         other._tbl.cap = 0;
-        // }
-
-        // Umap<K, V> &operator=(Umap &&other) noexcept {
-        //         if (this != &other) {
-        //                 // Clean up existing data
-        //                 for (size_t i = 0; i < _tbl.cap; ++i) {
-        //                         Umap_Bucket<K, V>* current = _tbl.data[i];
-        //                         while (current) {
-        //                                 Umap_Bucket<K, V>* next = current->next;
-        //                                 delete current;
-        //                                 current = next;
-        //                         }
-        //                 }
-        //                 delete[] _tbl.data;
-
-        //                 // Move from other
-        //                 _hash = other._hash;
-        //                 _compar = std::move(other._compar);
-        //                 _tbl.data = other._tbl.data;
-        //                 _tbl.len = other._tbl.len;
-        //                 _tbl.cap = other._tbl.cap;
-        //                 other._tbl.data = nullptr;
-        //                 other._tbl.len = 0;
-        //                 other._tbl.cap = 0;
-        //         }
-        //         return *this;
-        // }
-
-        // Umap<K, V>& operator=(const Umap& other) {
-        //         if (this != &other) {
-        //                 // Clean up existing data
-        //                 for (size_t i = 0; i < _tbl.cap; ++i) {
-        //                         Umap_Bucket<K, V>* current = _tbl.data[i];
-        //                         while (current) {
-        //                                 Umap_Bucket<K, V>* next = current->next;
-        //                                 delete current;
-        //                                 current = next;
-        //                         }
-        //                 }
-        //                 delete[] _tbl.data;
-
-        //                 // Copy from other
-        //                 _hash = other._hash;
-        //                 _compar = other._compar;
-        //                 _tbl.len = other._tbl.len;
-        //                 _tbl.cap = other._tbl.cap;
-        //                 _tbl.data = new Umap_Bucket<K, V>*[_tbl.cap]();
-        //                 for (size_t i = 0; i < _tbl.cap; ++i) {
-        //                         Umap_Bucket<K, V>* src = other._tbl.data[i];
-        //                         Umap_Bucket<K, V>** dst = &_tbl.data[i];
-        //                         while (src) {
-        //                                 *dst = new Umap_Bucket<K, V>{src->k, src->v, nullptr};
-        //                                 dst = &(*dst)->next;
-        //                                 src = src->next;
-        //                         }
-        //                 }
-        //         }
-        //         return *this;
-        // }
-
         // TODO: check for duplicate
         void add(K k, V v) {
                 unsigned long idx = _hash(k) % _tbl.cap;
@@ -155,6 +72,10 @@ struct Umap {
 
         bool has(const K &k) {
                 return get(k) != NULL;
+        }
+
+        bool empty(void) const {
+                return _tbl.len == 0;
         }
 
 private:

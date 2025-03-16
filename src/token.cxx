@@ -49,6 +49,7 @@ const char *token_type_to_cstr(Token_Type ty) {
         case TOKEN_TYPE_AMPERSAND_EQUALS: return "TOKEN_TYPE_AMPERSAND_EQUALS";
         case TOKEN_TYPE_PIPE_EQUALS: return "TOKEN_TYPE_PIPE_EQUALS";
         case TOKEN_TYPE_CARET_EQUALS: return "TOKEN_TYPE_CARET_EQUALS";
+        case TOKEN_TYPE_PERIOD: return "TOKEN_TYPE_PERIOD";
         default: {
                 err_wargs("unknown token type: %d", (int)ty);
         } break;

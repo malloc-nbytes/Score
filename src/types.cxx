@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "types.hxx"
 #include "utils.hxx"
@@ -18,72 +19,76 @@ static const char *scr_base_type_to_cstr(Scr_Base_Type ty) {
         case SCR_BASE_TYPE_STR: return "str";
         case SCR_BASE_TYPE_VOID: return "void";
         case SCR_BASE_TYPE_PTR: return "ptr";
+        case SCR_BASE_TYPE_CUSTOM: return "custom";
         default: {
                 err_wargs("unkown type %d", (int)ty);
         } break;
         }
 }
 
-Scr_Type::Scr_Type(void) {
-        this->base = (Scr_Base_Type)0;
-        this->ptrn = nullptr;
-}
+// Scr_Type::Scr_Type(void) {
+//         this->base = (Scr_Base_Type)0;
+//         this->ptrn = nullptr;
+//         this->custom_name = nullptr;
+// }
 
-Scr_Type::Scr_Type(const Scr_Type &other) : base(other.base), ptrn(nullptr) {
-    if (other.ptrn) {
-        ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
-        *ptrn = *other.ptrn;
-        Scr_Type *current = ptrn;
-        Scr_Type *other_current = other.ptrn->ptrn;
+// Scr_Type::Scr_Type(const Scr_Type &other) : base(other.base), ptrn(nullptr) {
+//         if (other.ptrn) {
+//                 ptrn = new Scr_Type;
+//                 *ptrn = *other.ptrn;
+//                 Scr_Type *current = ptrn;
+//                 Scr_Type *other_current = other.ptrn->ptrn;
+//                 custom_name = strdup(other.custom_name);
 
-        while (other_current) {
-            current->ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
-            *current->ptrn = *other_current;
-            current = current->ptrn;
-            other_current = other_current->ptrn;
-        }
-    }
-}
+//                 while (other_current) {
+//                         current->ptrn = new Scr_Type;
+//                         *current->ptrn = *other_current;
+//                         current = current->ptrn;
+//                         other_current = other_current->ptrn;
+//                 }
+//         }
+// }
 
-Scr_Type &Scr_Type::operator=(const Scr_Type &other) {
-    if (this != &other) {
-        this->~Scr_Type();
+// Scr_Type &Scr_Type::operator=(const Scr_Type &other) {
+//         if (this != &other) {
+//                 this->~Scr_Type();
 
-        base = other.base;
-        ptrn = nullptr;
+//                 base = other.base;
+//                 ptrn = nullptr;
+//                 if (other.custom_name) {
+//                         custom_name = strdup(other.custom_name);
+//                 }
 
-        if (other.ptrn) {
-            ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
-            *ptrn = *other.ptrn;
-            Scr_Type *current = ptrn;
-            Scr_Type *other_current = other.ptrn->ptrn;
+//                 if (other.ptrn) {
+//                         ptrn = new Scr_Type;
+//                         *ptrn = *other.ptrn;
+//                         Scr_Type *current = ptrn;
+//                         Scr_Type *other_current = other.ptrn->ptrn;
 
-            while (other_current) {
-                current->ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
-                *current->ptrn = *other_current;
-                current = current->ptrn;
-                other_current = other_current->ptrn;
-            }
-        }
-    }
-    return *this;
-}
+//                         while (other_current) {
+//                                 current->ptrn = (Scr_Type *)malloc(sizeof(Scr_Type));
+//                                 *current->ptrn = *other_current;
+//                                 current = current->ptrn;
+//                                 other_current = other_current->ptrn;
+//                         }
+//                 }
+//         }
 
-Scr_Type::~Scr_Type(void) {
-        // auto it = this->ptrn;
-        // while (it) {
-        //         auto tmp = it->ptrn;
-        //         free(it);
-        //         it = tmp;
-        // }
-}
+//         return *this;
+// }
+
+// Scr_Type::~Scr_Type(void) {
+// }
 
 void scr_type_dump(Scr_Type *ty, bool newline) {
         if (ty->base == SCR_BASE_TYPE_PTR) {
                 printf("Ptr<");
                 scr_type_dump(ty->ptrn, newline);
                 printf(">");
-        } else {
+        } else if (ty->base == SCR_BASE_TYPE_CUSTOM) {
+                printf("Custom<%s>", ty->custom_name);
+        }
+        else {
                 printf("%s", scr_base_type_to_cstr(ty->base));
         }
         if (newline) putchar('\n');

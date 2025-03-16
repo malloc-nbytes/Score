@@ -67,7 +67,7 @@ static Scr_Base_Type get_base_type(const Token *tok) {
         if (!strcmp(tok->lx, PRIMITIVE_U64)) return SCR_BASE_TYPE_U64;
         if (!strcmp(tok->lx, PRIMITIVE_STR)) return SCR_BASE_TYPE_STR;
         if (!strcmp(tok->lx, PRIMITIVE_VOID)) return SCR_BASE_TYPE_VOID;
-        err_wargs("invalid type %s", tok->lx);
+        return SCR_BASE_TYPE_CUSTOM;
 }
 
 static void type_to_ptr(Scr_Type *ty) {
@@ -79,15 +79,20 @@ static void type_to_ptr(Scr_Type *ty) {
         ty->ptrn->ptrn = old_ptrn;
 }
 
-static Scr_Type parse_type(Lexer *lexer) {
-        Scr_Base_Type basety = get_base_type(expect(lexer, TOKEN_TYPE_TYPE));
-        Scr_Type type;
-        type.base = basety;
-        type.ptrn = nullptr;
+static Scr_Type *parse_type(Lexer *lexer) {
+        Token *name = lexer_next(lexer);
+        Scr_Base_Type basety = get_base_type(name);
+        Scr_Type *type = new Scr_Type;
+        type->base = basety;
+        type->ptrn = nullptr;
+
+        if (type->base == SCR_BASE_TYPE_CUSTOM) {
+                type->custom_name = strdup(name->lx);
+        }
 
         while (true) {
                 if (lexer_speek(lexer, 0)->ty == TOKEN_TYPE_ASTERISK) {
-                        type_to_ptr(&type);
+                        type_to_ptr(type);
                         lexer_discard(lexer); // *
                 } else if (lexer_speek(lexer, 0)->ty == TOKEN_TYPE_LEFT_SQUARE_BRACKET) {
                         assert(0 && "array type parsing unimplemented");
@@ -101,15 +106,25 @@ static Scr_Type parse_type(Lexer *lexer) {
 
 // Does not check for opening paren and does not consume
 // the closing paren. These jobs are for the caller.
-static Expr **parse_comma_sep_exprs(Lexer *lexer, size_t *len, size_t *cap, Token_Type closing_brace) {
+static Expr **parse_comma_sep_exprs(Lexer *lexer,
+                                    size_t *len,
+                                    size_t *cap,
+                                    Token **ids,
+                                    Token_Type closing_brace) {
         struct {
                 Expr **data;
                 size_t len, cap;
         } exprs = { nullptr, 0, 0 };
 
+        struct {
+                Token **data;
+                size_t len, cap;
+        } ids_ = { nullptr, 0, 0 };
+
         while (lexer_speek(lexer, 0)->ty != closing_brace) {
                 Expr *e = parse_expr(lexer);
                 da_append(exprs.data, exprs.len, exprs.cap, Expr *, e);
+
                 if (lexer_speek(lexer, 0)->ty == TOKEN_TYPE_COMMA) {
                         (void)lexer_discard(lexer); // ,
                 } else {
@@ -121,6 +136,39 @@ static Expr **parse_comma_sep_exprs(Lexer *lexer, size_t *len, size_t *cap, Toke
         *len = exprs.len;
         *cap = exprs.cap;
         return exprs.data;
+}
+
+static Expr_Struct_Inst *parse_struct_inst(Lexer *lexer) {
+        Token *struct_name = expect(lexer, TOKEN_TYPE_IDENTIFIER);
+        (void)expect(lexer, TOKEN_TYPE_LEFT_CURLY_BRACKET);
+
+        struct {
+                Token **data;
+                size_t len, cap;
+        } ids = {nullptr, 0, 0};
+
+        struct {
+                Expr **data;
+                size_t len, cap;
+        } exprs = {nullptr, 0, 0};
+
+        while (lexer_speek(lexer, 0)->ty != TOKEN_TYPE_RIGHT_CURLY_BRACKET) {
+                (void)expect(lexer, TOKEN_TYPE_PERIOD);
+                Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
+                (void)expect(lexer, TOKEN_TYPE_EQUALS);
+                Expr *e = parse_expr(lexer);
+                da_append(ids.data, ids.len, ids.cap, Token *, id);
+                da_append(exprs.data, exprs.len, exprs.cap, Expr *, e);
+
+                if (lexer_speek(lexer, 0)->ty == TOKEN_TYPE_COMMA) {
+                        (void)lexer_discard(lexer); // ,
+                } else {
+                        expect_wo_eat(lexer, TOKEN_TYPE_RIGHT_CURLY_BRACKET);
+                        break;
+                }
+        }
+
+        return expr_struct_inst(struct_name, ids.data, exprs.data, ids.len, ids.cap);
 }
 
 static Expr *parse_primary_expr(Lexer *lexer) {
@@ -138,13 +186,20 @@ static Expr *parse_primary_expr(Lexer *lexer) {
 
                 switch (cur->ty) {
                 case TOKEN_TYPE_IDENTIFIER: {
-                        left = (Expr *)expr_ident_alloc(lexer_next(lexer));
+                        if (lexer_speek(lexer, 1)->ty == TOKEN_TYPE_LEFT_CURLY_BRACKET) {
+                                left = (Expr *)parse_struct_inst(lexer);
+                                (void)expect(lexer, TOKEN_TYPE_RIGHT_CURLY_BRACKET);
+                        } else {
+                                left = (Expr *)expr_ident_alloc(lexer_next(lexer));
+                        }
                 } break;
                 case TOKEN_TYPE_LEFT_PARENTHESIS: {
                         lexer_discard(lexer); // (
                         if (left) {
                                 size_t len = 0, cap = 0;
-                                Expr **exprs = parse_comma_sep_exprs(lexer, &len, &cap, TOKEN_TYPE_RIGHT_PARENTHESIS);
+                                bool unused = false;
+                                Expr **exprs = parse_comma_sep_exprs(lexer, &len, &cap,
+                                                                     nullptr, TOKEN_TYPE_RIGHT_PARENTHESIS);
                                 left = (Expr *)expr_proc_call_alloc(left, exprs, len, cap);
                         } else {
                                 left = parse_expr(lexer);
@@ -156,6 +211,21 @@ static Expr *parse_primary_expr(Lexer *lexer) {
                 } break;
                 case TOKEN_TYPE_STRING_LITERAL: {
                         left = (Expr *)expr_str_lit_alloc(lexer_next(lexer));
+                } break;
+                case TOKEN_TYPE_LEFT_CURLY_BRACKET: {
+                        if (left) {
+                                return left;
+                        }
+                        lexer_discard(lexer); // {
+                        assert(0 && "bracket initializers are unimplemented");
+                } break;
+                case TOKEN_TYPE_PERIOD: {
+                        if (left == nullptr) {
+                                err("cannot use dot notation with no left expression");
+                        }
+                        lexer_discard(lexer); // .
+                        Expr *r = parse_expr(lexer);
+                        left = (Expr *)expr_get_alloc(left, r);
                 } break;
                 case TOKEN_TYPE_KEYWORD: {
                         if (!strcmp(cur->lx, KEYWORD_ELSE)) {
@@ -270,7 +340,7 @@ static Stmt_Let *parse_stmt_let(Lexer *lexer) {
         (void)expectkw(lexer, KEYWORD_LET);
         Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
         (void)expect(lexer, TOKEN_TYPE_COLON);
-        Scr_Type type = parse_type(lexer);
+        Scr_Type *type = parse_type(lexer);
         (void)expect(lexer, TOKEN_TYPE_EQUALS);
         Expr *e = parse_expr(lexer);
         (void)expect(lexer, TOKEN_TYPE_SEMICOLON);
@@ -281,7 +351,7 @@ static void parse_function_args(Lexer *lexer,
                                 Token ***ids,
                                 size_t *ids_len,
                                 size_t *ids_cap,
-                                Scr_Type **types,
+                                Scr_Type ***types,
                                 size_t *types_len,
                                 size_t *types_cap,
                                 bool *variadic) {
@@ -310,9 +380,9 @@ static void parse_function_args(Lexer *lexer,
                 da_append(*ids, *ids_len, *ids_cap, Token *, id);
 
                 (void)expect(lexer, TOKEN_TYPE_COLON);
-                Scr_Type ty = parse_type(lexer);
+                Scr_Type *ty = parse_type(lexer);
 
-                da_append(*types, *types_len, *types_cap, Scr_Type, ty);
+                da_append(*types, *types_len, *types_cap, Scr_Type *, ty);
 
                 if (lexer_speek(lexer, 0)->ty != TOKEN_TYPE_COMMA) {
                         (void)expect(lexer, TOKEN_TYPE_RIGHT_PARENTHESIS);
@@ -351,7 +421,7 @@ static Stmt_Proc *parse_stmt_proc(Lexer *lexer, bool is_proto) {
         } ids = { nullptr, 0, 0 };
 
         struct {
-                Scr_Type *data;
+                Scr_Type **data;
                 size_t len, cap;
         } types = { nullptr, 0, 0 };
 
@@ -360,7 +430,7 @@ static Stmt_Proc *parse_stmt_proc(Lexer *lexer, bool is_proto) {
                             &types.data, &types.len, &types.cap, &variadic);
 
         (void)expect(lexer, TOKEN_TYPE_COLON);
-        Scr_Type rtype = parse_type(lexer);
+        Scr_Type *rtype = parse_type(lexer);
         Stmt_Block *block = nullptr;
         if (!is_proto) {
                 block = parse_stmt_block(lexer);
@@ -409,6 +479,72 @@ static Stmt_If *parse_stmt_if(Lexer *lexer) {
         return stmt_if_alloc(e, then, else_);
 }
 
+static Stmt_While *parse_stmt_while(Lexer *lexer) {
+        (void)expectkw(lexer, KEYWORD_WHILE);
+        Expr *e = parse_expr(lexer);
+        Stmt *s = parse_stmt(lexer);
+        return stmt_while_alloc(e, s);
+}
+
+static Stmt_For *parse_stmt_for(Lexer *lexer) {
+        expectkw(lexer, KEYWORD_FOR);
+        Stmt *init = parse_stmt(lexer);
+        Expr *cond = parse_expr(lexer);
+        (void)expect(lexer, TOKEN_TYPE_SEMICOLON);
+        Expr *end = parse_expr(lexer);
+        Stmt *body = parse_stmt(lexer);
+        return stmt_for_alloc(init, cond, end, body);
+}
+
+static void parse_struct_fields(Lexer *lexer,
+                                Token ***ids,
+                                size_t *ids_len,
+                                size_t *ids_cap,
+                                Scr_Type ***types,
+                                size_t *types_len,
+                                size_t *types_cap) {
+        while (lexer_speek(lexer, 0)->ty != TOKEN_TYPE_RIGHT_CURLY_BRACKET) {
+                Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
+                da_append(*ids, *ids_len, *ids_cap, Token *, id);
+
+                (void)expect(lexer, TOKEN_TYPE_COLON);
+                Scr_Type *ty = parse_type(lexer);
+
+                da_append(*types, *types_len, *types_cap, Scr_Type *, ty);
+
+                if (lexer_speek(lexer, 0)->ty != TOKEN_TYPE_COMMA) {
+                        (void)expect(lexer, TOKEN_TYPE_RIGHT_CURLY_BRACKET);
+                        break;
+                } else {
+                        (void)expect(lexer, TOKEN_TYPE_COMMA);
+                }
+        }
+}
+
+static Stmt_Struct *parse_stmt_struct(Lexer *lexer) {
+        (void)expectkw(lexer, KEYWORD_STRUCT);
+        Token *id = expect(lexer, TOKEN_TYPE_IDENTIFIER);
+
+        (void)expect(lexer, TOKEN_TYPE_LEFT_CURLY_BRACKET);
+
+        struct {
+                Token **data;
+                size_t len, cap;
+        } ids = { nullptr, 0, 0 };
+
+        struct {
+                Scr_Type **data;
+                size_t len, cap;
+        } types = { nullptr, 0, 0 };
+
+        parse_struct_fields(lexer, &ids.data, &ids.len, &ids.cap,
+                            &types.data, &types.len, &types.cap);
+
+        (void)expect(lexer, TOKEN_TYPE_RIGHT_CURLY_BRACKET);
+
+        return stmt_struct_alloc(id, ids.data, types.data, ids.len, ids.cap);
+}
+
 static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
         Token *hd = lexer_peek(lexer);
         if (!strcmp(hd->lx, KEYWORD_LET)) {
@@ -421,6 +557,12 @@ static Stmt *parse_stmt_from_keyword(Lexer *lexer) {
                 return (Stmt *)parse_stmt_def(lexer);
         } else if (!strcmp(hd->lx, KEYWORD_IF)) {
                 return (Stmt *)parse_stmt_if(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_WHILE)) {
+                return (Stmt *)parse_stmt_while(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_FOR)) {
+                return (Stmt *)parse_stmt_for(lexer);
+        } else if (!strcmp(hd->lx, KEYWORD_STRUCT)) {
+                return (Stmt *)parse_stmt_struct(lexer);
         } else {
                 err_wargs("unhandled keyword for statement %s", hd->lx);
         }
@@ -442,6 +584,10 @@ static Stmt *parse_stmt(Lexer *lexer) {
         } break;
         case TOKEN_TYPE_LEFT_CURLY_BRACKET: {
                 return (Stmt *)parse_stmt_block(lexer);
+        } break;
+        case TOKEN_TYPE_SEMICOLON: {
+                lexer_discard(lexer); // ;
+                return (Stmt *)stmt_empty_alloc();
         } break;
         default: {
                 return (Stmt *)parse_stmt_expr(lexer);

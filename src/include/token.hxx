@@ -43,6 +43,7 @@ typedef enum {
         TOKEN_TYPE_AMPERSAND_EQUALS,
         TOKEN_TYPE_PIPE_EQUALS,
         TOKEN_TYPE_CARET_EQUALS,
+        TOKEN_TYPE_PERIOD,
 
         TOKEN_TYPE_UNKNOWN,
 } Token_Type;

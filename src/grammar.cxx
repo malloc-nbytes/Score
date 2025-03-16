@@ -12,12 +12,55 @@
 // Statements /////
 ///////////////////
 
+Stmt_Struct *stmt_struct_alloc(Token *id,
+                               Token **ids,
+                               Scr_Type **types,
+                               size_t len,
+                               size_t cap) {
+        Stmt_Struct *s = new Stmt_Struct;
+        s->base.ty = STMT_TYPE_STRUCT;
+        s->id = id;
+        s->fields.ids = ids;
+        s->fields.types = types;
+        s->fields.len = len;
+        s->fields.cap = cap;
+        return s;
+}
+
+Stmt_For *stmt_for_alloc(Stmt *init, Expr *cond, Expr *end, Stmt *body) {
+        Stmt_For *s = new Stmt_For;
+        s->base.ty = STMT_TYPE_FOR;
+        s->init = init;
+        s->cond = cond;
+        s->end = end;
+        s->body = body;
+        return s;
+}
+
+Stmt_While *stmt_while_alloc(Expr *e, Stmt *s) {
+        Stmt_While *w = new Stmt_While;
+        w->base.ty = STMT_TYPE_WHILE;
+        w->e = e;
+        w->s = s;
+        return w;
+}
+
+Stmt_Empty *stmt_empty_alloc(void) {
+        Stmt_Empty *s = new Stmt_Empty;
+        s->base.ty = STMT_TYPE_EMPTY;
+        return s;
+}
+
 Stmt_If *stmt_if_alloc(Expr *e, Stmt *then, Stmt *else_) {
         Stmt_If *s = new Stmt_If;
         s->base.ty = STMT_TYPE_IF;
         s->e = e;
         s->then = then;
-        s->else_ = else_;
+        if (else_) {
+                s->else_ = else_;
+        } else {
+                s->else_ = (Stmt *)stmt_empty_alloc();
+        }
         return s;
 }
 
@@ -53,10 +96,10 @@ Stmt_Block *stmt_block_alloc(Stmt **stmts, size_t len, size_t cap) {
 
 Stmt_Proc *stmt_proc_alloc(Token *id,
                            Token **ids,
-                           Scr_Type *id_types,
+                           Scr_Type **id_types,
                            size_t len,
                            size_t cap,
-                           Scr_Type rtype,
+                           Scr_Type *rtype,
                            Stmt_Block *block,
                            bool variadic) {
         Stmt_Proc *p = new Stmt_Proc;
@@ -72,7 +115,7 @@ Stmt_Proc *stmt_proc_alloc(Token *id,
         return p;
 }
 
-Stmt_Let *stmt_let_alloc(Token *id, Scr_Type type, Expr *e) {
+Stmt_Let *stmt_let_alloc(Token *id, Scr_Type *type, Expr *e) {
         Stmt_Let *s = new Stmt_Let;
         s->base.ty = STMT_TYPE_LET;
         s->id = id;
@@ -84,6 +127,25 @@ Stmt_Let *stmt_let_alloc(Token *id, Scr_Type type, Expr *e) {
 ///////////////////
 // Expressions ////
 ///////////////////
+
+Expr_Get *expr_get_alloc(Expr *l, Expr *r) {
+        Expr_Get *e = new Expr_Get;
+        e->base.ty = EXPR_TYPE_GET;
+        e->l = l;
+        e->r = r;
+        return e;
+}
+
+Expr_Struct_Inst *expr_struct_inst(Token *struct_name, Token **ids, Expr **exprs, size_t len, size_t cap) {
+        Expr_Struct_Inst *e = new Expr_Struct_Inst;
+        e->base.ty = EXPR_TYPE_STRUCT_INST;
+        e->struct_name = struct_name;
+        e->ids = ids;
+        e->exprs = exprs;
+        e->len = len;
+        e->cap = cap;
+        return e;
+}
 
 Expr_Mut *expr_mut_alloc(Expr *l, Token *op, Expr *r) {
         Expr_Mut *e = new Expr_Mut;
@@ -218,7 +280,7 @@ static void dump_expr(Expr *e) {
 static void dump_stmt_let(Stmt_Let *s, int pad) {
         (void)pad;
         printf("LET %s: ", s->id->lx);
-        scr_type_dump(&s->type, false);
+        scr_type_dump(s->type, false);
         printf(" = ");
         dump_expr(s->e);
 }
@@ -239,13 +301,13 @@ static void dump_stmt_proc(Stmt_Proc *s, int pad) {
                         printf(", ");
                 }
                 printf("%s: ", s->args.ids[i]->lx);
-                scr_type_dump(&s->args.types[i], false);
+                scr_type_dump(s->args.types[i], false);
         }
         if (s->variadic) {
                 printf(", ...");
         }
         printf("): ");
-        scr_type_dump(&s->rtype, false);
+        scr_type_dump(s->rtype, false);
         putchar(' ');
         if (s->block) {
                 dump_stmt_block(s->block, pad);

@@ -8,7 +8,7 @@ typedef struct {
         Token *tl;
 } Lexer;
 
-#define lexer_speek(l, i) lexer_peek((l), 0) && lexer_peek((l), 0)
+#define lexer_speek(l, i) lexer_peek((l), i) && lexer_peek((l), i)
 
 Lexer lexer_init(const char *fp, char *src);
 void lexer_append(Lexer *lexer, Token *tok);

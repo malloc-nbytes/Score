@@ -7,6 +7,9 @@
 #define KEYWORD_PROC "proc"
 #define KEYWORD_RETURN "return"
 #define KEYWORD_DEF "def"
+#define KEYWORD_WHILE "while"
+#define KEYWORD_FOR "for"
+#define KEYWORD_STRUCT "struct"
 
 #define KEYWORD_AS_CPL {                        \
                 KEYWORD_LET,                    \
@@ -15,6 +18,9 @@
                 KEYWORD_PROC,                   \
                 KEYWORD_RETURN,                 \
                 KEYWORD_DEF,                    \
+                KEYWORD_WHILE,                  \
+                KEYWORD_FOR,                    \
+                KEYWORD_STRUCT,                 \
 }
 
 #define PRIMITIVE_I8 "i8"

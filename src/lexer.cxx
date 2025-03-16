@@ -32,6 +32,14 @@ static void init_operators(void) {
         operators.add("-", TOKEN_TYPE_MINUS);
         operators.add("/", TOKEN_TYPE_FORWARD_SLASH);
         operators.add(",", TOKEN_TYPE_COMMA);
+        operators.add(">", TOKEN_TYPE_GREATERTHAN);
+        operators.add("<", TOKEN_TYPE_LESSTHAN);
+        operators.add("%", TOKEN_TYPE_PERCENT);
+        operators.add("%=", TOKEN_TYPE_PERCENT_EQUALS);
+        operators.add(">=", TOKEN_TYPE_GREATERTHAN_EQUALS);
+        operators.add("<=", TOKEN_TYPE_LESSTHAN_EQUALS);
+        operators.add("&&", TOKEN_TYPE_DOUBLE_AMPERSAND);
+        operators.add("||", TOKEN_TYPE_DOUBLE_PIPE);
         operators.add("...", TOKEN_TYPE_TRIPLE_PERIOD);
         operators.add("==", TOKEN_TYPE_DOUBLE_EQUALS);
         operators.add("+=", TOKEN_TYPE_PLUS_EQUALS);
@@ -41,6 +49,7 @@ static void init_operators(void) {
         operators.add("&=", TOKEN_TYPE_AMPERSAND_EQUALS);
         operators.add("|=", TOKEN_TYPE_PIPE_EQUALS);
         operators.add("^=", TOKEN_TYPE_CARET_EQUALS);
+        operators.add(".", TOKEN_TYPE_PERIOD);
 }
 
 static Token_Type determine_operator_type(const char *s, size_t end, size_t *len) {

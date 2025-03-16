@@ -14,7 +14,7 @@ int main(void) {
         Lexer lexer = lexer_init(fp, src);
         //lexer_dbg_dump(&lexer);
         Program program = parse(&lexer);
-        program_dump(&program);
+        //program_dump(&program);
         codegen(&program);
 
         return 0;
