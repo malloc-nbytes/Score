@@ -1,0 +1,11 @@
+def printf(format: u8*, ...): i32;
+
+proc main(void): i32 {
+    let x: i32 = 1;
+    let y: i32 = 2;
+    let z: i32 = x + y;
+
+    printf("ok\n");
+
+    return 0;
+}

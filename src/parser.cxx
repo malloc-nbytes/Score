@@ -171,6 +171,11 @@ static Expr_Struct_Inst *parse_struct_inst(Lexer *lexer) {
         return expr_struct_inst(struct_name, ids.data, exprs.data, ids.len, ids.cap);
 }
 
+static Expr_Ident *parse_immediate_identifier(Lexer *lexer) {
+        Token *t = expect(lexer, TOKEN_TYPE_IDENTIFIER);
+        return expr_ident_alloc(t);
+}
+
 static Expr *parse_primary_expr(Lexer *lexer) {
         Expr *left = nullptr;
 
@@ -224,7 +229,7 @@ static Expr *parse_primary_expr(Lexer *lexer) {
                                 err("cannot use dot notation with no left expression");
                         }
                         lexer_discard(lexer); // .
-                        Expr *r = parse_expr(lexer);
+                        Expr *r = (Expr *)parse_immediate_identifier(lexer);
                         left = (Expr *)expr_get_alloc(left, r);
                 } break;
                 case TOKEN_TYPE_KEYWORD: {

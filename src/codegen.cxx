@@ -315,24 +315,125 @@ static llvm::Value *compile_expr_str_lit(Expr_Str_Lit *e, Context *ctx) {
 
 static llvm::Value *compile_expr_mut(Expr_Mut *e, Context *ctx) {
         llvm::Value *left = nullptr;
+        llvm::Type *val_type = nullptr; // Type of the value to load/store
+
         if (e->l->ty == EXPR_TYPE_IDENT) {
                 left = compile_expr_ident((Expr_Ident *)e->l, ctx);
+                if (!left) {
+                        err("failed to compile left operand (identifier) of assignment");
+                        return nullptr;
+                }
+                // Get the type from the variable scope
+                char *id = ((Expr_Ident *)e->l)->id->lx;
+                for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
+                        if (ctx->vs[i]->has(id)) {
+                                Var *var = *(ctx->vs[i]->get(id));
+                                val_type = scr_type_to_llvm_type(var->ty, ctx);
+                                break;
+                        }
+                }
+                if (!val_type) {
+                        err_wargs("could not determine type of identifier '%s'", id);
+                        return nullptr;
+                }
+        } else if (e->l->ty == EXPR_TYPE_GET) {
+                Expr_Get *get_expr = (Expr_Get *)e->l;
+                llvm::Value *base_ptr = compile_expr(get_expr->l, ctx);
+                if (!base_ptr || !base_ptr->getType()->isPointerTy()) {
+                        err("base of field access must be a pointer");
+                        return nullptr;
+                }
+                if (get_expr->l->ty != EXPR_TYPE_IDENT) {
+                        err("base of field access must be an identifier for now");
+                        return nullptr;
+                }
+                Expr_Ident *base_ident = (Expr_Ident *)get_expr->l;
+                char *base_id = base_ident->id->lx;
+
+                Var *var = nullptr;
+                for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
+                        if (ctx->vs[i]->has(base_id)) {
+                                var = *(ctx->vs[i]->get(base_id));
+                                break;
+                        }
+                }
+                if (!var) {
+                        err_wargs("variable '%s' not found in scope", base_id);
+                        return nullptr;
+                }
+
+                llvm::Type *base_type = scr_type_to_llvm_type(var->ty, ctx);
+                if (!base_type->isStructTy()) {
+                        err_wargs("variable '%s' must be a struct for field access", base_id);
+                        return nullptr;
+                }
+                llvm::StructType *struct_type = llvm::cast<llvm::StructType>(base_type);
+
+                if (get_expr->r->ty != EXPR_TYPE_IDENT) {
+                        err("field must be an identifier");
+                        return nullptr;
+                }
+                Expr_Ident *field_ident = (Expr_Ident *)get_expr->r;
+                char *field_name = field_ident->id->lx;
+
+                Stmt_Struct *struct_def = nullptr;
+                const std::string struct_name = struct_type->getName().str();
+                for (int i = (int)ctx->ss.length() - 1; i >= 0; --i) {
+                        if (ctx->ss[i].has((char *)struct_name.c_str())) {
+                                struct_def = *ctx->ss[i].get((char *)struct_name.c_str());
+                                break;
+                        }
+                }
+                if (!struct_def) {
+                        err_wargs("struct type '%s' not found", struct_name.c_str());
+                        return nullptr;
+                }
+
+                unsigned field_index = UINT_MAX;
+                for (size_t i = 0; i < struct_def->fields.len; ++i) {
+                        if (!strcmp(struct_def->fields.ids[i]->lx, field_name)) {
+                                field_index = i;
+                                break;
+                        }
+                }
+                if (field_index == UINT_MAX) {
+                        err_wargs("field '%s' not found in struct '%s'", field_name, struct_name.c_str());
+                        return nullptr;
+                }
+
+                std::vector<llvm::Value *> indices;
+                indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), 0));
+                indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), field_index));
+                left = ctx->bl->CreateGEP(struct_type, base_ptr, indices, "fieldptr");
+
+                // Get the field type from the struct definition
+                val_type = scr_type_to_llvm_type(struct_def->fields.types[field_index], ctx);
         } else {
-                // For now, only support identifiers as lvalues; TODO: extend later
                 left = compile_expr(e->l, ctx);
+                if (!left) {
+                        err("failed to compile left operand of assignment");
+                        return nullptr;
+                }
+                // Fallback: assume left’s type provides the value type (may fail for unsupported cases)
+                if (left->getType()->isPointerTy()) {
+                        err("type inference for non-identifier, non-get lvalue not supported yet");
+                        return nullptr;
+                }
         }
+
         if (!left) {
                 err("failed to compile left operand of assignment");
                 return nullptr;
         }
-
-        // Ensure left is a pointer (lvalue) that we can store to
         if (!left->getType()->isPointerTy()) {
                 err("left operand of assignment must be an lvalue");
                 return nullptr;
         }
+        if (!val_type) {
+                err("could not determine value type for assignment");
+                return nullptr;
+        }
 
-        // Compile the right-hand side (the value to assign)
         llvm::Value *right = compile_expr(e->r, ctx);
         if (!right) {
                 err("failed to compile right operand of assignment");
@@ -340,29 +441,11 @@ static llvm::Value *compile_expr_mut(Expr_Mut *e, Context *ctx) {
         }
 
         const char *op = e->op->lx;
-
         if (!strcmp(op, "=")) {
                 ctx->bl->CreateStore(right, left);
                 return right;
         } else {
-                // For compound assignments, we need to load the current value
-                llvm::Type *val_type = nullptr;
-                if (e->l->ty == EXPR_TYPE_IDENT) {
-                        char *id = ((Expr_Ident *)e->l)->id->lx;
-                        for (int i = (int)ctx->vs.length() - 1; i >= 0; --i) {
-                                if (ctx->vs[i]->has(id)) {
-                                        Var *var = *(ctx->vs[i]->get(id));
-                                        val_type = scr_type_to_llvm_type(var->ty, ctx);
-                                        break;
-                                }
-                        }
-                        if (!val_type) {
-                                err_wargs("could not determine type of identifier '%s' for compound assignment", id);
-                        }
-                } else {
-                        err("compound assignment only supported for identifiers with known types");
-                }
-
+                // Compound assignments
                 llvm::Value *current = ctx->bl->CreateLoad(val_type, left, "loadtmp");
 
                 llvm::Value *result = nullptr;
@@ -600,23 +683,15 @@ static llvm::Value *compile_expr_expr_struct_inst(Expr_Struct_Inst *s, Context *
 }
 
 static llvm::Value *compile_expr_get(Expr_Get *e, Context *ctx) {
-        // Step 1: Compile the left-hand side to get the base pointer
-        llvm::Value *base_ptr = compile_expr(e->l, ctx);
-        if (!base_ptr) {
+        llvm::Value *base = compile_expr(e->l, ctx); // p
+        if (!base) {
                 err("compile_expr_get: failed to compile base expression");
                 return nullptr;
         }
 
-        // Ensure the base is a pointer type
-        llvm::Type *ptr_type = base_ptr->getType();
-        if (!ptr_type->isPointerTy()) {
-                err("compile_expr_get: base expression must be a pointer to a struct");
-                return nullptr;
-        }
-
-        // Step 2: Determine the struct type from the variable's scope (since pointers are opaque)
+        // Ensure base is an identifier (for now)
         if (e->l->ty != EXPR_TYPE_IDENT) {
-                err("compile_expr_get: left-hand side must be an identifier for now (opaque pointers)");
+                err("compile_expr_get: left-hand side must be an identifier for now");
                 return nullptr;
         }
         Expr_Ident *base_ident = (Expr_Ident *)e->l;
@@ -635,7 +710,6 @@ static llvm::Value *compile_expr_get(Expr_Get *e, Context *ctx) {
                 return nullptr;
         }
 
-        // Convert the variable's Scr_Type to LLVM type
         llvm::Type *base_type = scr_type_to_llvm_type(var->ty, ctx);
         if (!base_type->isStructTy()) {
                 err_wargs("compile_expr_get: variable '%s' must be a struct", base_id);
@@ -643,7 +717,7 @@ static llvm::Value *compile_expr_get(Expr_Get *e, Context *ctx) {
         }
         llvm::StructType *struct_type = llvm::cast<llvm::StructType>(base_type);
 
-        // Step 3: Get the field name from the right-hand side
+        // Get the field name
         if (e->r->ty != EXPR_TYPE_IDENT) {
                 err("compile_expr_get: right-hand side must be an identifier");
                 return nullptr;
@@ -651,17 +725,15 @@ static llvm::Value *compile_expr_get(Expr_Get *e, Context *ctx) {
         Expr_Ident *field_ident = (Expr_Ident *)e->r;
         char *field_name = field_ident->id->lx;
 
-        // Step 4: Find the field index in the struct
+        // Find the field index
         Stmt_Struct *struct_def = nullptr;
         const std::string struct_name = struct_type->getName().str();
-
         for (int i = (int)ctx->ss.length() - 1; i >= 0; --i) {
                 if (ctx->ss[i].has((char *)struct_name.c_str())) {
                         struct_def = *ctx->ss[i].get((char *)struct_name.c_str());
                         break;
                 }
         }
-
         if (!struct_def) {
                 err_wargs("compile_expr_get: struct type '%s' not found in context", struct_name.c_str());
                 return nullptr;
@@ -674,25 +746,29 @@ static llvm::Value *compile_expr_get(Expr_Get *e, Context *ctx) {
                         break;
                 }
         }
-
         if (field_index == UINT_MAX) {
                 err_wargs("compile_expr_get: field '%s' not found in struct '%s'", field_name, struct_name.c_str());
                 return nullptr;
         }
 
-        // Step 5: Create GEP to access the field
-        std::vector<llvm::Value *> indices;
-        indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), 0)); // Access the struct itself
-        indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), field_index)); // Field offset
-
-        llvm::Value *field_ptr = ctx->bl->CreateGEP(struct_type, base_ptr, indices, "fieldptr");
-
-        // Step 6: Load the field value (since this is an rvalue context, e.g., passing to printf)
-        llvm::Type *field_type = scr_type_to_llvm_type(struct_def->fields.types[field_index], ctx);
-        return ctx->bl->CreateLoad(field_type, field_ptr, field_name);
+        // Handle pointer (local var) or value (parameter)
+        if (base->getType()->isPointerTy()) {
+                // Local variable: use GEP and load
+                std::vector<llvm::Value *> indices;
+                indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), 0));
+                indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx->llctx), field_index));
+                llvm::Value *field_ptr = ctx->bl->CreateGEP(struct_type, base, indices, "fieldptr");
+                llvm::Type *field_type = scr_type_to_llvm_type(struct_def->fields.types[field_index], ctx);
+                return ctx->bl->CreateLoad(field_type, field_ptr, field_name);
+        } else if (base->getType()->isStructTy()) {
+                // Parameter: extract value directly
+                return ctx->bl->CreateExtractValue(base, field_index, field_name);
+        } else {
+                err("compile_expr_get: base must be a pointer to struct or struct value");
+                return nullptr;
+        }
 }
 
-// 2
 static llvm::Value *compile_expr(Expr *e, Context *ctx) {
         switch (e->ty) {
         case EXPR_TYPE_UNARY: {
@@ -742,7 +818,6 @@ static llvm::Value *compile_stmt_block(Stmt_Block *s, Context *ctx) {
 
 static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
         llvm::Function *existing_function = ctx->md->getFunction(s->id->lx);
-
         if (!existing_function) {
                 existing_function = gen_proc_proto(s, ctx);
         }
@@ -758,39 +833,33 @@ static llvm::Function *compile_stmt_proc(Stmt_Proc *s, Context *ctx) {
 
         push_scope(ctx);
 
-        // Add function arguments to scope
+        // Allocate and store function arguments
         for (auto &arg : existing_function->args()) {
-                Var *v = new Var{ s->args.ids[arg.getArgNo()], s->args.types[arg.getArgNo()], &arg };
+                size_t arg_no = arg.getArgNo();
+                llvm::Type *arg_type = scr_type_to_llvm_type(s->args.types[arg_no], ctx);
+                llvm::AllocaInst *arg_alloca = ctx->bl->CreateAlloca(arg_type, nullptr, s->args.ids[arg_no]->lx);
+                ctx->bl->CreateStore(&arg, arg_alloca);
+                Var *v = new Var{ s->args.ids[arg_no], s->args.types[arg_no], arg_alloca };
                 add_var_to_scope(v, ctx);
         }
 
-        // Compile the function body
         compile_stmt_block(s->block, ctx);
 
-        // Check if the current block has a terminator and add implicit return if needed
         if (!ctx->bl->GetInsertBlock()->getTerminator()) {
                 llvm::Type *return_type = existing_function->getReturnType();
                 if (return_type->isVoidTy()) {
-                        // For void functions, add ret void
                         ctx->bl->CreateRetVoid();
+                } else if (return_type->isIntegerTy(32)) {
+                        ctx->bl->CreateRet(llvm::ConstantInt::get(return_type, 0));
                 } else {
-                        // For non-void functions, we need a default return value
-                        if (return_type->isIntegerTy(32)) {
-                                llvm::Value *default_ret = llvm::ConstantInt::get(return_type, 0);
-                                ctx->bl->CreateRet(default_ret);
-                        } else {
-                                // Handle other return types or error out
-                                printf("function %s with non-void return type lacks a return statement and no default value defined", s->id->lx);
-                                // For now, we'll insert an unreachable instruction to avoid LLVM errors
-                                ctx->bl->CreateUnreachable();
-                        }
+                        printf("function %s with non-void return type lacks a return statement", s->id->lx);
+                        ctx->bl->CreateUnreachable();
                 }
         }
 
         pop_scope(ctx);
 
         llvm::verifyFunction(*existing_function);
-
         return existing_function;
 }
 
@@ -1079,6 +1148,8 @@ static llvm::Value *compile_stmt(Stmt *s, Context *ctx) {
 }
 
 void codegen(Program *p) {
+        assert(0 && "unimplemented");
+
         Context *ctx = new Context;
         ctx->llctx = new llvm::LLVMContext();
         ctx->md = new llvm::Module("main", *ctx->llctx);

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "lexer.hxx"
 #include "token.hxx"
@@ -7,8 +8,14 @@
 #include "grammar.hxx"
 #include "utils.hxx"
 
-int main(void) {
-        const char *fp = "../src/input.scr";
+int main(int argc, char **argv) {
+        if (argc < 2) {
+                printf("Usage: scr <filepath>\n");
+                exit(1);
+        }
+        --argc, ++argv;
+
+        const char *fp = *argv;
         char *src = file_to_cstr(fp);
 
         Lexer lexer = lexer_init(fp, src);
