@@ -1,0 +1,201 @@
+module grammar;
+
+import token;
+import runtimeTypes;
+
+enum ExprType {
+        Bin,
+        Un,
+        StrLit,
+        IntLit,
+        Ident,
+        Mut,
+        ProcCall,
+}
+
+//////////////////
+// Expressions
+//////////////////
+
+class Expr {
+        ExprType ty;
+        this(ExprType ty) {
+                this.ty = ty;
+        }
+}
+
+class ExprBin : Expr {
+        Expr l, r;
+        Token* op;
+        this(Expr l, Token* op, Expr r) {
+                super(ExprType.Bin);
+                this.l = l;
+                this.r = r;
+        }
+}
+
+class ExprUn : Expr {
+        Token* op;
+        Expr e;
+        this(Token* op, Expr e) {
+                super(ExprType.Un);
+                this.op = op;
+                this.e = e;
+        }
+}
+
+class ExprStrLit : Expr {
+        Token* s;
+        this(Token* s) {
+                super(ExprType.StrLit);
+                this.s = s;
+        }
+}
+
+class ExprIntLit : Expr {
+        Token* i;
+        this(Token* i) {
+                super(ExprType.IntLit);
+                this.i = i;
+        }
+}
+
+class ExprIdent : Expr {
+        Token* id;
+        this(Token* id) {
+                super(ExprType.Ident);
+                this.id = id;
+        }
+}
+
+class ExprMut : Expr {
+        Expr l;
+        Token* eqty;
+        Expr r;
+        this(Expr l, Token* eqty, Expr r) {
+                super(ExprType.Mut);
+                this.l = l;
+                this.eqty = eqty;
+                this.r = r;
+        }
+}
+
+class ExprProcCall : Expr {
+        Expr l;
+        Expr[] exprs;
+        this(Expr l, Expr[] exprs) {
+                super(ExprType.ProcCall);
+                this.l = l;
+                this.exprs = exprs;
+        }
+}
+
+//////////////////
+// Statements
+//////////////////
+
+enum StmtType {
+        Let,
+        Expr,
+        Proc,
+        Block,
+        Return,
+        Extern,
+        If,
+        While,
+}
+
+class Stmt {
+        StmtType ty;
+        this(StmtType ty) {
+                this.ty = ty;
+        }
+}
+
+class StmtLet : Stmt {
+        Token* id;
+        RuntimeType* t;
+        Expr e;
+        this(Token* id, RuntimeType* t, Expr e) {
+                super(StmtType.Let);
+                this.id = id;
+                this.t = t;
+                this.e = e;
+        }
+}
+
+class StmtExpr : Stmt {
+        Expr e;
+        this(Expr e) {
+                super(StmtType.Expr);
+                this.e = e;
+        }
+}
+
+class StmtBlock : Stmt {
+        Stmt[] stmts;
+        this(Stmt[] stmts) {
+                super(StmtType.Block);
+                this.stmts = stmts;
+        }
+}
+
+class StmtProc : Stmt {
+        Token* id;
+        Token*[] pn;
+        RuntimeType*[] pt;
+        bool variadic = false;
+        StmtBlock b;
+
+        this(Token* id, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b) {
+                super(StmtType.Proc);
+                this.id = id;
+                this.pn = pn;
+                this.pt = pt;
+                this.variadic = variadic;
+                this.b = b;
+        }
+}
+
+class StmtReturn : Stmt {
+        Expr e;
+        this(Expr e) {
+                super(StmtType.Return);
+                this.e = e;
+        }
+}
+
+class StmtExtern : Stmt {
+        StmtProc proto;
+        this(StmtProc proto) {
+                super(StmtType.Extern);
+                this.proto = proto;
+        }
+}
+
+class StmtIf : Stmt {
+        Expr e;
+        Stmt then;
+        Stmt else_; // optional
+
+        this(Expr e, Stmt then, Stmt else_) {
+                super(StmtType.If);
+                this.e = e;
+                this.then = then;
+                this.else_ = else_;
+        }
+}
+
+class StmtWhile : Stmt {
+        Expr e;
+        Stmt s;
+        this(Expr e, Stmt s) {
+                super(StmtType.While);
+                this.e = e;
+                this.s = s;
+        }
+}
+
+struct Program {
+        Stmt[] stmts;
+}

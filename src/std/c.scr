@@ -1,7 +1,0 @@
-struct ForiegnLibraryPoint {
-    x: i32,
-    y: i32,
-    z: i32,
-}
-
-def printf(format: u8*, ...): i32;
