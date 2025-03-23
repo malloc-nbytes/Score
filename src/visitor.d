@@ -169,27 +169,29 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
  */
 
 void visitStmtLet(Visitor* v, StmtLet s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
 void visitStmtExpr(Visitor* v, StmtExpr s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
-        assert(0);
+        visitStmtBlock(v, s.b);
 }
 
 void visitStmtBlock(Visitor* v, StmtBlock s) {
-        assert(0);
+        for (size_t i = 0; i < s.stmts.length; ++i) {
+                s.stmts[i].accept(s.stmts[i], v);
+        }
 }
 
 void visitStmtReturn(Visitor* v, StmtReturn s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
 void visitStmtExtern(Visitor* v, StmtExtern s) {
-        assert(0);
+        visitStmtProc(v, s.proto);
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {

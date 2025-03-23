@@ -10,7 +10,7 @@ import keywords;
 import utils;
 
 struct Lexer {
-        Token *hd, tl;
+        Token* hd, tl;
 }
 
 private TokenType[string] gOps;
@@ -58,7 +58,7 @@ private void initOps() {
         gOps["..."] = TokenType.TriplePeriod;
 }
 
-void lexerAppend(Lexer *l, Token *t) {
+void lexerAppend(Lexer* l, Token* t) {
         if (!l.hd || !l.tl) {
                 l.hd = l.tl = t;
         } else {
@@ -67,7 +67,7 @@ void lexerAppend(Lexer *l, Token *t) {
         }
 }
 
-void lexerDump(Lexer *l) {
+void lexerDump(Lexer* l) {
         Token *it = l.hd;
         while (it) {
                 writeln(*it);
@@ -75,7 +75,7 @@ void lexerDump(Lexer *l) {
         }
 }
 
-Token* lexerPeek(Lexer *l, size_t p = 0) {
+Token* lexerPeek(Lexer* l, size_t p = 0) {
         Token* it = l.hd;
         for (size_t i = 0; it && i < p; ++i) {
                 it = it.next;
@@ -88,7 +88,7 @@ void lexerDiscard(Lexer *l) {
         l.hd = l.hd.next;
 }
 
-Token* lexerNext(Lexer *l) {
+Token* lexerNext(Lexer* l) {
         assert(l.hd);
         Token* t = l.hd;
         l.hd = l.hd.next;
