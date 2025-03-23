@@ -166,14 +166,16 @@ class StmtBlock : Stmt {
 
 class StmtProc : Stmt {
         Token* id;
+        RuntimeType* rtype;
         Token*[] pn;
         RuntimeType*[] pt;
         bool variadic = false;
         StmtBlock b;
 
-        this(Token* id, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b) {
+        this(Token* id, RuntimeType* rtype, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b) {
                 super(StmtType.Proc);
                 this.id = id;
+                this.rtype = rtype;
                 this.pn = pn;
                 this.pt = pt;
                 this.variadic = variadic;

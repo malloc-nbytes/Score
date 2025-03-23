@@ -1,6 +1,8 @@
 module semanticSymbols;
 
+import std.stdio;
 import std.format;
+import core.stdc.stdlib : exit;
 
 import visitor;
 import runtimeTypes;
@@ -50,6 +52,11 @@ class SymTbl {
 class SymTblChecker {
         SymTbl tbl;
         string[] errs;
+
+        this() {
+                this.tbl = new SymTbl;
+                this.errs = [];
+        }
 
         void reportErr(string msg) {
                 errs ~= msg;
@@ -108,11 +115,30 @@ void symCheckVisitStmtExpr(Visitor* v, StmtExpr s) {
 }
 
 void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
-        assert(0);
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
+        string name = cast(string)s.id.lx;
+        if (!checker.tbl.addSym(name, s.rtype, true)) {
+                checker.reportErr(format("Redefinition of procedure '%s'", name));
+        }
+
+        for (size_t i = 0; i < s.pn.length; ++i) {
+                string pname = cast(string)s.pn[i].lx;
+                if (!checker.tbl.addSym(pname, s.pt[i], false)) {
+                        checker.reportErr(format("Redefinition of parameter '%s' in procedure '%s'",
+                                                 pname, name));
+                }
+        }
+
+        symCheckVisitStmtBlock(v, s.b);
 }
 
 void symCheckVisitStmtBlock(Visitor* v, StmtBlock s) {
-        assert(0);
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
+        checker.tbl.enterScope();
+        for (size_t i = 0; i < s.stmts.length; ++i) {
+                s.stmts[i].accept(s.stmts[i], v);
+        }
+        checker.tbl.exitScope();
 }
 
 void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
@@ -120,7 +146,7 @@ void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
 }
 
 void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
-        assert(0);
+        //assert(0);
 }
 
 void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
@@ -131,9 +157,9 @@ void symCheckVisitStmtWhile(Visitor* v, StmtWhile s) {
         assert(0);
 }
 
-Visitor createSymTblChecker(SymTblChecker* c) {
+Visitor createSymTblChecker(void* c) {
         Visitor v;
-        v.context = cast(void*)c;
+        v.context = c;
         v.visitStmtLet = &symCheckVisitStmtLet;
         v.visitStmtExpr = &symCheckVisitStmtExpr;
         v.visitStmtProc = &symCheckVisitStmtProc;
@@ -146,9 +172,16 @@ Visitor createSymTblChecker(SymTblChecker* c) {
 }
 
 void semSymCheck(Program* p) {
-        SymTblChecker tbl;
-        Visitor v = createSymTblChecker(&tbl);
+        SymTblChecker tbl = new SymTblChecker();
+        Visitor v = createSymTblChecker(cast(void*)&tbl);
         for (size_t i = 0; i < p.stmts.length; ++i) {
                 p.stmts[i].accept(p.stmts[i], &v);
+        }
+        if (tbl.errs.length != 0) {
+                writeln("Errors found during semanticsymbols analysis");
+                foreach (ref string err; tbl.errs) {
+                        writeln("  ", err);
+                }
+                exit(1);
         }
 }

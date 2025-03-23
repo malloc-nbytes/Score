@@ -298,7 +298,7 @@ private StmtProc parseStmtProc(Lexer* l, bool isProto) {
                 b = parseStmtBlock(l);
         }
 
-        return new StmtProc(id, pn, pt, variadic, b);
+        return new StmtProc(id, rtype, pn, pt, variadic, b);
 }
 
 private StmtReturn parseStmtReturn(Lexer* l) {
