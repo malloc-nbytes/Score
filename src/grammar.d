@@ -2,6 +2,7 @@ module grammar;
 
 import token;
 import runtimeTypes;
+import visitor;
 
 enum ExprType {
         Bin,
@@ -19,8 +20,19 @@ enum ExprType {
 
 class Expr {
         ExprType ty;
+        void function(Expr* e, Visitor* v) accept;
         this(ExprType ty) {
                 this.ty = ty;
+                switch (this.ty) {
+                case ExprType.Bin:      this.accept = &acceptExprBin;      break;
+                case ExprType.Un:       this.accept = &acceptExprUn;       break;
+                case ExprType.StrLit:   this.accept = &acceptExprStrLit;   break;
+                case ExprType.IntLit:   this.accept = &acceptExprIntLit;   break;
+                case ExprType.Ident:    this.accept = &acceptExprIdent;    break;
+                case ExprType.Mut:      this.accept = &acceptExprMut;      break;
+                case ExprType.ProcCall: this.accept = &acceptExprProcCall; break;
+                default: assert(0);
+                }
         }
 }
 
@@ -107,8 +119,20 @@ enum StmtType {
 
 class Stmt {
         StmtType ty;
+        void function(Stmt* e, Visitor* v) accept;
         this(StmtType ty) {
                 this.ty = ty;
+                switch (this.ty) {
+                case StmtType.Let:    this.accept = &acceptStmtLet;    break;
+                case StmtType.Expr:   this.accept = &acceptStmtExpr;   break;
+                case StmtType.Proc:   this.accept = &acceptStmtProc;   break;
+                case StmtType.Block:  this.accept = &acceptStmtBlock;  break;
+                case StmtType.Return: this.accept = &acceptStmtReturn; break;
+                case StmtType.Extern: this.accept = &acceptStmtExtern; break;
+                case StmtType.If:     this.accept = &acceptStmtIf;     break;
+                case StmtType.While:  this.accept = &acceptStmtWhile;  break;
+                default: assert(0);
+                }
         }
 }
 
