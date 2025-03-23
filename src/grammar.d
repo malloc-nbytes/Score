@@ -20,7 +20,7 @@ enum ExprType {
 
 class Expr {
         ExprType ty;
-        void function(Expr* e, Visitor* v) accept;
+        void function(Expr e, Visitor* v) accept;
         this(ExprType ty) {
                 this.ty = ty;
                 switch (this.ty) {
@@ -119,7 +119,7 @@ enum StmtType {
 
 class Stmt {
         StmtType ty;
-        void function(Stmt* e, Visitor* v) accept;
+        void function(Stmt e, Visitor* v) accept;
         this(StmtType ty) {
                 this.ty = ty;
                 switch (this.ty) {
