@@ -5,6 +5,8 @@ import lexer;
 import token;
 import grammar;
 import parser;
+import visitor;
+import semanticSymbols;
 
 int main() {
         const string fp = "./input.scr";
@@ -14,6 +16,7 @@ int main() {
         lexerDump(&lexer);
 
         Program p = parseProgram(&lexer);
+        semSymCheck(&p);
 
         return 0;
 }
