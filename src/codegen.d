@@ -257,71 +257,76 @@ void compileStmtExpr(Visitor* v, StmtExpr s) {
 void compileStmtProc(Visitor* v, StmtProc s) {
         Context* c = cast(Context*)v.context;
 
-        // Save the old stack offset to restore after function generation
+        // Save the old stack offset for the outer scope
         size_t oldStackOffset = c.stackOffset;
 
         string proc_name = s.id.lx.idup;
-        c.current_return_type = s.rtype; // Set the return type
+        c.current_return_type = s.rtype;
         if (s.isExport) {
-                c.export_(proc_name); // Export the function
+                c.export_(proc_name);
         }
 
         // Generate prologue
         c.prologue(proc_name);
 
+        // Reset stack offset for this function
+        c.stackOffset = 0;
+
         // Parameter handling
         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-        size_t stack_offset = 0;
+        size_t paramOffset = 8; // Start after saved rbp (at [rbp - 8])
 
         foreach (i, param_name; s.pn) {
                 RuntimeType* param_type = s.pt[i];
                 size_t param_size = getTypeSize(param_type);
-                string param_str = param_name.lx.idup;
+                if (param_size < 8) param_size = 8; // ABI minimum size
 
-                // Align each parameter to at least 8 bytes (ABI requirement)
-                if (param_size < 8) param_size = 8; // Minimum size for stack slots
-                stack_offset += param_size;
+                // Add parameter to symbol table
+                c.addSymbol(param_name.lx.idup, param_type, false, false, true);
 
-                // Add parameter to symbol table with aligned offset
-                c.addSymbol(param_str, param_type, false, false, true);
-
-                if (i < 6) { // Parameters passed in registers
-                        // Select register based on parameter size
+                if (i < 6) { // Parameters in registers
                         string reg = param_size == 8 ? regs[i] :
-                                param_size == 4 ? regs[i][0 .. 2] ~ "i" : // edi, esi, etc.
-                                param_size == 2 ? regs[i][2 .. $] :       // di, si, etc.
-                                regs[i][3 .. $];                         // dil, sil, etc.
+                                param_size == 4 ? regs[i][0 .. 2] ~ "i" :
+                                param_size == 2 ? regs[i][2 .. $] :
+                                regs[i][3 .. $];
                         string size_spec = param_size == 8 ? "qword" :
                                 param_size == 4 ? "dword" :
                                 param_size == 2 ? "word" : "byte";
 
-                        // Store register value to stack
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ stack_offset.to!string ~ "], " ~ reg;
-                        c.addComment(param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "]");
+                        // Store parameter on stack
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
+                        c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
+                        paramOffset += 8; // Increment for next parameter
                 } else {
-                        // Stack parameters are pushed by the caller; just note their location
-                        c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "] (stack param)";
+                        // Stack parameters (not handled here, managed by caller)
+                        c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
+                        paramOffset += 8; // Reserve space even for stack params
                 }
         }
 
-        // Align total stack space to 16 bytes if necessary
-        if (stack_offset > 0 && stack_offset % 16 != 0) {
-                size_t padding = 16 - (stack_offset % 16);
-                stack_offset += padding;
-                c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
-        }
+        // Record total parameter space
+        size_t paramSpace = paramOffset - 8; // Subtract initial 8
 
-        // If stack space was allocated, adjust rsp
-        if (stack_offset > 0) {
-                c.text ~= c.s ~ "sub rsp, " ~ stack_offset.to!string;
+        // Align stack for local variables and calls
+        size_t totalStackSpace = paramSpace;
+        if (totalStackSpace > 0) {
+                // After push rbp (8 bytes), rsp is misaligned by 8.
+                // We need rsp % 16 == 0 before calls, so adjust accordingly.
+                if ((totalStackSpace + 8) % 16 != 0) {
+                        size_t padding = 16 - ((totalStackSpace + 8) % 16);
+                        totalStackSpace += padding;
+                        c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
+                }
+                c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
         }
 
         // Compile the function body
+        c.stackOffset = totalStackSpace; // Local variables start after parameters + padding
         s.b.accept(s.b, v);
 
         // Generate epilogue
-        if (stack_offset > 0) {
-                c.text ~= c.s ~ "add rsp, " ~ stack_offset.to!string; // Restore stack
+        if (totalStackSpace > 0) {
+                c.text ~= c.s ~ "add rsp, " ~ totalStackSpace.to!string;
         }
         c.text ~= c.s ~ "leave";
         c.text ~= c.s ~ "ret";
