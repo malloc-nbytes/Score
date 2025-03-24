@@ -281,7 +281,7 @@ private StmtBlock parseStmtBlock(Lexer *l) {
         return new StmtBlock(stmts);
 }
 
-private StmtProc parseStmtProc(Lexer* l, bool isProto) {
+private StmtProc parseStmtProc(Lexer* l, bool isProto, bool isExport) {
         lexerDiscard(l); // proc
         Token* id = expect(l, TokenType.Ident);
 
@@ -298,7 +298,7 @@ private StmtProc parseStmtProc(Lexer* l, bool isProto) {
                 b = parseStmtBlock(l);
         }
 
-        return new StmtProc(id, rtype, pn, pt, variadic, b);
+        return new StmtProc(id, rtype, pn, pt, variadic, b, isExport);
 }
 
 private StmtReturn parseStmtReturn(Lexer* l) {
@@ -309,7 +309,7 @@ private StmtReturn parseStmtReturn(Lexer* l) {
 }
 
 private StmtExtern parseStmtExtern(Lexer* l) {
-        StmtProc p = parseStmtProc(l, true);
+        StmtProc p = parseStmtProc(l, /*isProto=*/true, /*isExport=*/false);
         cast(void)expect(l, TokenType.SemiColon);
         return new StmtExtern(p);
 }
@@ -348,8 +348,12 @@ private StmtWhile parseStmtWhile(Lexer* l) {
 
 private Stmt parseStmtKW(Lexer* l) {
         switch (lexerPeek(l).lx) {
+        case Keyword.Export: {
+                lexerDiscard(l); // export
+                return parseStmtProc(l, /*isProto=*/false, /*isExport=*/true);
+        } break;
         case Keyword.Proc: {
-                return parseStmtProc(l, false);
+                return parseStmtProc(l, /*isProto=*/false, /*isExport=*/false);
         } break;
         case Keyword.If: {
                 return parseStmtIf(l);

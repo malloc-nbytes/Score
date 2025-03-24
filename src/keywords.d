@@ -21,6 +21,7 @@ static const string[] keywords = [
         "else",
         "extern",
         "while",
+        "export",
 ];
 
 enum Keyword {
@@ -31,6 +32,7 @@ enum Keyword {
         Else = keywords[4],
         Extern = keywords[5],
         While = keywords[6],
+        Export = keywords[7],
 }
 
 enum TypeKeyword {

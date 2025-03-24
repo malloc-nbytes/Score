@@ -14,6 +14,7 @@ class Context {
         string[] data            = [];
         string[] text            = [];
         string[] externs         = [];
+        string[] exports         = [];
         const string noexecstack = "section .note.GNU-stack noalloc noexec nowrite progbits";
         const string s           = "    ";
         RuntimeType* current_return_type;
@@ -33,14 +34,17 @@ class Context {
                 this.rotdata ~= "section .rotdata";
                 this.bss     ~= "section .bss";
                 this.data    ~= "section .data";
-                this.text    ~= "section .text\nglobal main\n";
+                this.text    ~= "section .text";
+        }
+
+        void addComment(string msg) {
+                this.text ~= this.s ~ "; " ~ msg;
         }
 
         void addSymbol(string name, RuntimeType* type, bool isFunction = false, bool variadic = false) {
                 size_t size = isFunction ? 0 : getTypeSize(type);  // No stack space for functions
                 stackOffset += size;
                 symbols ~= Symbol(name, stackOffset, type, isFunction, variadic);
-                writeln("Added sym: ", symbols[$-1]);
         }
 
         // Find a symbol by name (returns null if not found)
@@ -55,6 +59,10 @@ class Context {
 
         void extern_(string name) {
                 this.externs ~= "extern " ~ name;
+        }
+
+        void export_(string name) {
+                this.exports ~= "global " ~ name;
         }
 
         void prologue(string label) {
@@ -75,6 +83,7 @@ class Context {
                 foreach (const ref string s; this.rotdata) res ~= s ~ '\n';
                 foreach (const ref string s; this.bss)     res ~= s ~ '\n';
                 foreach (const ref string s; this.data)    res ~= s ~ '\n';
+                foreach (const ref string s; this.exports) res ~= s ~ '\n';
                 foreach (const ref string s; this.text)    res ~= s ~ '\n';
                 res ~= '\n' ~ this.noexecstack ~ '\n';
                 return res;
@@ -146,6 +155,7 @@ void compileExprMut(Visitor* v, ExprMut e) {
 
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
         Context* c = cast(Context*)v.context;
+        c.addComment("Calling procedure");
         if (auto ident = cast(ExprIdent)e.l) {
                 string proc_name = ident.id.lx.idup;
                 string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -170,6 +180,7 @@ void compileExprProcCall(Visitor* v, ExprProcCall e) {
         } else {
                 c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
         }
+        c.addComment("End calling procedure");
 }
 
 void compileStmtLet(Visitor* v, StmtLet s) {
@@ -183,7 +194,8 @@ void compileStmtLet(Visitor* v, StmtLet s) {
 
         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
 
-        c.text ~= c.s ~ "; " ~ varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]";
+        // c.text ~= c.s ~ "; " ~ varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]";
+        c.addComment(varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]");
 
         if (s.e !is null) {
                 s.e.accept(s.e, v); // Result in rax
@@ -205,19 +217,265 @@ void compileStmtLet(Visitor* v, StmtLet s) {
 void compileStmtExpr(Visitor* v, StmtExpr s) {
         Context* c = cast(Context*)v.context;
         s.e.accept(s.e, v);
-        c.text ~= c.s ~ "; Expression result in rax (discarded)";
+        // c.text ~= c.s ~ "; Expression result in rax (discarded)";
+        c.addComment("Expression result in rax (discarded)");
 }
 
+// void compileStmtProc(Visitor* v, StmtProc s) {
+//         Context* c = cast(Context*)v.context;
+
+//         // Save the old stack offset to restore after function generation
+//         size_t oldStackOffset = c.stackOffset;
+
+//         string proc_name = s.id.lx.idup;
+//         c.current_return_type = s.rtype; // Set the return type
+//         if (s.isExport) {
+//                 c.export_(proc_name); // Export the function
+//         }
+
+//         // Generate prologue
+//         c.prologue(proc_name);
+
+//         // Parameter handling
+//         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+//         size_t stack_offset = 0;
+
+//         foreach (i, param_name; s.pn) {
+//                 RuntimeType* param_type = s.pt[i];
+//                 size_t param_size = getTypeSize(param_type);
+//                 string param_str = param_name.lx.idup;
+
+//                 // Align each parameter to at least 8 bytes (ABI requirement)
+//                 if (param_size < 8) param_size = 8; // Minimum size for stack slots
+//                 stack_offset += param_size;
+
+//                 // Add parameter to symbol table with aligned offset
+//                 c.addSymbol(param_str, param_type);
+
+//                 if (i < 6) { // Parameters passed in registers
+//                         // Select register based on parameter size
+//                         string reg = param_size == 8 ? regs[i] :
+//                                 param_size == 4 ? regs[i][0 .. 2] ~ "i" : // edi, esi, etc.
+//                                 param_size == 2 ? regs[i][2 .. $] :       // di, si, etc.
+//                                 regs[i][3 .. $];                         // dil, sil, etc.
+//                         string size_spec = param_size == 8 ? "qword" :
+//                                 param_size == 4 ? "dword" :
+//                                 param_size == 2 ? "word" : "byte";
+
+//                         // Store register value to stack
+//                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ stack_offset.to!string ~ "], " ~ reg;
+//                         c.addComment(param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "]");
+//                 } else {
+//                         // Stack parameters are pushed by the caller; just note their location
+//                         c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "] (stack param)";
+//                 }
+//         }
+
+//         // Align total stack space to 16 bytes if necessary
+//         if (stack_offset > 0 && stack_offset % 16 != 0) {
+//                 size_t padding = 16 - (stack_offset % 16);
+//                 stack_offset += padding;
+//                 c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
+//         }
+
+//         // If stack space was allocated, adjust rsp
+//         if (stack_offset > 0) {
+//                 c.text ~= c.s ~ "sub rsp, " ~ stack_offset.to!string;
+//         }
+
+//         // Compile the function body
+//         s.b.accept(s.b, v);
+
+//         // Generate epilogue
+//         if (stack_offset > 0) {
+//                 c.text ~= c.s ~ "add rsp, " ~ stack_offset.to!string; // Restore stack
+//         }
+//         c.text ~= c.s ~ "leave";
+//         c.text ~= c.s ~ "ret";
+
+//         // Restore outer scope’s stack offset
+//         c.stackOffset = oldStackOffset;
+// }
+
+// 3
 void compileStmtProc(Visitor* v, StmtProc s) {
         Context* c = cast(Context*)v.context;
 
-        string proc_name = s.id.lx.idup;
-        c.current_return_type = s.rtype;
+        size_t oldStackOffset = c.stackOffset;
 
-        c.prologue(proc_name);
+        string proc_name = s.id.lx.idup;
+        c.current_return_type = s.rtype; // Set the return type
+        c.prologue(proc_name);          // Generate prologue (push rbp, move rsp to rbp)
+
+        if (s.isExport) {
+                c.export_(proc_name);  // Export the function (make it globally visible)
+        }
+
+        string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        size_t stack_offset = 0;
+
+        // Handle parameters
+        foreach (i, param_name; s.pn) {
+                RuntimeType* param_type = s.pt[i];
+                size_t param_size = getTypeSize(param_type);
+                string param_str = param_name.lx.idup;
+
+                // Handle parameters passed in registers (up to 6 parameters can be passed in registers)
+                if (i < 6) {
+                        // Reserve space for the parameter in the stack if it's passed in registers
+                        stack_offset += param_size;
+                        c.addSymbol(param_str, param_type);
+
+                        // Determine which register to use based on parameter size
+                        string reg = param_size == 8 ? regs[i] :           // 64-bit: rdi, rsi, ...
+                                param_size == 4 ? regs[i][0 .. 2] ~ "i" : // 32-bit: edi, esi, ...
+                                param_size == 2 ? regs[i][2 .. $] :      // 16-bit: di, si, ...
+                                regs[i][3 .. $];                         // 8-bit: dil, sil, ...
+
+                        // string size_spec = param_size == 8 ? "qword" :
+                        //         param_size == 4 ? "dword" :
+                        //         param_size == 2 ? "word" : "byte";
+                        // TODO: fix size
+                        string size_spec = param_size == 8 ? "qword" :
+                                param_size == 4 ? "qword" :
+                                param_size == 2 ? "word" : "byte";
+                        // Move the value from the register to the stack
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ stack_offset.to!string ~ "], " ~ reg;
+                        c.addComment(param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "]");
+                } else {
+                        // Handle parameters passed on the stack (when there are more than 6)
+                        stack_offset += param_size;
+                        c.addSymbol(param_str, param_type);
+                        c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "] (stack param)";
+                }
+        }
+
+        // Ensure stack alignment (16-byte boundary)
+        // if (stack_offset % 16 != 0) {
+        //         size_t alignment = (16 - (stack_offset % 16));
+        //         stack_offset += alignment;
+        //         c.text ~= c.s ~ "; Stack aligned to 16 bytes";
+        // }
+
+        // Now handle the function body (e.g., the statements in `s.b`)
         s.b.accept(s.b, v);
+
+        // Generate epilogue (clean up the stack, restore rbp, and return)
         c.epilogue();
+
+        c.stackOffset = oldStackOffset;
 }
+
+// 2
+// void compileStmtProc(Visitor* v, StmtProc s) {
+//         Context* c = cast(Context*)v.context;
+
+//         string proc_name = s.id.lx.idup;
+//         c.current_return_type = s.rtype; // Set the return type
+//         c.prologue(proc_name);
+
+//         if (s.isExport) {
+//                 c.export_(proc_name);
+//         }
+
+//         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+//         size_t stack_offset = 0;
+
+//         foreach (i, param_name; s.pn) {
+//                 RuntimeType* param_type = s.pt[i];
+//                 size_t param_size = getTypeSize(param_type);
+//                 string param_str = param_name.lx.idup;
+
+//                 if (i < 6) { // Parameters passed in registers
+//                         stack_offset += param_size;
+//                         c.addSymbol(param_str, param_type);
+//                         // Use the correct register size based on param_size
+//                         string reg = param_size == 8 ? regs[i] :           // 64-bit: rdi
+//                                 param_size == 4 ? regs[i][0 .. 2] ~ "i" : // 32-bit: edi
+//                                 param_size == 2 ? regs[i][2 .. $] :      // 16-bit: di
+//                                 regs[i][3 .. $];                         // 8-bit: dil
+//                         string size_spec = param_size == 8 ? "qword" :
+//                                 param_size == 4 ? "dword" :
+//                                 param_size == 2 ? "word" : "byte";
+//                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ stack_offset.to!string ~ "], " ~ reg;
+//                         c.addComment(param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "]");
+//                 } else { // Parameters passed on the stack
+//                         stack_offset += param_size;
+//                         c.addSymbol(param_str, param_type);
+//                         // Note: Stack parameters are typically handled by the caller, so we just reserve space
+//                         c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "] (stack param)";
+//                 }
+//         }
+
+//         // Ensure stack alignment (16-byte boundary) if needed
+//         if (stack_offset % 16 != 0) {
+//                 stack_offset += (16 - (stack_offset % 16)); // Align to 16 bytes
+//                 c.text ~= c.s ~ "; Stack aligned to 16 bytes";
+//         }
+
+//         s.b.accept(s.b, v);
+//         c.epilogue();
+// }
+
+// 1
+// void compileStmtProc(Visitor* v, StmtProc s) {
+//         Context* c = cast(Context*)v.context;
+
+//         string proc_name = s.id.lx.idup;
+//         c.current_return_type = s.rtype; // Set the return type
+//         c.prologue(proc_name);
+
+//         if (s.isExport) {
+//                 c.export_(proc_name);
+//         }
+
+//         // Handle parameters (none in your example, so this is skipped)
+//         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+//         size_t stack_offset = 0;
+
+//         foreach (i, param_name; s.pn) {
+//                 RuntimeType* param_type = s.pt[i];
+//                 size_t param_size = getTypeSize(param_type);
+//                 string param_str = param_name.lx.idup;
+
+//                 if (i < 6) {
+//                         stack_offset += param_size;
+//                         c.addSymbol(param_str, param_type);
+//                         string reg = param_size == 8 ? regs[i] :
+//                                 param_size == 4 ? regs[i][1 .. $] :
+//                                 param_size == 2 ? regs[i][2 .. $] :
+//                                 regs[i][3 .. $];
+//                         string size_spec = param_size == 8 ? "qword" :
+//                                 param_size == 4 ? "dword" :
+//                                 param_size == 2 ? "word" : "byte";
+//                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ stack_offset.to!string ~ "], " ~ reg;
+//                         c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "]";
+//                 } else {
+//                         stack_offset += param_size;
+//                         c.addSymbol(param_str, param_type);
+//                         c.text ~= c.s ~ "; " ~ param_str ~ " at [rbp - " ~ stack_offset.to!string ~ "] (stack param)";
+//                 }
+//         }
+
+//         s.b.accept(s.b, v);
+//         c.epilogue();
+// }
+
+
+// void compileStmtProc(Visitor* v, StmtProc s) {
+//         Context* c = cast(Context*)v.context;
+
+//         string procName = s.id.lx.idup;
+//         c.current_return_type = s.rtype;
+
+//         if (s.isExport) {
+//                 c.export_(procName);
+//         }
+
+//         c.prologue(procName);
+//         s.b.accept(s.b, v);
+//         c.epilogue();
+// }
 
 void compileStmtBlock(Visitor* v, StmtBlock s) {
         Context* c = cast(Context*)v.context;

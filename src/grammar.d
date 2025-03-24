@@ -172,8 +172,9 @@ class StmtProc : Stmt {
         RuntimeType*[] pt;
         bool variadic = false;
         StmtBlock b;
+        bool isExport;
 
-        this(Token* id, RuntimeType* rtype, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b) {
+        this(Token* id, RuntimeType* rtype, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b, bool isExport) {
                 super(StmtType.Proc);
                 this.id = id;
                 this.rtype = rtype;
@@ -181,6 +182,7 @@ class StmtProc : Stmt {
                 this.pt = pt;
                 this.variadic = variadic;
                 this.b = b;
+                this.isExport = isExport;
         }
 }
 
