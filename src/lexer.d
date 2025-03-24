@@ -162,11 +162,11 @@ Lexer lexFile(const ref string src, const ref string fp) {
                         lexerAppend(&lexer, t);
                         i += num.length, c += num.length;
                 } else if (ch == '"') {
-                        i += 1, r += 1; // "
+                        i += 1, c += 1; // "
                         char[] s = consumeWhile(src[i..$], (dchar c) { return c != '"'; });
                         Token *t = tokenCreate(s, TokenType.StrLit, r, c, fp);
                         lexerAppend(&lexer, t);
-                        i += s.length + 1, r += s.length + 1; // +1 for "
+                        i += s.length + 1, c += s.length + 1; // +1 for "
                 } else if (ch == '\'') {
                         assert(0);
                 } else {

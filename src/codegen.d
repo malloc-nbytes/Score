@@ -210,7 +210,7 @@ void compileExprBin(Visitor* v, ExprBin e) {
         case TokenType.Pipe:
                 c.text ~= c.s ~ "or rax, rbx";  // Bitwise OR
                 break;
-        case TokenType.Uptick: // Assuming Uptick (^) is XOR
+        case TokenType.Uptick:
                 c.text ~= c.s ~ "xor rax, rbx"; // Bitwise XOR
                 break;
 
@@ -259,8 +259,8 @@ void compileExprStrLit(Visitor* v, ExprStrLit e) {
 void compileExprIntLit(Visitor* v, ExprIntLit e) {
         Context* c = cast(Context*)v.context;
 
-        // Assuming 64-bit integers for literals unless specified
-        c.text ~= c.s ~ "mov rax, " ~ e.i.lx.idup;
+        // TODO: use appropriate register
+        c.text ~= c.s ~ "mov eax, " ~ e.i.lx.idup;
 }
 
 void compileExprIdent(Visitor* v, ExprIdent e) {
@@ -302,46 +302,6 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
                 }
         }
 }
-
-// void compileExprIdent(Visitor* v, ExprIdent e) {
-//         Context* c = cast(Context*)v.context;
-
-//         string name = e.id.lx.idup;
-//         Context.Symbol* sym = c.findSymbol(name);
-
-//         if (sym is null) {
-//                 c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ name;
-//                 return;
-//         }
-
-//         c.addComment("Retrieving identifier: "~name);
-
-//         size_t size = getTypeSize(sym.type);
-//         string size_spec = size == 8 ? "qword" :
-//                 size == 4 ? "dword" :
-//                 size == 2 ? "word" : "byte";
-//         string reg = size == 8 ? "rax" :
-//                 size == 4 ? "eax" :
-//                 size == 2 ? "ax" : "al";
-
-//         // Load the value from memory into the appropriate register size
-//         if (sym.param) {
-//                 c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ (2 * sym.offset).to!string ~ "]";
-//         } else {
-//                 c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ sym.offset.to!string ~ "]";
-//         }
-
-//         // Extend to 64-bit rax if needed
-//         if (size < 8) {
-//                 if (sym.type.b == RuntimeTypeBase.U8 ||
-//                     sym.type.b == RuntimeTypeBase.U16 ||
-//                     sym.type.b == RuntimeTypeBase.U32) {
-//                         c.text ~= c.s ~ "movzx rax, " ~ reg;  // Zero-extend for unsigned
-//                 } else {
-//                         c.text ~= c.s ~ "movsx rax, " ~ reg;  // Sign-extend for signed
-//                 }
-//         }
-// }
 
 void compileExprMut(Visitor* v, ExprMut e) {
         Context* c = cast(Context*)v.context;
@@ -552,70 +512,6 @@ void compileStmtProc(Visitor* v, StmtProc s) {
 
         c.popScope();
 }
-
-// done
-// void compileStmtProc(Visitor* v, StmtProc s) {
-//         Context* c = cast(Context*)v.context;
-
-//         string proc_name = s.id.lx.idup;
-//         c.current_return_type = s.rtype;
-//         if (s.isExport) {
-//                 c.export_(proc_name);
-//         }
-
-//         c.prologue(proc_name);
-//         c.pushScope();
-
-//         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-//         size_t paramOffset = 8;
-
-//         foreach (i, param_name; s.pn) {
-//                 RuntimeType* param_type = s.pt[i];
-//                 size_t param_size = getTypeSize(param_type);
-//                 if (param_size < 8) param_size = 8;
-
-//                 c.addSymbol(param_name.lx.idup, param_type, false, false, true);
-
-//                 if (i < 6) {
-//                         string reg = param_size == 8 ? regs[i] :
-//                                 param_size == 4 ? regs[i][0 .. 2] ~ "i" :
-//                                 param_size == 2 ? regs[i][2 .. $] :
-//                                 regs[i][3 .. $];
-//                         string size_spec = param_size == 8 ? "qword" :
-//                                 param_size == 4 ? "dword" :
-//                                 param_size == 2 ? "word" : "byte";
-
-//                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
-//                         c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
-//                         paramOffset += 8;
-//                 } else {
-//                         c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
-//                         paramOffset += 8;
-//                 }
-//         }
-
-//         size_t paramSpace = paramOffset - 8;
-//         size_t totalStackSpace = paramSpace;
-//         if (totalStackSpace > 0) {
-//                 if ((totalStackSpace + 8) % 16 != 0) {
-//                         size_t padding = 16 - ((totalStackSpace + 8) % 16);
-//                         totalStackSpace += padding;
-//                         c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
-//                 }
-//                 c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
-//         }
-
-//         c.stackOffset = totalStackSpace; // Set for local variables
-//         s.b.accept(s.b, v);
-
-//         if (totalStackSpace > 0) {
-//                 c.text ~= c.s ~ "add rsp, " ~ totalStackSpace.to!string;
-//         }
-//         c.text ~= c.s ~ "leave";
-//         c.text ~= c.s ~ "ret";
-
-//         c.popScope();
-// }
 
 void compileStmtBlock(Visitor* v, StmtBlock s) {
         Context* c = cast(Context*)v.context;

@@ -4,6 +4,6 @@ import std.stdio;
 import core.stdc.stdlib : exit;
 
 void err(const string msg) {
-        writeln("[Error]: ", msg);
+        writeln(msg);
         exit(1);
 }

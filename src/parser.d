@@ -234,7 +234,7 @@ private void parseFunctionArgs(Lexer* l, ref Token*[] pn, ref RuntimeType*[] pt,
         cast(void)expect(l, TokenType.Lparen);
 
         if (l.hd && lexerPeek(l).ty == TokenType.Rparen) {
-                err("a proc accepting no args must have `void`");
+                err(tokerrToStr(l.hd) ~ "a proc accepting no args must have `void`");
         }
 
         if (l.hd && lexerPeek(l).ty == TokenType.TypeKeyword && lexerPeek(l).lx == TypeKeyword.Void) {
@@ -392,6 +392,7 @@ Stmt parseStmt(Lexer* l) {
                 return parseStmtBlock(l);
         } break;
         default: {
+                writeln("parsing stmt expression");
                 return parseStmtExpr(l);
         } break;
         }

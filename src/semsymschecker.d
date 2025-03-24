@@ -57,6 +57,8 @@ class SymTbl {
 
 class SymTblChecker {
         SymTbl tbl;
+        StmtProc[string] procs;
+        StmtExtern[string] externs;
         string[] errs;
 
         this() {
@@ -104,9 +106,30 @@ void symCheckVisitExprMut(Visitor* v, ExprMut s) {
 }
 
 void symCheckVisitExprProcCall(Visitor* v, ExprProcCall s) {
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
         s.l.accept(s.l, v);
+
         for (size_t i = 0; i < s.exprs.length; ++i) {
                 s.exprs[i].accept(s.exprs[i], v);
+        }
+
+        assert(s.l.ty == ExprType.Ident && "function calls must be identifiers for now");
+        ExprIdent ident = cast(ExprIdent)s.l;
+        string name = cast(const string)ident.id.lx;
+        if (name in checker.procs) {
+                const size_t N = checker.procs[name].pn.length;
+                if (s.exprs.length != N && !checker.procs[name].variadic) {
+                        checker.reportErr(tokerrToStr(ident.id)
+                                          ~ format("Incorrect number of function arguments, expected %d but got %d",
+                                                   N, s.exprs.length));
+                }
+        } else if (name in checker.externs && !checker.externs[name].proto.variadic) {
+                const size_t N = checker.externs[name].proto.pn.length;
+                if (s.exprs.length != N) {
+                        checker.reportErr(tokerrToStr(ident.id)
+                                          ~ format("Incorrect number of function arguments, expected %d but got %d",
+                                                   N, s.exprs.length));
+                }
         }
 }
 
@@ -130,9 +153,12 @@ void symCheckVisitStmtExpr(Visitor* v, StmtExpr s) {
 void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
+
         if (!checker.tbl.addSym(name, s.rtype, true)) {
                 checker.reportErr(tokerrToStr(s.id) ~ format("Redefinition of procedure '%s'", name));
         }
+
+        checker.procs[name] = s;
 
         checker.tbl.enterScope();
 
@@ -168,6 +194,7 @@ void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
         if (!checker.tbl.addSym(name, s.proto.rtype, true)) {
                 checker.reportErr(tokerrToStr(s.proto.id) ~ format("Redefinition of procedure '%s'", name));
         }
+        checker.externs[name] = s;
 }
 
 void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
