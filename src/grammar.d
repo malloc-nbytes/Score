@@ -42,6 +42,7 @@ class ExprBin : Expr {
         this(Expr l, Token* op, Expr r) {
                 super(ExprType.Bin);
                 this.l = l;
+                this.op = op;
                 this.r = r;
         }
 }

@@ -46,14 +46,14 @@ void acceptExprUn(Expr e, Visitor* v) {
 }
 
 void acceptExprStrLit(Expr e, Visitor* v) {
-        if (v.visitExprIntLit) {
-                v.visitExprIntLit(v, cast(ExprIntLit)e);
+        if (v.visitExprStrLit) {
+                v.visitExprStrLit(v, cast(ExprStrLit)e);
         }
 }
 
 void acceptExprIntLit(Expr e, Visitor* v) {
-        if (v.visitExprStrLit) {
-                v.visitExprStrLit(v, cast(ExprStrLit)e);
+        if (v.visitExprIntLit) {
+                v.visitExprIntLit(v, cast(ExprIntLit)e);
         }
 }
 

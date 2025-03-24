@@ -1,3 +1,8 @@
+/*
+ * First pass. Checks to make sure all identifiers
+ * are in scope and defined.
+ */
+
 module semanticSymbols;
 
 import std.stdio;
@@ -68,7 +73,8 @@ class SymTblChecker {
  */
 
 void symCheckVisitExprBin(Visitor* v, ExprBin s) {
-        assert(0);
+        s.l.accept(s.l, v);
+        s.r.accept(s.r, v);
 }
 
 void symCheckVisitExprUn(Visitor* v, ExprUn s) {
@@ -76,23 +82,29 @@ void symCheckVisitExprUn(Visitor* v, ExprUn s) {
 }
 
 void symCheckVisitExprStrLit(Visitor* v, ExprStrLit s) {
-        assert(0);
+        return;
 }
 
 void symCheckVisitExprIntLit(Visitor* v, ExprIntLit s) {
-        assert(0);
+        return;
 }
 
 void symCheckVisitExprIdent(Visitor* v, ExprIdent s) {
-        assert(0);
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
+        string name = cast(string)s.id.lx;
+        if (!checker.tbl.symLookup(name)) {
+                checker.reportErr(format("Identifier is not defined '%s'", name));
+        }
 }
 
 void symCheckVisitExprMut(Visitor* v, ExprMut s) {
         assert(0);
 }
 
+// TODO
 void symCheckVisitExprProcCall(Visitor* v, ExprProcCall s) {
-        assert(0);
+        return;
+        // assert(0);
 }
 
 /*
@@ -105,13 +117,11 @@ void symCheckVisitStmtLet(Visitor* v, StmtLet s) {
         if (!checker.tbl.addSym(name, s.t, false)) {
                 checker.reportErr(format("Redefinition of identifier '%s'", name));
         }
-        if (s.e) {
-                s.e.accept(s.e, v);
-        }
+        s.e.accept(s.e, v);
 }
 
 void symCheckVisitStmtExpr(Visitor* v, StmtExpr s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
 void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
@@ -142,11 +152,12 @@ void symCheckVisitStmtBlock(Visitor* v, StmtBlock s) {
 }
 
 void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
+// TODO
 void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
-        //assert(0);
+        return;
 }
 
 void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
@@ -157,28 +168,37 @@ void symCheckVisitStmtWhile(Visitor* v, StmtWhile s) {
         assert(0);
 }
 
-Visitor createSymTblChecker(void* c) {
+Visitor createSymTblChecker(SymTblChecker* c) {
         Visitor v;
-        v.context = c;
-        v.visitStmtLet = &symCheckVisitStmtLet;
-        v.visitStmtExpr = &symCheckVisitStmtExpr;
-        v.visitStmtProc = &symCheckVisitStmtProc;
-        v.visitStmtBlock = &symCheckVisitStmtBlock;
-        v.visitStmtReturn = &symCheckVisitStmtReturn;
-        v.visitStmtExtern = &symCheckVisitStmtExtern;
-        v.visitStmtIf = &symCheckVisitStmtIf;
-        v.visitStmtWhile = &symCheckVisitStmtWhile;
+        v.context = cast(void*)c;
+
+        v.visitExprBin      = &symCheckVisitExprBin;
+        v.visitExprUn       = &symCheckVisitExprUn;
+        v.visitExprStrLit   = &symCheckVisitExprStrLit;
+        v.visitExprIntLit   = &symCheckVisitExprIntLit;
+        v.visitExprIdent    = &symCheckVisitExprIdent;
+        v.visitExprMut      = &symCheckVisitExprMut;
+        v.visitExprProcCall = &symCheckVisitExprProcCall;
+
+        v.visitStmtLet      = &symCheckVisitStmtLet;
+        v.visitStmtExpr     = &symCheckVisitStmtExpr;
+        v.visitStmtProc     = &symCheckVisitStmtProc;
+        v.visitStmtBlock    = &symCheckVisitStmtBlock;
+        v.visitStmtReturn   = &symCheckVisitStmtReturn;
+        v.visitStmtExtern   = &symCheckVisitStmtExtern;
+        v.visitStmtIf       = &symCheckVisitStmtIf;
+        v.visitStmtWhile    = &symCheckVisitStmtWhile;
         return v;
 }
 
 void semSymCheck(Program* p) {
         SymTblChecker tbl = new SymTblChecker();
-        Visitor v = createSymTblChecker(cast(void*)&tbl);
+        Visitor v = createSymTblChecker(&tbl);
         for (size_t i = 0; i < p.stmts.length; ++i) {
                 p.stmts[i].accept(p.stmts[i], &v);
         }
         if (tbl.errs.length != 0) {
-                writeln("Errors found during semanticsymbols analysis");
+                writeln("Errors found during semantic symbols analysis");
                 foreach (ref string err; tbl.errs) {
                         writeln("  ", err);
                 }

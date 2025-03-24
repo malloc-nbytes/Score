@@ -1,6 +1,7 @@
 module runtimeTypes;
 
 import keywords;
+import std.conv;
 
 enum RuntimeTypeBase {
         Unknown,
@@ -46,5 +47,21 @@ RuntimeTypeBase getBaseTypeFromStr(const char[] s) {
         case TypeKeyword.Usize: return Usize;
         case TypeKeyword.Void: return Void;
         default: return Custom;
+        }
+}
+
+size_t getTypeSize(RuntimeType* t) {
+        if (t is null) return 0;
+        switch (t.b) {
+        case RuntimeTypeBase.I8:  case RuntimeTypeBase.U8:  return 1;
+        case RuntimeTypeBase.I16: case RuntimeTypeBase.U16: return 2;
+        case RuntimeTypeBase.I32: case RuntimeTypeBase.U32: return 4;
+        case RuntimeTypeBase.I64: case RuntimeTypeBase.U64:
+        case RuntimeTypeBase.Usize: case RuntimeTypeBase.Ptr: return 8;
+        case RuntimeTypeBase.Void: return 0;
+        case RuntimeTypeBase.Custom:
+        case RuntimeTypeBase.Unknown:
+                assert(0, "Unsupported type size for " ~ t.b.to!string);
+        default: assert(0, "Unknown RuntimeTypeBase");
         }
 }
