@@ -12,6 +12,7 @@ import core.stdc.stdlib : exit;
 import visitor;
 import runtimeTypes;
 import grammar;
+import token;
 
 struct Sym {
         string name;
@@ -93,18 +94,20 @@ void symCheckVisitExprIdent(Visitor* v, ExprIdent s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
         if (!checker.tbl.symLookup(name)) {
-                checker.reportErr(format("Identifier is not defined '%s'", name));
+                checker.reportErr(tokerrToStr(s.id) ~ format("Identifier is not defined '%s'", name));
         }
 }
 
 void symCheckVisitExprMut(Visitor* v, ExprMut s) {
-        assert(0);
+        s.l.accept(s.l, v);
+        s.r.accept(s.r, v);
 }
 
-// TODO
 void symCheckVisitExprProcCall(Visitor* v, ExprProcCall s) {
-        return;
-        // assert(0);
+        s.l.accept(s.l, v);
+        for (size_t i = 0; i < s.exprs.length; ++i) {
+                s.exprs[i].accept(s.exprs[i], v);
+        }
 }
 
 /*
@@ -115,7 +118,7 @@ void symCheckVisitStmtLet(Visitor* v, StmtLet s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
         if (!checker.tbl.addSym(name, s.t, false)) {
-                checker.reportErr(format("Redefinition of identifier '%s'", name));
+                checker.reportErr(tokerrToStr(s.id) ~ format("Redefinition of identifier '%s'", name));
         }
         s.e.accept(s.e, v);
 }
@@ -128,7 +131,7 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
         if (!checker.tbl.addSym(name, s.rtype, true)) {
-                checker.reportErr(format("Redefinition of procedure '%s'", name));
+                checker.reportErr(tokerrToStr(s.id) ~ format("Redefinition of procedure '%s'", name));
         }
 
         checker.tbl.enterScope();
@@ -136,8 +139,8 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
         for (size_t i = 0; i < s.pn.length; ++i) {
                 string pname = cast(string)s.pn[i].lx;
                 if (!checker.tbl.addSym(pname, s.pt[i], false)) {
-                        checker.reportErr(format("Redefinition of parameter '%s' in procedure '%s'",
-                                                 pname, name));
+                        checker.reportErr(tokerrToStr(s.pn[i]) ~ format("Redefinition of parameter '%s' in procedure '%s'",
+                                                                        pname, name));
                 }
         }
 
@@ -160,7 +163,11 @@ void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
 
 // TODO
 void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
-        return;
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
+        string name = cast(string)s.proto.id.lx;
+        if (!checker.tbl.addSym(name, s.proto.rtype, true)) {
+                checker.reportErr(tokerrToStr(s.proto.id) ~ format("Redefinition of procedure '%s'", name));
+        }
 }
 
 void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
@@ -203,7 +210,7 @@ void semSymCheck(Program* p) {
         if (tbl.errs.length != 0) {
                 writeln("Errors found during semantic symbols analysis");
                 foreach (ref string err; tbl.errs) {
-                        writeln("  ", err);
+                        writeln(err);
                 }
                 exit(1);
         }

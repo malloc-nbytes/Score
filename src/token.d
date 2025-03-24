@@ -1,6 +1,7 @@
 module token;
 
 import std.stdio;
+import std.conv;
 
 enum TokenType {
         Ident,
@@ -125,3 +126,8 @@ string tokenTypeToStr(TokenType ty) {
 void tokerr(const Token* t) {
         write(t.fp, ":", t.r, ":", t.c, ": ");
 }
+
+string tokerrToStr(const Token* t) {
+        return t.fp ~ ":" ~ t.r.to!string ~ ":" ~ t.c.to!string ~ ": ";
+}
+
