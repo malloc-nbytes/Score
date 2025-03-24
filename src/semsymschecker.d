@@ -131,6 +131,8 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
                 checker.reportErr(format("Redefinition of procedure '%s'", name));
         }
 
+        checker.tbl.enterScope();
+
         for (size_t i = 0; i < s.pn.length; ++i) {
                 string pname = cast(string)s.pn[i].lx;
                 if (!checker.tbl.addSym(pname, s.pt[i], false)) {
@@ -140,6 +142,7 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
         }
 
         symCheckVisitStmtBlock(v, s.b);
+        checker.tbl.exitScope();
 }
 
 void symCheckVisitStmtBlock(Visitor* v, StmtBlock s) {
