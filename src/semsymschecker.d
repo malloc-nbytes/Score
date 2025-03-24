@@ -179,7 +179,8 @@ void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
 }
 
 void symCheckVisitStmtWhile(Visitor* v, StmtWhile s) {
-        assert(0);
+        s.e.accept(s.e, v);
+        s.s.accept(s.s, v);
 }
 
 Visitor createSymTblChecker(SymTblChecker* c) {

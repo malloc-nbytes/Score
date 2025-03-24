@@ -22,6 +22,7 @@ class Context {
         const string s           = "    ";
         RuntimeType* current_return_type;
         size_t labelCounter = 0;
+        size_t oldStackOffset;
 
         struct Symbol {
                 string name;
@@ -32,39 +33,56 @@ class Context {
                 bool param;
         }
 
-        Symbol[] symbols; // Stack-based, no scope yet
-        size_t stackOffset = 0; // Total stack space used
+        Symbol[][] symbols; // Stack of scopes
+        size_t stackOffset = 0; // Total stack space used in current scope
 
         this() {
                 this.rotdata ~= "section .rotdata";
                 this.bss     ~= "section .bss";
                 this.data    ~= "section .data";
                 this.text    ~= "section .text";
+                // this.symbols ~= []; // Start with global scope
+                if (this.symbols.length == 0) {
+                        this.symbols = [[]];
+                }
+                this.oldStackOffset = 0;
         }
 
         string genLabel(string prefix) {
-                return prefix~"_"~this.labelCounter++.to!string;
+                return prefix ~ "_" ~ this.labelCounter++.to!string;
         }
 
         void addComment(string msg) {
                 this.text ~= this.s ~ "; " ~ msg;
         }
 
-        void addSymbol(string name,
-                       RuntimeType* type,
-                       bool isFunction = false,
-                       bool variadic = false,
-                       bool param = false) {
-                size_t size = isFunction ? 0 : getTypeSize(type);  // No stack space for functions
-                stackOffset += size;
-                symbols ~= Symbol(name, stackOffset, type, isFunction, variadic, param);
+        void pushScope() {
+                this.symbols ~= [[]]; // Add a new scope
+                //this.stackOffset = 0; // Reset offset for new scope
+                this.oldStackOffset = this.stackOffset;
         }
 
-        // Find a symbol by name (returns null if not found)
+        void popScope() {
+                if (this.symbols.length > 1) { // Preserve global scope
+                        this.symbols = this.symbols[0 .. $ - 1];
+                        this.stackOffset = this.symbols.length > 0 ? this.symbols[$ - 1].map!(s => s.offset + getTypeSize(s.type)).maxElement(0) : 0;
+                        this.stackOffset = this.oldStackOffset;
+                }
+        }
+
+        void addSymbol(string name, RuntimeType* type, bool isFunction = false, bool variadic = false, bool param = false) {
+                size_t size = isFunction ? 0 : getTypeSize(type);
+                stackOffset += size;
+                this.symbols[$ - 1] ~= Symbol(name, stackOffset, type, isFunction, variadic, param); // Add to current scope
+        }
+
         Symbol* findSymbol(string name) {
-                foreach (ref sym; symbols) {
-                        if (sym.name == name) {
-                                return &sym;
+                // Search from innermost scope outward
+                for (ptrdiff_t i = this.symbols.length - 1; i >= 0; i--) {
+                        foreach (ref sym; this.symbols[i]) {
+                                if (sym.name == name) {
+                                        return &sym;
+                                }
                         }
                 }
                 return null;
@@ -256,6 +274,8 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
                 return;
         }
 
+        c.addComment("Retrieving identifier: " ~ name);
+
         size_t size = getTypeSize(sym.type);
         string size_spec = size == 8 ? "qword" :
                 size == 4 ? "dword" :
@@ -266,7 +286,7 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
 
         // Load the value from memory into the appropriate register size
         if (sym.param) {
-                c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ (2 * sym.offset).to!string ~ "]";
+                c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ (2*sym.offset).to!string ~ "]";
         } else {
                 c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ sym.offset.to!string ~ "]";
         }
@@ -282,6 +302,46 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
                 }
         }
 }
+
+// void compileExprIdent(Visitor* v, ExprIdent e) {
+//         Context* c = cast(Context*)v.context;
+
+//         string name = e.id.lx.idup;
+//         Context.Symbol* sym = c.findSymbol(name);
+
+//         if (sym is null) {
+//                 c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ name;
+//                 return;
+//         }
+
+//         c.addComment("Retrieving identifier: "~name);
+
+//         size_t size = getTypeSize(sym.type);
+//         string size_spec = size == 8 ? "qword" :
+//                 size == 4 ? "dword" :
+//                 size == 2 ? "word" : "byte";
+//         string reg = size == 8 ? "rax" :
+//                 size == 4 ? "eax" :
+//                 size == 2 ? "ax" : "al";
+
+//         // Load the value from memory into the appropriate register size
+//         if (sym.param) {
+//                 c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ (2 * sym.offset).to!string ~ "]";
+//         } else {
+//                 c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ sym.offset.to!string ~ "]";
+//         }
+
+//         // Extend to 64-bit rax if needed
+//         if (size < 8) {
+//                 if (sym.type.b == RuntimeTypeBase.U8 ||
+//                     sym.type.b == RuntimeTypeBase.U16 ||
+//                     sym.type.b == RuntimeTypeBase.U32) {
+//                         c.text ~= c.s ~ "movzx rax, " ~ reg;  // Zero-extend for unsigned
+//                 } else {
+//                         c.text ~= c.s ~ "movsx rax, " ~ reg;  // Sign-extend for signed
+//                 }
+//         }
+// }
 
 void compileExprMut(Visitor* v, ExprMut e) {
         Context* c = cast(Context*)v.context;
@@ -399,11 +459,10 @@ void compileStmtLet(Visitor* v, StmtLet s) {
         if (varSize == 0) assert(0, "Cannot allocate variable with void type");
 
         string varName = s.id.lx.idup;
-        c.addSymbol(varName, s.t);
+        c.addSymbol(varName, s.t); // Adds to current scope (symbols[$ - 1])
 
         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
 
-        // c.text ~= c.s ~ "; " ~ varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]";
         c.addComment(varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]");
 
         if (s.e !is null) {
@@ -433,34 +492,26 @@ void compileStmtExpr(Visitor* v, StmtExpr s) {
 void compileStmtProc(Visitor* v, StmtProc s) {
         Context* c = cast(Context*)v.context;
 
-        // Save the old stack offset for the outer scope
-        size_t oldStackOffset = c.stackOffset;
-
         string proc_name = s.id.lx.idup;
         c.current_return_type = s.rtype;
         if (s.isExport) {
                 c.export_(proc_name);
         }
 
-        // Generate prologue
         c.prologue(proc_name);
+        c.pushScope();
 
-        // Reset stack offset for this function
-        c.stackOffset = 0;
-
-        // Parameter handling
         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-        size_t paramOffset = 8; // Start after saved rbp (at [rbp - 8])
+        size_t paramOffset = 8;
 
         foreach (i, param_name; s.pn) {
                 RuntimeType* param_type = s.pt[i];
                 size_t param_size = getTypeSize(param_type);
-                if (param_size < 8) param_size = 8; // ABI minimum size
+                if (param_size < 8) param_size = 8;
 
-                // Add parameter to symbol table
                 c.addSymbol(param_name.lx.idup, param_type, false, false, true);
 
-                if (i < 6) { // Parameters in registers
+                if (i < 6) {
                         string reg = param_size == 8 ? regs[i] :
                                 param_size == 4 ? regs[i][0 .. 2] ~ "i" :
                                 param_size == 2 ? regs[i][2 .. $] :
@@ -469,25 +520,18 @@ void compileStmtProc(Visitor* v, StmtProc s) {
                                 param_size == 4 ? "dword" :
                                 param_size == 2 ? "word" : "byte";
 
-                        // Store parameter on stack
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
                         c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
-                        paramOffset += 8; // Increment for next parameter
+                        paramOffset += 8;
                 } else {
-                        // Stack parameters (not handled here, managed by caller)
                         c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
-                        paramOffset += 8; // Reserve space even for stack params
+                        paramOffset += 8;
                 }
         }
 
-        // Record total parameter space
-        size_t paramSpace = paramOffset - 8; // Subtract initial 8
-
-        // Align stack for local variables and calls
+        size_t paramSpace = paramOffset - 8;
         size_t totalStackSpace = paramSpace;
         if (totalStackSpace > 0) {
-                // After push rbp (8 bytes), rsp is misaligned by 8.
-                // We need rsp % 16 == 0 before calls, so adjust accordingly.
                 if ((totalStackSpace + 8) % 16 != 0) {
                         size_t padding = 16 - ((totalStackSpace + 8) % 16);
                         totalStackSpace += padding;
@@ -496,27 +540,93 @@ void compileStmtProc(Visitor* v, StmtProc s) {
                 c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
         }
 
-        // Compile the function body
-        c.stackOffset = totalStackSpace; // Local variables start after parameters + padding
+        // c.stackOffset = 0; // Reset stackOffset for local variables
+        c.stackOffset = paramSpace;
         s.b.accept(s.b, v);
 
-        // Generate epilogue
-        if (totalStackSpace > 0) {
-                c.text ~= c.s ~ "add rsp, " ~ totalStackSpace.to!string;
+        if (totalStackSpace > 0 || c.stackOffset > 0) {
+                c.text ~= c.s ~ "add rsp, " ~ (totalStackSpace + c.stackOffset).to!string;
         }
         c.text ~= c.s ~ "leave";
         c.text ~= c.s ~ "ret";
 
-        // Restore outer scope’s stack offset
-        c.stackOffset = oldStackOffset;
+        c.popScope();
 }
+
+// done
+// void compileStmtProc(Visitor* v, StmtProc s) {
+//         Context* c = cast(Context*)v.context;
+
+//         string proc_name = s.id.lx.idup;
+//         c.current_return_type = s.rtype;
+//         if (s.isExport) {
+//                 c.export_(proc_name);
+//         }
+
+//         c.prologue(proc_name);
+//         c.pushScope();
+
+//         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+//         size_t paramOffset = 8;
+
+//         foreach (i, param_name; s.pn) {
+//                 RuntimeType* param_type = s.pt[i];
+//                 size_t param_size = getTypeSize(param_type);
+//                 if (param_size < 8) param_size = 8;
+
+//                 c.addSymbol(param_name.lx.idup, param_type, false, false, true);
+
+//                 if (i < 6) {
+//                         string reg = param_size == 8 ? regs[i] :
+//                                 param_size == 4 ? regs[i][0 .. 2] ~ "i" :
+//                                 param_size == 2 ? regs[i][2 .. $] :
+//                                 regs[i][3 .. $];
+//                         string size_spec = param_size == 8 ? "qword" :
+//                                 param_size == 4 ? "dword" :
+//                                 param_size == 2 ? "word" : "byte";
+
+//                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
+//                         c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
+//                         paramOffset += 8;
+//                 } else {
+//                         c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
+//                         paramOffset += 8;
+//                 }
+//         }
+
+//         size_t paramSpace = paramOffset - 8;
+//         size_t totalStackSpace = paramSpace;
+//         if (totalStackSpace > 0) {
+//                 if ((totalStackSpace + 8) % 16 != 0) {
+//                         size_t padding = 16 - ((totalStackSpace + 8) % 16);
+//                         totalStackSpace += padding;
+//                         c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
+//                 }
+//                 c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
+//         }
+
+//         c.stackOffset = totalStackSpace; // Set for local variables
+//         s.b.accept(s.b, v);
+
+//         if (totalStackSpace > 0) {
+//                 c.text ~= c.s ~ "add rsp, " ~ totalStackSpace.to!string;
+//         }
+//         c.text ~= c.s ~ "leave";
+//         c.text ~= c.s ~ "ret";
+
+//         c.popScope();
+// }
 
 void compileStmtBlock(Visitor* v, StmtBlock s) {
         Context* c = cast(Context*)v.context;
 
+        c.pushScope();
+
         for (size_t i = 0; i < s.stmts.length; ++i) {
                 s.stmts[i].accept(s.stmts[i], v);
         }
+
+        c.popScope();
 }
 
 void compileStmtReturn(Visitor* v, StmtReturn s) {
@@ -530,7 +640,7 @@ void compileStmtExtern(Visitor* v, StmtExtern s) {
 
         string proc_name = s.proto.id.lx.idup;
 
-        // Check for redefinition
+        // Check for redefinition across all scopes
         if (c.findSymbol(proc_name) !is null) {
                 c.text ~= c.s ~ "; ERROR: Redefinition of external symbol " ~ proc_name;
                 return;
@@ -542,14 +652,17 @@ void compileStmtExtern(Visitor* v, StmtExtern s) {
                 if (i < s.proto.pn.length - 1) sig ~= ", ";
         }
         sig ~= ") -> " ~ s.proto.rtype.b.to!string;
-        // c.text ~= c.s ~ "; " ~ sig;
         c.externs ~= "; " ~ sig;
 
         // Add extern directive
         c.extern_(proc_name);
 
-        // Add to symbol table as a function
-        c.addSymbol(proc_name, s.proto.rtype, true, s.proto.variadic);
+        // Add to global scope (symbols[0]) as a function
+        if (c.symbols[0].length == 0 && c.symbols.length == 1) {
+                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic); // Add directly to global scope
+        } else {
+                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic); // Append to global scope
+        }
 }
 
 void compileStmtIf(Visitor* v, StmtIf s) {
@@ -580,7 +693,22 @@ void compileStmtIf(Visitor* v, StmtIf s) {
 }
 
 void compileStmtWhile(Visitor* v, StmtWhile s) {
-        assert(0);
+        Context* c = cast(Context*)v.context;
+        string loopBeginLabel = c.genLabel("while");
+        string loopEndLabel = c.genLabel("endwhile");
+
+        c.text ~= loopBeginLabel ~ ":";
+        s.e.accept(s.e, v);
+
+        // Compare rax with 0 (false if zero, true if non-zero)
+        c.text ~= c.s ~ "cmp rax, 0";
+        c.text ~= c.s ~ "je " ~ loopEndLabel; // Jump if equal (false)
+
+        s.s.accept(s.s, v);
+        c.text ~= c.s ~ "jmp " ~ loopBeginLabel;
+
+        // End of if statement
+        c.text ~= loopEndLabel ~ ":";
 }
 
 Visitor createCodegenContext(Context* c) {
