@@ -3,6 +3,8 @@ module codegen;
 import std.stdio;
 import std.conv;
 import std.algorithm;
+import std.file : write, exists, remove;
+import std.process : execute;
 
 import grammar;
 import runtimeTypes;
@@ -378,6 +380,33 @@ Visitor createCodegenContext(Context* c) {
         return v;
 }
 
+void writeX86_64AsmFile(Context c) {
+        writeln(c.write());
+        string outputName = "output";
+        string asmFile = outputName~".asm";
+        string objFile = outputName~".o";
+        string[] nasmArgs = ["nasm", "-f", "elf64", asmFile, "-o", objFile, "-g", "-F dwarf"];
+        string[] linkArgs = ["gcc", "-no-pie", objFile, "-o", outputName, "-g"];
+        writeln("Generated assembly:");
+        writeln(c.write());
+        write(asmFile, c.write());
+        auto nasmResult = execute(nasmArgs);
+        if (nasmResult.status != 0) {
+                writeln("Assembly failed:");
+                writeln(nasmResult.output);
+        } else {
+                auto linkResult = execute(linkArgs);
+                if (linkResult.status != 0) {
+                        writeln("Linking failed:");
+                        writeln(linkResult.output);
+                } else {
+                        writeln("Successfully compiled and linked to ", outputName);
+                }
+        }
+        if (exists(asmFile)) remove(asmFile);
+        if (exists(objFile)) remove(objFile);
+}
+
 void gen(Program* p) {
         Context c = new Context();
         Visitor v = createCodegenContext(&c);
@@ -386,5 +415,5 @@ void gen(Program* p) {
                 p.stmts[i].accept(p.stmts[i], &v);
         }
 
-        writeln(c.write());
+        writeX86_64AsmFile(c);
 }
