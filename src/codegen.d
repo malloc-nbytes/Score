@@ -284,7 +284,82 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
 }
 
 void compileExprMut(Visitor* v, ExprMut e) {
-        assert(0);
+        Context* c = cast(Context*)v.context;
+
+        // Ensure the left side is an identifier (variable)
+        if (auto ident = cast(ExprIdent)e.l) {
+                string varName = ident.id.lx.idup;
+                Context.Symbol* sym = c.findSymbol(varName);
+
+                if (sym is null) {
+                        c.text ~= c.s ~ "; ERROR: Undefined variable " ~ varName;
+                        return;
+                }
+
+                // Get variable details
+                size_t size = getTypeSize(sym.type);
+                string size_spec = size == 8 ? "qword" :
+                        size == 4 ? "dword" :
+                        size == 2 ? "word" : "byte";
+                string reg = size == 8 ? "rax" :
+                        size == 4 ? "eax" :
+                        size == 2 ? "ax" : "al";
+                string offset = sym.param ? (2 * sym.offset).to!string : sym.offset.to!string;
+
+                // Evaluate the right-hand side (result in rax)
+                e.r.accept(e.r, v);
+
+                // Handle the mutation based on the operator
+                switch (e.eqty.ty) {
+                case TokenType.Equals: // Simple assignment
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+
+                        // Compound Assignments
+                case TokenType.PlusEquals:
+                        c.text ~= c.s ~ "add " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.MinusEquals:
+                        c.text ~= c.s ~ "sub " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.AsteriskEquals:
+                        c.text ~= c.s ~ "imul " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.ForwardSlashEquals:
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]"; // Load current value
+                        c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
+                        c.text ~= c.s ~ "idiv rbx";    // Divide rax by rbx (rbx from right operand)
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.PercentEquals:
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]"; // Load current value
+                        c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
+                        c.text ~= c.s ~ "idiv rbx";    // Divide rax by rbx
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], rdx"; // Store remainder
+                        break;
+                case TokenType.AmpersandEquals:
+                        c.text ~= c.s ~ "and " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.PipeEquals:
+                        c.text ~= c.s ~ "or " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+                case TokenType.CaretEquals: // Assuming Caret is XOR
+                        c.text ~= c.s ~ "xor " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        break;
+
+                default:
+                        c.text ~= c.s ~ "; ERROR: Unsupported mutation operator " ~ e.eqty.ty.to!string;
+                        break;
+                }
+        } else {
+                c.text ~= c.s ~ "; ERROR: Left side of mutation must be an identifier";
+        }
 }
 
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
