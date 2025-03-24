@@ -18,6 +18,7 @@ struct Sym {
         string name;
         RuntimeType* type;
         bool fun;
+        bool strct;
 }
 
 struct SymScope {
@@ -33,7 +34,7 @@ class SymTbl {
                 assert(this.scopes.length > 0);
                 this.scopes.length--;
         }
-        bool addSym(string name, RuntimeType* type, bool fun) {
+        bool addSym(string name, RuntimeType* type, bool fun, bool strct) {
                 if (this.scopes.length == 0) {
                         this.enterScope();
                 }
@@ -140,7 +141,7 @@ void symCheckVisitExprProcCall(Visitor* v, ExprProcCall s) {
 void symCheckVisitStmtLet(Visitor* v, StmtLet s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
-        if (!checker.tbl.addSym(name, s.t, false)) {
+        if (!checker.tbl.addSym(name, s.t, false, false)) {
                 checker.reportErr(tokerrToStr(s.id) ~ format("Redefinition of identifier '%s'", name));
         }
         s.e.accept(s.e, v);
@@ -154,7 +155,7 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.id.lx;
 
-        if (!checker.tbl.addSym(name, s.rtype, true)) {
+        if (!checker.tbl.addSym(name, s.rtype, true, false)) {
                 checker.reportErr(tokerrToStr(s.id) ~ format("Redefinition of procedure '%s'", name));
         }
 
@@ -164,7 +165,7 @@ void symCheckVisitStmtProc(Visitor* v, StmtProc s) {
 
         for (size_t i = 0; i < s.pn.length; ++i) {
                 string pname = cast(string)s.pn[i].lx;
-                if (!checker.tbl.addSym(pname, s.pt[i], false)) {
+                if (!checker.tbl.addSym(pname, s.pt[i], false, false)) {
                         checker.reportErr(tokerrToStr(s.pn[i]) ~ format("Redefinition of parameter '%s' in procedure '%s'",
                                                                         pname, name));
                 }
@@ -191,7 +192,7 @@ void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
 void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.proto.id.lx;
-        if (!checker.tbl.addSym(name, s.proto.rtype, true)) {
+        if (!checker.tbl.addSym(name, s.proto.rtype, true, false)) {
                 checker.reportErr(tokerrToStr(s.proto.id) ~ format("Redefinition of procedure '%s'", name));
         }
         checker.externs[name] = s;
@@ -208,6 +209,25 @@ void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
 void symCheckVisitStmtWhile(Visitor* v, StmtWhile s) {
         s.e.accept(s.e, v);
         s.s.accept(s.s, v);
+}
+
+void symCheckVisitStmtStruct(Visitor* v, StmtStruct s) {
+        SymTblChecker* checker = cast(SymTblChecker*)v.context;
+        string name = cast(string)s.id.lx;
+        auto sym = checker.tbl.symLookup(name);
+        if (sym !is null && sym.strct) {
+                checker.reportErr(tokerrToStr(s.id) ~ format("Struct is already defined '%s'", name));
+        }
+        bool[string] memberIds;
+        for (size_t i = 0; i < s.members.length; ++i) {
+                const char[]* id = &s.members[i].lx;
+                if (*id in memberIds) {
+                        checker.reportErr(tokerrToStr(s.members[i])
+                                          ~ format("Duplicate field '%s' in struct '%s'",
+                                                   *id, name));
+                }
+                memberIds[*id] = true;
+        }
 }
 
 Visitor createSymTblChecker(SymTblChecker* c) {
@@ -230,6 +250,7 @@ Visitor createSymTblChecker(SymTblChecker* c) {
         v.visitStmtExtern   = &symCheckVisitStmtExtern;
         v.visitStmtIf       = &symCheckVisitStmtIf;
         v.visitStmtWhile    = &symCheckVisitStmtWhile;
+        v.visitStmtStruct   = &symCheckVisitStmtStruct;
         return v;
 }
 

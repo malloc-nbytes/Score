@@ -346,6 +346,29 @@ private StmtWhile parseStmtWhile(Lexer* l) {
         return new StmtWhile(e, s);
 }
 
+private StmtStruct parseStmtStruct(Lexer* l) {
+        lexerDiscard(l); // struct
+        Token* id = expect(l, TokenType.Ident);
+        Token*[] members = [];
+        RuntimeType*[] memberTypes = [];
+        cast(void)expect(l, TokenType.LCurlyBracket);
+        while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
+                Token* member = expect(l, TokenType.Ident);
+                cast(void)expect(l, TokenType.Colon);
+                RuntimeType* memberType = parseType(l);
+                members ~= member;
+                memberTypes ~= memberType;
+                if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
+                        lexerDiscard(l); // ,
+                } else {
+                        cast(void)expectWoEat(l, TokenType.RCurlyBracket);
+                        break;
+                }
+        }
+        cast(void)expect(l, TokenType.RCurlyBracket);
+        return new StmtStruct(id, members, memberTypes);
+}
+
 private Stmt parseStmtKW(Lexer* l) {
         switch (lexerPeek(l).lx) {
         case Keyword.Export: {
@@ -369,6 +392,9 @@ private Stmt parseStmtKW(Lexer* l) {
         } break;
         case Keyword.While: {
                 return parseStmtWhile(l);
+        } break;
+        case Keyword.Struct: {
+                return parseStmtStruct(l);
         } break;
         default: {
                 err(format("invalid keyword '%s' for statement", lexerPeek(l).lx));

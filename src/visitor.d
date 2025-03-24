@@ -27,6 +27,7 @@ struct Visitor {
         void function(Visitor* v, StmtExtern s) visitStmtExtern;
         void function(Visitor* v, StmtIf s)     visitStmtIf;
         void function(Visitor* v, StmtWhile s)  visitStmtWhile;
+        void function(Visitor* v, StmtStruct s) visitStmtStruct;
 }
 
 /*
@@ -78,6 +79,12 @@ void acceptExprProcCall(Expr e, Visitor* v) {
 /*
  * Statement acceptors
  */
+
+void acceptStmtStruct(Stmt s, Visitor* v) {
+        if (v.visitStmtStruct) {
+                v.visitStmtStruct(v, cast(StmtStruct)s);
+        }
+}
 
 void acceptStmtLet(Stmt s, Visitor* v) {
         if (v.visitStmtLet) {

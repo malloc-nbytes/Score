@@ -116,6 +116,7 @@ enum StmtType {
         Extern,
         If,
         While,
+        Struct,
 }
 
 class Stmt {
@@ -132,8 +133,21 @@ class Stmt {
                 case StmtType.Extern: this.accept = &acceptStmtExtern; break;
                 case StmtType.If:     this.accept = &acceptStmtIf;     break;
                 case StmtType.While:  this.accept = &acceptStmtWhile;  break;
+                case StmtType.Struct: this.accept = &acceptStmtStruct;  break;
                 default: assert(0);
                 }
+        }
+}
+
+class StmtStruct : Stmt {
+        Token* id;
+        Token*[] members;
+        RuntimeType*[] memberTypes;
+        this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
+                super(StmtType.Struct);
+                this.id = id;
+                this.members = members;
+                this.memberTypes = memberTypes;
         }
 }
 
