@@ -3,6 +3,8 @@ module token;
 import std.stdio;
 import std.conv;
 
+import utils;
+
 enum TokenType {
         Ident,
         StrLit,
@@ -60,9 +62,28 @@ struct Token {
         Token *next;
 }
 
-Token *tokenCreate(char[] lx, TokenType ty, size_t r, size_t c, string fp) {
-        Token *t = new Token;
-        t.lx = lx;
+Token* tokenCreate(char[] lx, TokenType ty, size_t r, size_t c, string fp) {
+        char[] result;
+
+        for (size_t i = 0; i < lx.length; ++i) {
+                if (i < lx.length - 1 && lx[i] == '\\') {
+                        if (lx[i + 1] == 'n') {
+                                result ~= '\n';
+                                i++;
+                        } else if (lx[i + 1] == '\\') {
+                                result ~= '\\';
+                                i++;
+                        } else {
+                                err("unsupported escape sequence: '"~lx[i]~lx[i + 1]~"'");
+                                result ~= lx[i];
+                        }
+                } else {
+                        result ~= lx[i];
+                }
+        }
+
+        Token* t = new Token;
+        t.lx = result;
         t.ty = ty;
         t.r = r;
         t.c = c;

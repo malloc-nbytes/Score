@@ -111,7 +111,29 @@ void compileExprStrLit(Visitor* v, ExprStrLit e) {
         static size_t str_count = 0;
         string label = "str_" ~ str_count++.to!string;
 
-        c.rotdata ~= label ~ ": db \"" ~ e.s.lx.idup ~ "\", 0";
+        string buf;
+
+        for (size_t i = 0; i < e.s.lx.length; ++i) {
+                if (e.s.lx[i] == '\n') {
+                        buf ~= "\", 10, \"";
+                } else {
+                        buf ~= e.s.lx[i];
+                }
+        }
+
+        // Remove surrounding quotes from e.s.lx if present and combine with processed content
+        string rawStr = e.s.lx.idup;
+        if (rawStr.length >= 2 && rawStr[0] == '"' && rawStr[$-1] == '"') {
+                rawStr = rawStr[1..$-1]; // Strip quotes
+        }
+
+        // Only wrap in quotes if there's content, and append null terminator
+        if (buf.length > 0) {
+                c.rotdata ~= label ~ ": db \"" ~ buf ~ "\", 0";
+        } else {
+                c.rotdata ~= label ~ ": db 0"; // Empty string case
+        }
+
         c.text ~= c.s ~ "lea rax, [" ~ label ~ "]";
 }
 
@@ -381,7 +403,6 @@ Visitor createCodegenContext(Context* c) {
 }
 
 void writeX86_64AsmFile(Context c) {
-        writeln(c.write());
         string outputName = "output";
         string asmFile = outputName~".asm";
         string objFile = outputName~".o";
