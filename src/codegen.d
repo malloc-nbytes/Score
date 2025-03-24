@@ -286,7 +286,6 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
 void compileExprMut(Visitor* v, ExprMut e) {
         Context* c = cast(Context*)v.context;
 
-        // Ensure the left side is an identifier (variable)
         if (auto ident = cast(ExprIdent)e.l) {
                 string varName = ident.id.lx.idup;
                 Context.Symbol* sym = c.findSymbol(varName);
@@ -296,7 +295,6 @@ void compileExprMut(Visitor* v, ExprMut e) {
                         return;
                 }
 
-                // Get variable details
                 size_t size = getTypeSize(sym.type);
                 string size_spec = size == 8 ? "qword" :
                         size == 4 ? "dword" :
@@ -306,22 +304,22 @@ void compileExprMut(Visitor* v, ExprMut e) {
                         size == 2 ? "ax" : "al";
                 string offset = sym.param ? (2 * sym.offset).to!string : sym.offset.to!string;
 
-                // Evaluate the right-hand side (result in rax)
+                // Evaluate right-hand side
                 e.r.accept(e.r, v);
 
-                // Handle the mutation based on the operator
                 switch (e.eqty.ty) {
-                case TokenType.Equals: // Simple assignment
+                case TokenType.Equals:
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
 
-                        // Compound Assignments
                 case TokenType.PlusEquals:
                         c.text ~= c.s ~ "add " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.MinusEquals:
-                        c.text ~= c.s ~ "sub " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov rbx, " ~ reg; // Save right operand
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "sub " ~ reg ~ ", rbx";
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.AsteriskEquals:
@@ -329,16 +327,18 @@ void compileExprMut(Visitor* v, ExprMut e) {
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.ForwardSlashEquals:
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]"; // Load current value
-                        c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
-                        c.text ~= c.s ~ "idiv rbx";    // Divide rax by rbx (rbx from right operand)
+                        c.text ~= c.s ~ "mov rbx, rax"; // Save right operand
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "cqo";
+                        c.text ~= c.s ~ "idiv rbx";
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.PercentEquals:
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]"; // Load current value
-                        c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
-                        c.text ~= c.s ~ "idiv rbx";    // Divide rax by rbx
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], rdx"; // Store remainder
+                        c.text ~= c.s ~ "mov rbx, rax"; // Save right operand
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "cqo";
+                        c.text ~= c.s ~ "idiv rbx";
+                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], rdx";
                         break;
                 case TokenType.AmpersandEquals:
                         c.text ~= c.s ~ "and " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
@@ -348,7 +348,7 @@ void compileExprMut(Visitor* v, ExprMut e) {
                         c.text ~= c.s ~ "or " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
-                case TokenType.CaretEquals: // Assuming Caret is XOR
+                case TokenType.CaretEquals:
                         c.text ~= c.s ~ "xor " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
