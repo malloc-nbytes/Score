@@ -9,6 +9,7 @@ import std.process : execute;
 import grammar;
 import runtimeTypes;
 import visitor;
+import token;
 
 class Context {
         string[] rotdata         = [];
@@ -20,6 +21,7 @@ class Context {
         const string noexecstack = "section .note.GNU-stack noalloc noexec nowrite progbits";
         const string s           = "    ";
         RuntimeType* current_return_type;
+        size_t labelCounter = 0;
 
         struct Symbol {
                 string name;
@@ -38,6 +40,10 @@ class Context {
                 this.bss     ~= "section .bss";
                 this.data    ~= "section .data";
                 this.text    ~= "section .text";
+        }
+
+        string genLabel(string prefix) {
+                return prefix~"_"~this.labelCounter++.to!string;
         }
 
         void addComment(string msg) {
@@ -98,7 +104,102 @@ class Context {
 }
 
 void compileExprBin(Visitor* v, ExprBin e) {
-        assert(0);
+        Context* c = cast(Context*)v.context;
+
+        // Evaluate left operand (result in rax)
+        e.l.accept(e.l, v);
+        // Save l operand to the stack to free rax
+        c.text ~= c.s ~ "push rax";
+
+        // Evaluate r operand (result in rax)
+        e.r.accept(e.r, v);
+        // Move r operand to rbx
+        c.text ~= c.s ~ "mov rbx, rax";
+
+        // Pop l operand back into rax
+        c.text ~= c.s ~ "pop rax";
+
+        // Perform the operation based on the operator
+        switch (e.op.ty) {
+                // Arithmetic Operations
+        case TokenType.Plus:
+                c.text ~= c.s ~ "add rax, rbx"; // rax = rax + rbx
+                break;
+        case TokenType.Minus:
+                c.text ~= c.s ~ "sub rax, rbx"; // rax = rax - rbx
+                break;
+        case TokenType.Asterisk:
+                c.text ~= c.s ~ "imul rax, rbx"; // rax = rax * rbx (signed multiply)
+                break;
+        case TokenType.ForwardSlash:
+                c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
+                c.text ~= c.s ~ "idiv rbx";    // rax = rax / rbx (signed division)
+                break;
+        case TokenType.Percent:
+                c.text ~= c.s ~ "cqo";         // Sign-extend rax into rdx:rax
+                c.text ~= c.s ~ "idiv rbx";    // rdx = rax % rbx (remainder)
+                c.text ~= c.s ~ "mov rax, rdx"; // Move remainder to rax
+                break;
+
+                // Comparison Operations (result is 0 or 1)
+        case TokenType.DoubleEquals:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "sete al";     // Set al to 1 if equal, 0 otherwise
+                c.text ~= c.s ~ "movzx rax, al"; // Zero-extend to 64-bit
+                break;
+        case TokenType.BangEquals:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "setne al";    // Set al to 1 if not equal
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+        case TokenType.Lessthan:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "setl al";     // Set al to 1 if less than
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+        case TokenType.Greaterthan:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "setg al";     // Set al to 1 if greater than
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+        case TokenType.LessthanEquals:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "setle al";    // Set al to 1 if less than or equal
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+        case TokenType.GreaterthanEquals:
+                c.text ~= c.s ~ "cmp rax, rbx";
+                c.text ~= c.s ~ "setge al";    // Set al to 1 if greater than or equal
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+
+                // Logical Operations (short-circuit not implemented here)
+        case TokenType.DoubleAmpersand:
+                c.text ~= c.s ~ "and rax, rbx"; // Logical AND (non-zero = true)
+                c.text ~= c.s ~ "setne al";     // Convert to 0 or 1
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+        case TokenType.DoublePipe:
+                c.text ~= c.s ~ "or rax, rbx";  // Logical OR
+                c.text ~= c.s ~ "setne al";     // Convert to 0 or 1
+                c.text ~= c.s ~ "movzx rax, al";
+                break;
+
+                // Bitwise Operations
+        case TokenType.Ampersand:
+                c.text ~= c.s ~ "and rax, rbx"; // Bitwise AND
+                break;
+        case TokenType.Pipe:
+                c.text ~= c.s ~ "or rax, rbx";  // Bitwise OR
+                break;
+        case TokenType.Uptick: // Assuming Uptick (^) is XOR
+                c.text ~= c.s ~ "xor rax, rbx"; // Bitwise XOR
+                break;
+
+        default:
+                c.text ~= c.s ~ "; ERROR: Unsupported binary operator " ~ e.op.ty.to!string;
+                break;
+        }
 }
 
 void compileExprUn(Visitor* v, ExprUn e) {
@@ -377,7 +478,30 @@ void compileStmtExtern(Visitor* v, StmtExtern s) {
 }
 
 void compileStmtIf(Visitor* v, StmtIf s) {
-        assert(0);
+        Context* c = cast(Context*)v.context;
+
+        // Generate unique labels
+        string elseLabel = c.genLabel("else");
+        string endLabel = c.genLabel("endif");
+
+        // Evaluate the condition expression (result in rax)
+        s.e.accept(s.e, v);
+
+        // Compare rax with 0 (false if zero, true if non-zero)
+        c.text ~= c.s ~ "cmp rax, 0";
+        c.text ~= c.s ~ "je " ~ (s.else_ !is null ? elseLabel : endLabel); // Jump if equal (false)
+
+        s.then.accept(s.then, v);
+
+        // If there's an else block, jump to end after then
+        if (s.else_ !is null) {
+                c.text ~= c.s ~ "jmp " ~ endLabel;
+                c.text ~= elseLabel ~ ":";
+                s.else_.accept(s.else_, v);
+        }
+
+        // End of if statement
+        c.text ~= endLabel ~ ":";
 }
 
 void compileStmtWhile(Visitor* v, StmtWhile s) {

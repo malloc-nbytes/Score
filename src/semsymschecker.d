@@ -171,7 +171,11 @@ void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
 }
 
 void symCheckVisitStmtIf(Visitor* v, StmtIf s) {
-        assert(0);
+        s.e.accept(s.e, v);
+        s.then.accept(s.then, v);
+        if (s.else_) {
+                s.else_.accept(s.else_, v);
+        }
 }
 
 void symCheckVisitStmtWhile(Visitor* v, StmtWhile s) {
