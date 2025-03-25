@@ -177,6 +177,7 @@ enum StmtType {
         While,
         Struct,
         Mod,
+        Import,
 }
 
 class Stmt {
@@ -195,6 +196,7 @@ class Stmt {
                 case StmtType.While:  this.accept = &acceptStmtWhile;  break;
                 case StmtType.Struct: this.accept = &acceptStmtStruct; break;
                 case StmtType.Mod:    this.accept = &acceptStmtMod;    break;
+                case StmtType.Import: this.accept = &acceptStmtImport; break;
                 default: assert(0);
                 }
         }
@@ -321,6 +323,14 @@ class StmtMod : Stmt {
         Token* id;
         this(Token* id) {
                 super(StmtType.Mod);
+                this.id = id;
+        }
+}
+
+class StmtImport : Stmt {
+        Token* id;
+        this(Token* id) {
+                super(StmtType.Import);
                 this.id = id;
         }
 }

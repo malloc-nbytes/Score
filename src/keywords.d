@@ -24,7 +24,8 @@ static const string[] keywords = [
         "export",
         "struct",
         "module",
-        "where"
+        "where",
+        "import",
 ];
 
 enum Keyword {
@@ -39,6 +40,7 @@ enum Keyword {
         Struct = keywords[8],
         Module = keywords[9],
         Where = keywords[10],
+        Import = keywords[11],
 }
 
 enum TypeKeyword {

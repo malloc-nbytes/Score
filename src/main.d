@@ -9,8 +9,9 @@ import token;
 import grammar;
 import parser;
 import visitor;
-import semanticSymbols;
 import gatherIdentifiers;
+import depTracker;
+import semanticSymbols;
 import codegen;
 import flag;
 
@@ -31,43 +32,36 @@ void assembleX86_64AsmFiles(FlagParser fp) {
         assert(gAsmFiles.length == gObjFiles.length);
 
         string outputName = fp.outputName.length == 0 ? "a.out" : fp.outputName;
-        string asmFiles = "";
-        string objFiles = "";
 
+        // Assemble each .asm file into its corresponding .o file
         for (size_t i = 0; i < gAsmFiles.length; ++i) {
-                if (i != 0) {
-                        asmFiles ~= " ";
-                        objFiles ~= " ";
-                }
-                asmFiles ~= gAsmFiles[i];
-                objFiles ~= gObjFiles[i];
-        }
-
-        string[] nasmArgs = ["nasm", "-f", "elf64", asmFiles, "-o", objFiles, "-g", "-F dwarf"];
-        string[] linkArgs = ["gcc", "-no-pie", objFiles, "-o", outputName, "-g"];
-
-        auto nasmResult = execute(nasmArgs);
-        if (nasmResult.status != 0) {
-                writeln("Assembly failed:");
-                writeln(nasmResult.output);
-        } else {
-                auto linkResult = execute(linkArgs);
-                if (linkResult.status != 0) {
-                        writeln("Linking failed:");
-                        writeln(linkResult.output);
-                } else {
-                        writeln("Successfully compiled and linked to ", outputName);
+                string[] nasmArgs = ["nasm", "-f", "elf64", gAsmFiles[i], "-o", gObjFiles[i], "-g", "-F dwarf"];
+                auto nasmResult = execute(nasmArgs);
+                if (nasmResult.status != 0) {
+                        writeln("Assembly failed for ", gAsmFiles[i], ":");
+                        writeln(nasmResult.output);
+                        exit(1); // Exit with error code
                 }
         }
 
+        // Link all object files into the final executable
+        string[] linkArgs = ["gcc", "-no-pie"];
+        linkArgs ~= gObjFiles;
+        linkArgs ~= ["-o", outputName, "-g"];
+
+        auto linkResult = execute(linkArgs);
+        if (linkResult.status != 0) {
+                writeln("[Score: Linking failed]:");
+                writeln(linkResult.output);
+                exit(1);
+        }
+
+        // Cleanup temporary files if --no-cleanup is not specified
         if ((fp.flags & FlagType.NoCleanup) == 0) {
                 for (size_t i = 0; i < gAsmFiles.length; ++i) {
                         if (exists(gAsmFiles[i])) {
                                 remove(gAsmFiles[i]);
                         }
-                }
-
-                for (size_t i = 0; i < gObjFiles.length; ++i) {
                         if (exists(gObjFiles[i])) {
                                 remove(gObjFiles[i]);
                         }
@@ -94,6 +88,7 @@ int main(string[] args) {
         Lexer[] lexers = [];
         Program[] programs = [];
         IdentGatherer[] igs = [];
+        DepTbl[] dts = [];
         SymTblChecker[] symTbls = [];
 
         if (fp.flags & FlagType.Help) {
@@ -106,24 +101,46 @@ int main(string[] args) {
                 lexers   ~= lexFile(src, fp.paths[i]);
                 programs ~= parseProgram(&lexers[i]);
                 igs      ~= getIdents(&programs[i]);
-                symTbls  ~= semSymCheck(&programs[i]);
+                dts      ~= determineDeps(&programs[i], fp.paths[i]);
         }
 
-        assert(fp.paths.length == lexers.length);
-        assert(fp.paths.length == programs.length);
-        assert(fp.paths.length == igs.length);
-        assert(fp.paths.length == symTbls.length);
+        for (size_t i = 0; i < programs.length; ++i) {
+                symTbls ~= semSymCheck(&programs[i], igs, dts[i], &igs[i]); // Pass current ig
+        }
 
-        // Do not do codegen if any errors were encountered.
+        // Check for multiple main definitions
+        size_t mainCount = 0;
+        size_t mainFileIndex = 0;
+        for (size_t i = 0; i < symTbls.length; ++i) {
+                if ("main" in symTbls[i].procs) {
+                        mainCount++;
+                        mainFileIndex = i;
+                        if (mainCount > 1) {
+                                writeln("Error: Multiple definitions of 'main' found across files:");
+                                for (size_t j = 0; j <= i; ++j) {
+                                        if ("main" in symTbls[j].procs) {
+                                                writeln("  - Defined in ", fp.paths[j]);
+                                        }
+                                }
+                                exit(1);
+                        }
+                }
+        }
+        if (mainCount == 0) {
+                writeln("Error: No 'main' function defined in any file.");
+                exit(1);
+        }
+
+        // Do not do codegen if any errors were encountered
         for (size_t i = 0; i < igs.length; ++i) {
                 if (!igs[i].ok || !symTbls[i].ok) {
                         exit(1);
                 }
         }
 
-        // Perform codegen.
+        // Perform codegen
         for (size_t i = 0; i < programs.length; ++i) {
-                char[] asm_ = gen(&programs[i]);
+                char[] asm_ = gen(&programs[i], igs);
                 if (fp.flags & FlagType.ShowAsm) {
                         writeln("--- Generated assembly for file: ", fp.paths[i], " ---");
                         writeln(asm_);
@@ -132,6 +149,64 @@ int main(string[] args) {
         }
 
         assembleX86_64AsmFiles(fp);
-
         return 0;
 }
+
+// int main(string[] args) {
+//         if (args.length < 2) {
+//                 usage();
+//         }
+
+//         args = args[1..$];
+
+//         FlagParser fp = handleArgs(args);
+//         Lexer[] lexers = [];
+//         Program[] programs = [];
+//         IdentGatherer[] igs = [];
+//         DepTbl[] dts = [];
+//         SymTblChecker[] symTbls = [];
+
+//         if (fp.flags & FlagType.Help) {
+//                 usage();
+//         }
+
+//         // Perform all pre-codegen analysis
+//         for (size_t i = 0; i < fp.paths.length; ++i) {
+//                 const string src = readText(fp.paths[i]);
+//                 lexers   ~= lexFile(src, fp.paths[i]);
+//                 programs ~= parseProgram(&lexers[i]);
+//                 igs      ~= getIdents(&programs[i]);
+//                 dts      ~= determineDeps(&programs[i], fp.paths[i]);
+//         }
+
+//         for (size_t i = 0; i < programs.length; ++i) {
+//                 symTbls ~= semSymCheck(&programs[i], igs, dts[i]);
+//         }
+
+//         assert(fp.paths.length == lexers.length);
+//         assert(fp.paths.length == programs.length);
+//         assert(fp.paths.length == igs.length);
+//         assert(fp.paths.length == symTbls.length);
+//         assert(fp.paths.length == dts.length);
+
+//         // Do not do codegen if any errors were encountered.
+//         for (size_t i = 0; i < igs.length; ++i) {
+//                 if (!igs[i].ok || !symTbls[i].ok) {
+//                         exit(1);
+//                 }
+//         }
+
+//         // Perform codegen.
+//         for (size_t i = 0; i < programs.length; ++i) {
+//                 char[] asm_ = gen(&programs[i], igs);
+//                 if (fp.flags & FlagType.ShowAsm) {
+//                         writeln("--- Generated assembly for file: ", fp.paths[i], " ---");
+//                         writeln(asm_);
+//                 }
+//                 writeX86_64AsmFile(asm_, fp.paths[i]);
+//         }
+
+//         assembleX86_64AsmFiles(fp);
+
+//         return 0;
+// }

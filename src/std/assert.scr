@@ -1,0 +1,11 @@
+module assert where
+
+extern printf(format: u8*, ...): i32;
+extern exit(e: i32): void;
+
+export proc assert(b: i32): void {
+        if (b == 0) {
+                printf("assert: ASSERTION FAILURE\n");
+                exit(1);
+        }
+}

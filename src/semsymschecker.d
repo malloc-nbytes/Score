@@ -1,8 +1,3 @@
-/*
- * First pass. Checks to make sure all identifiers
- * are in scope and defined.
- */
-
 module semanticSymbols;
 
 import std.stdio;
@@ -13,6 +8,8 @@ import visitor;
 import runtimeTypes;
 import grammar;
 import token;
+import depTracker;
+import gatherIdentifiers;
 
 struct Sym {
         string name;
@@ -27,31 +24,81 @@ struct SymScope {
 
 class SymTbl {
         SymScope[] scopes;
+        DepTbl dt;
+        IdentGatherer[] igs;
+        IdentGatherer* currentIg;
+
+        this(DepTbl dt, IdentGatherer[] igs, IdentGatherer* currentIg) {
+                this.dt = dt;
+                this.igs = igs;
+                this.currentIg = currentIg;
+        }
+
         void enterScope() {
                 this.scopes ~= SymScope();
         }
+
         void exitScope() {
                 assert(this.scopes.length > 0);
                 this.scopes.length--;
         }
+
         bool addSym(string name, RuntimeType* type, bool fun, bool strct) {
                 if (this.scopes.length == 0) {
                         this.enterScope();
                 }
                 auto currentScope = &this.scopes[$ - 1];
+
+                // Check for redefinition in the current scope
                 if (name in currentScope.syms) {
-                        // Symbol already exists
                         return false;
                 }
-                currentScope.syms[name] = Sym(name, type, fun);
+
+                // For procedures, check dependencies but exclude the current file
+                if (fun) {
+                        foreach (ref depFile; this.dt.deps) {
+                                foreach (ref ig; this.igs) {
+                                        if (&ig != this.currentIg) { // Skip the current file's IdentGatherer
+                                                foreach (ref proc; ig.procs) {
+                                                        string procName = cast(string)proc.id.lx;
+                                                        if (procName == name) {
+                                                                return false; // Procedure defined in a dependency
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+                }
+
+                // Add the symbol if no conflicts are found
+                currentScope.syms[name] = Sym(name, type, fun, strct);
                 return true;
         }
+
         const const(Sym)* symLookup(const ref string name) {
-                foreach (const ref SymScope it; this.scopes) {
+                // First, check local scopes
+                foreach_reverse (const ref SymScope it; this.scopes) {
                         if (name in it.syms) {
                                 return &(it.syms[name]);
                         }
                 }
+
+                // If not found locally, check dependencies
+                foreach (ref depFile; this.dt.deps) {
+                        foreach (ref ig; this.igs) {
+                                if (&ig != this.currentIg) { // Skip current file for consistency
+                                        foreach (ref proc; ig.procs) {
+                                                string procName = cast(string)proc.id.lx;
+                                                if (procName == name) {
+                                                        static Sym foundSym;
+                                                        foundSym = Sym(name, cast(RuntimeType*)proc.rtype, true, false);
+                                                        return &foundSym;
+                                                }
+                                        }
+                                }
+                        }
+                }
+
                 return null;
         }
 }
@@ -63,8 +110,8 @@ class SymTblChecker {
         string[] errs;
         bool ok;
 
-        this() {
-                this.tbl = new SymTbl;
+        this(DepTbl dt, IdentGatherer[] igs, IdentGatherer* currentIg) {
+                this.tbl = new SymTbl(dt, igs, currentIg);
                 this.errs = [];
                 this.ok = true;
         }
@@ -256,8 +303,8 @@ Visitor createSymTblChecker(SymTblChecker* c) {
         return v;
 }
 
-SymTblChecker semSymCheck(Program* p) {
-        SymTblChecker tbl = new SymTblChecker();
+SymTblChecker semSymCheck(Program* p, IdentGatherer[] igs, DepTbl dt, IdentGatherer* currentIg) {
+        SymTblChecker tbl = new SymTblChecker(dt, igs, currentIg);
         Visitor v = createSymTblChecker(&tbl);
         for (size_t i = 0; i < p.stmts.length; ++i) {
                 p.stmts[i].accept(p.stmts[i], &v);
@@ -270,3 +317,4 @@ SymTblChecker semSymCheck(Program* p) {
         }
         return tbl;
 }
+

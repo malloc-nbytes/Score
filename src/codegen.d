@@ -11,8 +11,10 @@ import grammar;
 import runtimeTypes;
 import visitor;
 import token;
+import gatherIdentifiers;
 
 class Context {
+        IdentGatherer[] igs;
         string[] rotdata         = [];
         string[] bss             = [];
         string[] data            = [];
@@ -37,7 +39,8 @@ class Context {
         Symbol[][] symbols; // Stack of scopes
         size_t stackOffset = 0; // Total stack space used in current scope
 
-        this() {
+        this(IdentGatherer[] igs) {
+                this.igs = igs;
                 this.rotdata ~= "section .rotdata";
                 this.bss     ~= "section .bss";
                 this.data    ~= "section .data";
@@ -46,6 +49,18 @@ class Context {
                         this.symbols = [[]];
                 }
                 this.oldStackOffset = 0;
+        }
+
+        void makeProcsExterns(ref const char[] modName) {
+                for (size_t i = 0; i < this.igs.length; ++i) {
+                        if (igs[i].mod.id.lx == modName) {
+                                for (size_t j = 0; j < igs[i].procs.length; ++j) {
+                                        if (igs[i].procs[j].isExport) {
+                                                this.extern_(igs[i].procs[j].id.lx.idup);
+                                        }
+                                }
+                        }
+                }
         }
 
         string genLabel(string prefix) {
@@ -788,6 +803,12 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
         c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
 }
 
+void compileStmtImport(Visitor* v, StmtImport s) {
+        Context* c = cast(Context*)v.context;
+        c.makeProcsExterns(s.id.lx);
+        return;
+}
+
 Visitor createCodegenContext(Context* c) {
         Visitor v;
         v.context             = cast(void*)c;
@@ -811,43 +832,18 @@ Visitor createCodegenContext(Context* c) {
         v.visitStmtWhile      = &compileStmtWhile;
         v.visitStmtStruct     = &compileStmtStruct;
         v.visitStmtMod        = &compileStmtMod;
+        v.visitStmtImport     = &compileStmtImport;
+
         return v;
 }
 
-// void writeX86_64AsmFile(Context c) {
-//         string outputName = "output";
-//         string asmFile = outputName~".asm";
-//         string objFile = outputName~".o";
-//         string[] nasmArgs = ["nasm", "-f", "elf64", asmFile, "-o", objFile, "-g", "-F dwarf"];
-//         string[] linkArgs = ["gcc", "-no-pie", objFile, "-o", outputName, "-g"];
-//         writeln("Generated assembly:");
-//         writeln(c.write());
-//         write(asmFile, c.write());
-//         auto nasmResult = execute(nasmArgs);
-//         if (nasmResult.status != 0) {
-//                 writeln("Assembly failed:");
-//                 writeln(nasmResult.output);
-//         } else {
-//                 auto linkResult = execute(linkArgs);
-//                 if (linkResult.status != 0) {
-//                         writeln("Linking failed:");
-//                         writeln(linkResult.output);
-//                 } else {
-//                         writeln("Successfully compiled and linked to ", outputName);
-//                 }
-//         }
-//         // if (exists(asmFile)) remove(asmFile);
-//         if (exists(objFile)) remove(objFile);
-// }
-
-char[] gen(Program* p) {
-        Context c = new Context();
+char[] gen(Program* p, IdentGatherer[] igs) {
+        Context c = new Context(igs);
         Visitor v = createCodegenContext(&c);
 
         for (size_t i = 0; i < p.stmts.length; ++i) {
                 p.stmts[i].accept(p.stmts[i], &v);
         }
 
-        // writeX86_64AsmFile(c);
         return c.write();
 }

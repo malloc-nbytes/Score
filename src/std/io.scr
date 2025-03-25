@@ -1,0 +1,8 @@
+module io where
+
+extern printf(format: u8*, ...): i32;
+
+export proc println(format: u8*): void {
+        printf(format);
+        printf("test\n");
+}

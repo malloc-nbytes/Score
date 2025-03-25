@@ -422,6 +422,13 @@ private StmtMod parseStmtMod(Lexer* l, Program* p) {
         return new StmtMod(id);
 }
 
+private StmtImport parseStmtImport(Lexer* l, Program* p) {
+        lexerDiscard(l); // import
+        Token* id = expect(l, TokenType.Ident);
+        cast(void)expect(l, TokenType.SemiColon);
+        return new StmtImport(id);
+}
+
 private Stmt parseStmtKW(Lexer* l, Program* p) {
         switch (lexerPeek(l).lx) {
         case Keyword.Export: {
@@ -452,6 +459,9 @@ private Stmt parseStmtKW(Lexer* l, Program* p) {
         case Keyword.Module: {
                 return parseStmtMod(l, p);
         } break;
+        case Keyword.Import: {
+                return parseStmtImport(l, p);
+        } break;
         default: {
                 err(tokerrToStr(l.hd) ~ format("invalid keyword '%s' for statement", lexerPeek(l).lx));
         } break;
@@ -474,7 +484,6 @@ Stmt parseStmt(Lexer* l, Program* p) {
                 return parseStmtBlock(l, p);
         } break;
         default: {
-                writeln("parsing stmt expression");
                 return parseStmtExpr(l, p);
         } break;
         }

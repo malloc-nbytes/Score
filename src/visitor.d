@@ -8,13 +8,13 @@ struct Visitor {
         /*
          * Expression Visitors
          */
-        void function(Visitor* v, ExprBin e)      visitExprBin;
-        void function(Visitor* v, ExprUn e)       visitExprUn;
-        void function(Visitor* v, ExprStrLit e)   visitExprStrLit;
-        void function(Visitor* v, ExprIntLit e)   visitExprIntLit;
-        void function(Visitor* v, ExprIdent e)    visitExprIdent;
-        void function(Visitor* v, ExprMut e)      visitExprMut;
-        void function(Visitor* v, ExprProcCall e) visitExprProcCall;
+        void function(Visitor* v, ExprBin e)        visitExprBin;
+        void function(Visitor* v, ExprUn e)         visitExprUn;
+        void function(Visitor* v, ExprStrLit e)     visitExprStrLit;
+        void function(Visitor* v, ExprIntLit e)     visitExprIntLit;
+        void function(Visitor* v, ExprIdent e)      visitExprIdent;
+        void function(Visitor* v, ExprMut e)        visitExprMut;
+        void function(Visitor* v, ExprProcCall e)   visitExprProcCall;
         void function(Visitor* v, ExprStructInst e) visitExprStructInst;
 
         /*
@@ -29,7 +29,8 @@ struct Visitor {
         void function(Visitor* v, StmtIf s)     visitStmtIf;
         void function(Visitor* v, StmtWhile s)  visitStmtWhile;
         void function(Visitor* v, StmtStruct s) visitStmtStruct;
-        void function(Visitor* v, StmtMod s) visitStmtMod;
+        void function(Visitor* v, StmtMod s)    visitStmtMod;
+        void function(Visitor* v, StmtImport s) visitStmtImport;
 }
 
 /*
@@ -143,7 +144,15 @@ void acceptStmtWhile(Stmt s, Visitor* v) {
 }
 
 void acceptStmtMod(Stmt s, Visitor* v) {
-        return;
+        if (v.visitStmtMod) {
+                v.visitStmtMod(v, cast(StmtMod)s);
+        }
+}
+
+void acceptStmtImport(Stmt s, Visitor* v) {
+        if (v.visitStmtImport) {
+                v.visitStmtImport(v, cast(StmtImport)s);
+        }
 }
 
 /*
@@ -233,5 +242,9 @@ void visitStmtWhile(Visitor* v, StmtWhile s) {
 }
 
 void visitStmtMod(Visitor* v, StmtMod s) {
+        return;
+}
+
+void visitStmtImport(Stmt s, Visitor* v) {
         return;
 }
