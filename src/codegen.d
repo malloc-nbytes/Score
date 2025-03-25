@@ -425,10 +425,12 @@ void compileStmtLet(Visitor* v, StmtLet s) {
         Context* c = cast(Context*)v.context;
 
         size_t varSize = getTypeSize(s.t);
-        if (varSize == 0) assert(0, "Cannot allocate variable with void type");
+        if (varSize == 0) {
+                assert(0, "Cannot allocate variable with void type");
+        }
 
         string varName = s.id.lx.idup;
-        c.addSymbol(varName, s.t); // Adds to current scope (symbols[$ - 1])
+        c.addSymbol(varName, s.t);
 
         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
 
@@ -454,7 +456,6 @@ void compileStmtLet(Visitor* v, StmtLet s) {
 void compileStmtExpr(Visitor* v, StmtExpr s) {
         Context* c = cast(Context*)v.context;
         s.e.accept(s.e, v);
-        // c.text ~= c.s ~ "; Expression result in rax (discarded)";
         c.addComment("Expression result in rax (discarded)");
 }
 
@@ -659,27 +660,32 @@ void compileStmtStruct(Visitor* v, StmtStruct s) {
         c.addComment("Defined struct " ~ structName ~ " with size " ~ totalSize.to!string ~ " bytes");
 }
 
+void compileExprStructInst(Visitor* v, ExprStructInst e) {
+        assert(0);
+}
+
 Visitor createCodegenContext(Context* c) {
         Visitor v;
-        v.context           = cast(void*)c;
+        v.context             = cast(void*)c;
 
-        v.visitExprBin      = &compileExprBin;
-        v.visitExprUn       = &compileExprUn;
-        v.visitExprStrLit   = &compileExprStrLit;
-        v.visitExprIntLit   = &compileExprIntLit;
-        v.visitExprIdent    = &compileExprIdent;
-        v.visitExprMut      = &compileExprMut;
-        v.visitExprProcCall = &compileExprProcCall;
+        v.visitExprBin        = &compileExprBin;
+        v.visitExprUn         = &compileExprUn;
+        v.visitExprStrLit     = &compileExprStrLit;
+        v.visitExprIntLit     = &compileExprIntLit;
+        v.visitExprIdent      = &compileExprIdent;
+        v.visitExprMut        = &compileExprMut;
+        v.visitExprProcCall   = &compileExprProcCall;
+        v.visitExprStructInst = &compileExprStructInst;
 
-        v.visitStmtLet      = &compileStmtLet;
-        v.visitStmtExpr     = &compileStmtExpr;
-        v.visitStmtProc     = &compileStmtProc;
-        v.visitStmtBlock    = &compileStmtBlock;
-        v.visitStmtReturn   = &compileStmtReturn;
-        v.visitStmtExtern   = &compileStmtExtern;
-        v.visitStmtIf       = &compileStmtIf;
-        v.visitStmtWhile    = &compileStmtWhile;
-        v.visitStmtStruct   = &compileStmtStruct;
+        v.visitStmtLet        = &compileStmtLet;
+        v.visitStmtExpr       = &compileStmtExpr;
+        v.visitStmtProc       = &compileStmtProc;
+        v.visitStmtBlock      = &compileStmtBlock;
+        v.visitStmtReturn     = &compileStmtReturn;
+        v.visitStmtExtern     = &compileStmtExtern;
+        v.visitStmtIf         = &compileStmtIf;
+        v.visitStmtWhile      = &compileStmtWhile;
+        v.visitStmtStruct     = &compileStmtStruct;
         return v;
 }
 

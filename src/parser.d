@@ -49,6 +49,23 @@ private Expr[] parseCommaSepExprs(Lexer* l, TokenType end) {
         return exprs;
 }
 
+void parseStructInstMembers(Lexer* l, ref Token*[] structMemIds, ref Expr[] structMemExprs) {
+        while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
+                Token* t = expect(l, TokenType.Ident);
+                cast(void)expect(l, TokenType.Equals);
+                Expr e = parseExpr(l);
+                structMemIds ~= t;
+                structMemExprs ~= e;
+                if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
+                        lexerDiscard(l); // ,
+                } else {
+                        cast(void)expectWoEat(l, TokenType.RCurlyBracket);
+                        break;
+                }
+        }
+        cast(void)expect(l, TokenType.RCurlyBracket);
+}
+
 private Expr parsePrimaryExpr(Lexer* l) {
         Expr left = null;
 
@@ -87,6 +104,16 @@ private Expr parsePrimaryExpr(Lexer* l) {
                 } break;
                 case TokenType.IntLit: {
                         left = new ExprIntLit(lexerNext(l));
+                } break;
+                case TokenType.LCurlyBracket: {
+                        Token* errTok = expect(l, TokenType.LCurlyBracket); // {
+                        if (!left || left.ty != ExprType.Ident) {
+                                err(tokerrToStr(errTok) ~ "A struct literal must have a name before '{'");
+                        }
+                        Token*[] structMemIds = [];
+                        Expr[] structMemExprs = [];
+                        parseStructInstMembers(l, structMemIds, structMemExprs);
+                        left = new ExprStructInst((cast(ExprIdent)left).id, structMemIds, structMemExprs);
                 } break;
                 case TokenType.StrLit: {
                         left = new ExprStrLit(lexerNext(l));
@@ -194,9 +221,9 @@ private RuntimeType* parseType(Lexer* l) {
         RuntimeTypeBase base = getBaseTypeFromStr(name.lx);
         RuntimeType* type = new RuntimeType(base, null);
 
-        if (type.b == RuntimeTypeBase.Struct) {
-                assert(0);
-        }
+        // if (type.b == RuntimeTypeBase.Struct) {
+        //         assert(0);
+        // }
 
         while (true) {
                 if (l.hd && lexerPeek(l).ty == TokenType.Asterisk) {
@@ -209,6 +236,7 @@ private RuntimeType* parseType(Lexer* l) {
                 }
         }
 
+        writeln("TYPE: ", name.lx, " ", base, " ", *type);
         return type;
 }
 

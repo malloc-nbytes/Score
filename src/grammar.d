@@ -254,6 +254,15 @@ class StmtWhile : Stmt {
         }
 }
 
+// struct StructDefinition {
+//         Token* id;
+//         Token*[] memberNames;
+//         RuntimeType*[] memberTypes;
+//         size_t[] memberOffsets;
+//         size_t size;
+// }
+
 struct Program {
         Stmt[] stmts;
+        // StructDefinition[string] structDefs;
 }
