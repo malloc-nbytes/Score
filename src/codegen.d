@@ -713,6 +713,12 @@ void compileStmtStruct(Visitor* v, StmtStruct s) {
         c.addComment("Defined struct " ~ structName ~ " with size " ~ totalSize.to!string ~ " bytes");
 }
 
+void compileStmtMod(Visitor* v, StmtMod s) {
+        Context* c = cast(Context*)v.context;
+        c.addComment("MODULE " ~ s.id.lx.idup);
+        return;
+}
+
 void compileExprStructInst(Visitor* v, ExprStructInst e) {
         Context* c = cast(Context*)v.context;
         c.addComment("Instantiating struct " ~ e.structId.lx.idup);
@@ -804,36 +810,37 @@ Visitor createCodegenContext(Context* c) {
         v.visitStmtIf         = &compileStmtIf;
         v.visitStmtWhile      = &compileStmtWhile;
         v.visitStmtStruct     = &compileStmtStruct;
+        v.visitStmtMod        = &compileStmtMod;
         return v;
 }
 
-void writeX86_64AsmFile(Context c) {
-        string outputName = "output";
-        string asmFile = outputName~".asm";
-        string objFile = outputName~".o";
-        string[] nasmArgs = ["nasm", "-f", "elf64", asmFile, "-o", objFile, "-g", "-F dwarf"];
-        string[] linkArgs = ["gcc", "-no-pie", objFile, "-o", outputName, "-g"];
-        writeln("Generated assembly:");
-        writeln(c.write());
-        write(asmFile, c.write());
-        auto nasmResult = execute(nasmArgs);
-        if (nasmResult.status != 0) {
-                writeln("Assembly failed:");
-                writeln(nasmResult.output);
-        } else {
-                auto linkResult = execute(linkArgs);
-                if (linkResult.status != 0) {
-                        writeln("Linking failed:");
-                        writeln(linkResult.output);
-                } else {
-                        writeln("Successfully compiled and linked to ", outputName);
-                }
-        }
-        // if (exists(asmFile)) remove(asmFile);
-        if (exists(objFile)) remove(objFile);
-}
+// void writeX86_64AsmFile(Context c) {
+//         string outputName = "output";
+//         string asmFile = outputName~".asm";
+//         string objFile = outputName~".o";
+//         string[] nasmArgs = ["nasm", "-f", "elf64", asmFile, "-o", objFile, "-g", "-F dwarf"];
+//         string[] linkArgs = ["gcc", "-no-pie", objFile, "-o", outputName, "-g"];
+//         writeln("Generated assembly:");
+//         writeln(c.write());
+//         write(asmFile, c.write());
+//         auto nasmResult = execute(nasmArgs);
+//         if (nasmResult.status != 0) {
+//                 writeln("Assembly failed:");
+//                 writeln(nasmResult.output);
+//         } else {
+//                 auto linkResult = execute(linkArgs);
+//                 if (linkResult.status != 0) {
+//                         writeln("Linking failed:");
+//                         writeln(linkResult.output);
+//                 } else {
+//                         writeln("Successfully compiled and linked to ", outputName);
+//                 }
+//         }
+//         // if (exists(asmFile)) remove(asmFile);
+//         if (exists(objFile)) remove(objFile);
+// }
 
-void gen(Program* p) {
+char[] gen(Program* p) {
         Context c = new Context();
         Visitor v = createCodegenContext(&c);
 
@@ -841,5 +848,6 @@ void gen(Program* p) {
                 p.stmts[i].accept(p.stmts[i], &v);
         }
 
-        writeX86_64AsmFile(c);
+        // writeX86_64AsmFile(c);
+        return c.write();
 }

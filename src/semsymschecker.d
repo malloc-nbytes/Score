@@ -61,14 +61,17 @@ class SymTblChecker {
         StmtProc[string] procs;
         StmtExtern[string] externs;
         string[] errs;
+        bool ok;
 
         this() {
                 this.tbl = new SymTbl;
                 this.errs = [];
+                this.ok = true;
         }
 
         void reportErr(string msg) {
                 errs ~= msg;
+                this.ok = false;
         }
 }
 
@@ -253,7 +256,7 @@ Visitor createSymTblChecker(SymTblChecker* c) {
         return v;
 }
 
-void semSymCheck(Program* p) {
+SymTblChecker semSymCheck(Program* p) {
         SymTblChecker tbl = new SymTblChecker();
         Visitor v = createSymTblChecker(&tbl);
         for (size_t i = 0; i < p.stmts.length; ++i) {
@@ -264,6 +267,6 @@ void semSymCheck(Program* p) {
                 foreach (ref string err; tbl.errs) {
                         writeln(err);
                 }
-                exit(1);
         }
+        return tbl;
 }
