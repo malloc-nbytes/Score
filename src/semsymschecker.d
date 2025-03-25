@@ -188,7 +188,6 @@ void symCheckVisitStmtReturn(Visitor* v, StmtReturn s) {
         s.e.accept(s.e, v);
 }
 
-// TODO
 void symCheckVisitStmtExtern(Visitor* v, StmtExtern s) {
         SymTblChecker* checker = cast(SymTblChecker*)v.context;
         string name = cast(string)s.proto.id.lx;

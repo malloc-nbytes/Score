@@ -12,6 +12,7 @@ enum ExprType {
         Ident,
         Mut,
         ProcCall,
+        StructInst,
 }
 
 //////////////////
@@ -24,13 +25,14 @@ class Expr {
         this(ExprType ty) {
                 this.ty = ty;
                 switch (this.ty) {
-                case ExprType.Bin:      this.accept = &acceptExprBin;      break;
-                case ExprType.Un:       this.accept = &acceptExprUn;       break;
-                case ExprType.StrLit:   this.accept = &acceptExprStrLit;   break;
-                case ExprType.IntLit:   this.accept = &acceptExprIntLit;   break;
-                case ExprType.Ident:    this.accept = &acceptExprIdent;    break;
-                case ExprType.Mut:      this.accept = &acceptExprMut;      break;
-                case ExprType.ProcCall: this.accept = &acceptExprProcCall; break;
+                case ExprType.Bin:        this.accept = &acceptExprBin;        break;
+                case ExprType.Un:         this.accept = &acceptExprUn;         break;
+                case ExprType.StrLit:     this.accept = &acceptExprStrLit;     break;
+                case ExprType.IntLit:     this.accept = &acceptExprIntLit;     break;
+                case ExprType.Ident:      this.accept = &acceptExprIdent;      break;
+                case ExprType.Mut:        this.accept = &acceptExprMut;        break;
+                case ExprType.ProcCall:   this.accept = &acceptExprProcCall;   break;
+                case ExprType.StructInst: this.accept = &acceptExprStructInst; break;
                 default: assert(0);
                 }
         }
@@ -100,6 +102,19 @@ class ExprProcCall : Expr {
                 super(ExprType.ProcCall);
                 this.l = l;
                 this.exprs = exprs;
+        }
+}
+
+class ExprStructInst : Expr {
+        Token* structId;
+        Token*[] structMemIds;
+        Expr[] structMemExprs;
+
+        this(Token* structId, Token*[] structMemIds, Expr[] structMemExprs) {
+                super(ExprType.StructInst);
+                this.structId = structId;
+                this.structMemIds = structMemIds;
+                this.structMemExprs = structMemExprs;
         }
 }
 

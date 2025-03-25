@@ -3,6 +3,7 @@ module codegen;
 import std.stdio;
 import std.conv;
 import std.algorithm;
+import std.array;
 import std.file : write, exists, remove;
 import std.process : execute;
 
@@ -41,7 +42,6 @@ class Context {
                 this.bss     ~= "section .bss";
                 this.data    ~= "section .data";
                 this.text    ~= "section .text";
-                // this.symbols ~= []; // Start with global scope
                 if (this.symbols.length == 0) {
                         this.symbols = [[]];
                 }
@@ -382,6 +382,8 @@ void compileExprMut(Visitor* v, ExprMut e) {
         }
 }
 
+// TODO: handle more than 6 function args and clean
+//       up the stack after pushing them.
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
         Context* c = cast(Context*)v.context;
         c.addComment("Calling procedure");
@@ -393,8 +395,12 @@ void compileExprProcCall(Visitor* v, ExprProcCall e) {
                 bool isVariadic = sym !is null && sym.variadic;
 
                 // Evaluate arguments
-                size_t arg_count = min(e.exprs.length, 6);
-                for (size_t i = 0; i < arg_count; i++) {
+                size_t argCount = min(e.exprs.length, 6);
+                string[] usedRegs = regs[0..argCount];
+                foreach (const ref string r; usedRegs) {
+                        c.text ~= c.s ~ "push " ~ r;
+                }
+                for (size_t i = 0; i < argCount; i++) {
                         e.exprs[i].accept(e.exprs[i], v);
                         c.text ~= c.s ~ "mov " ~ regs[i] ~ ", rax";
                 }
@@ -405,6 +411,9 @@ void compileExprProcCall(Visitor* v, ExprProcCall e) {
                         c.text ~= c.s ~ "xor al, al"; // No FP args
                 }
                 c.text ~= c.s ~ "call " ~ proc_name;
+                foreach (const ref string r; usedRegs) {
+                        c.text ~= c.s ~ "pop " ~ r;
+                }
                 //c.text ~= c.s ~ "add rsp, 8"; // Restore stack
         } else {
                 c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
@@ -529,6 +538,7 @@ void compileStmtReturn(Visitor* v, StmtReturn s) {
         Context* c = cast(Context*)v.context;
 
         s.e.accept(s.e, v); // Result in rax
+        c.epilogue();
 }
 
 void compileStmtExtern(Visitor* v, StmtExtern s) {
@@ -607,6 +617,48 @@ void compileStmtWhile(Visitor* v, StmtWhile s) {
         c.text ~= loopEndLabel ~ ":";
 }
 
+void compileStmtStruct(Visitor* v, StmtStruct s) {
+        Context* c = cast(Context*)v.context;
+
+        // Extract struct name
+        string structName = s.id.lx.idup;
+
+        // Check for redefinition
+        if (c.findSymbol(structName) !is null) {
+                c.text ~= c.s ~ "; ERROR: Redefinition of symbol " ~ structName;
+                return;
+        }
+
+        // Calculate member offsets and total size
+        size_t totalSize = 0;
+        size_t[] memberOffsets;
+        foreach (memberType; s.memberTypes) {
+                size_t memberSize = getTypeSize(memberType);
+                // Align to next 8-byte boundary if needed (for x86-64 compatibility)
+                if (totalSize % 8 != 0) {
+                        size_t padding = 8 - (totalSize % 8);
+                        totalSize += padding;
+                }
+                memberOffsets ~= totalSize;
+                totalSize += memberSize;
+        }
+
+        // Create a RuntimeType for the struct
+        RuntimeType* structType = new RuntimeType();
+        structType.b = RuntimeTypeBase.Struct;
+        structType.size = totalSize;
+        structType.memberNames = s.members.map!(m => m.lx.idup).array; // Convert Token*[] to string[]
+        structType.memberTypes = s.memberTypes.dup;                    // Copy member types
+        structType.memberOffsets = memberOffsets.dup;                  // Copy offsets
+        structType.nptr = null;                                        // Not a pointer yet
+
+        // Add the struct to the global scope
+        c.addSymbol(structName, structType, false, false, false); // Not a function, not variadic, not a param
+
+        // Add a comment for debugging
+        c.addComment("Defined struct " ~ structName ~ " with size " ~ totalSize.to!string ~ " bytes");
+}
+
 Visitor createCodegenContext(Context* c) {
         Visitor v;
         v.context           = cast(void*)c;
@@ -627,6 +679,7 @@ Visitor createCodegenContext(Context* c) {
         v.visitStmtExtern   = &compileStmtExtern;
         v.visitStmtIf       = &compileStmtIf;
         v.visitStmtWhile    = &compileStmtWhile;
+        v.visitStmtStruct   = &compileStmtStruct;
         return v;
 }
 
@@ -652,7 +705,7 @@ void writeX86_64AsmFile(Context c) {
                         writeln("Successfully compiled and linked to ", outputName);
                 }
         }
-        if (exists(asmFile)) remove(asmFile);
+        // if (exists(asmFile)) remove(asmFile);
         if (exists(objFile)) remove(objFile);
 }
 

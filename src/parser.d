@@ -194,7 +194,7 @@ private RuntimeType* parseType(Lexer* l) {
         RuntimeTypeBase base = getBaseTypeFromStr(name.lx);
         RuntimeType* type = new RuntimeType(base, null);
 
-        if (type.b == RuntimeTypeBase.Custom) {
+        if (type.b == RuntimeTypeBase.Struct) {
                 assert(0);
         }
 
