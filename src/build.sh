@@ -2,5 +2,4 @@
 
 set -xe
 
-snap run dmd -g *.d -of=scr -g
-./scr
+snap run dmd *.d -of=scr -g

@@ -21,6 +21,17 @@ Token* expect(Lexer* l, TokenType e) {
         return lexerNext(l);
 }
 
+private Token* expectkw(Lexer* l, Keyword k) {
+        Token* hd = lexerPeek(l);
+        if (!hd) {
+                err(format("expected keyword %s but got nothing", k));
+        } else if (hd.ty != TokenType.Keyword || hd.lx != k) {
+                tokerr(hd);
+                err(format("expected keyword %s but got %s", k, hd.lx));
+        }
+        return lexerNext(l);
+}
+
 Token* expectWoEat(Lexer* l, TokenType e) {
         Token* hd = lexerPeek(l);
         if (!hd) {
@@ -115,16 +126,6 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
                 case TokenType.IntLit: {
                         left = new ExprIntLit(lexerNext(l));
                 } break;
-                // case TokenType.LCurlyBracket: {
-                //         Token* errTok = expect(l, TokenType.LCurlyBracket); // {
-                //         if (!left || left.ty != ExprType.Ident) {
-                //                 err(tokerrToStr(errTok) ~ "A struct literal must have a name before '{'");
-                //         }
-                //         Token*[] structMemIds = [];
-                //         Expr[] structMemExprs = [];
-                //         parseStructInstMembers(l, structMemIds, structMemExprs, p);
-                //         left = new ExprStructInst((cast(ExprIdent)left).id, structMemIds, structMemExprs, p);
-                // } break;
                 case TokenType.StrLit: {
                         left = new ExprStrLit(lexerNext(l));
                 } break;
@@ -414,6 +415,13 @@ private StmtStruct parseStmtStruct(Lexer* l, Program* p) {
         return stmt;
 }
 
+private StmtMod parseStmtMod(Lexer* l, Program* p) {
+        lexerDiscard(l); // module
+        Token* id = expect(l, TokenType.Ident);
+        cast(void)expectkw(l, Keyword.Where);
+        return new StmtMod(id);
+}
+
 private Stmt parseStmtKW(Lexer* l, Program* p) {
         switch (lexerPeek(l).lx) {
         case Keyword.Export: {
@@ -441,8 +449,11 @@ private Stmt parseStmtKW(Lexer* l, Program* p) {
         case Keyword.Struct: {
                 return parseStmtStruct(l, p);
         } break;
+        case Keyword.Module: {
+                return parseStmtMod(l, p);
+        } break;
         default: {
-                err(format("invalid keyword '%s' for statement", lexerPeek(l).lx));
+                err(tokerrToStr(l.hd) ~ format("invalid keyword '%s' for statement", lexerPeek(l).lx));
         } break;
         }
         assert(0 && "unreachable");

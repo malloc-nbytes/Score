@@ -29,6 +29,7 @@ struct Visitor {
         void function(Visitor* v, StmtIf s)     visitStmtIf;
         void function(Visitor* v, StmtWhile s)  visitStmtWhile;
         void function(Visitor* v, StmtStruct s) visitStmtStruct;
+        void function(Visitor* v, StmtMod s) visitStmtMod;
 }
 
 /*
@@ -141,6 +142,10 @@ void acceptStmtWhile(Stmt s, Visitor* v) {
         }
 }
 
+void acceptStmtMod(Stmt s, Visitor* v) {
+        return;
+}
+
 /*
  * Expression visitors
  */
@@ -225,4 +230,8 @@ void visitStmtIf(Visitor* v, StmtIf s) {
 void visitStmtWhile(Visitor* v, StmtWhile s) {
         s.e.accept(s.e, v);
         s.s.accept(s.s, v);
+}
+
+void visitStmtMod(Visitor* v, StmtMod s) {
+        return;
 }

@@ -176,6 +176,7 @@ enum StmtType {
         If,
         While,
         Struct,
+        Mod,
 }
 
 class Stmt {
@@ -192,7 +193,8 @@ class Stmt {
                 case StmtType.Extern: this.accept = &acceptStmtExtern; break;
                 case StmtType.If:     this.accept = &acceptStmtIf;     break;
                 case StmtType.While:  this.accept = &acceptStmtWhile;  break;
-                case StmtType.Struct: this.accept = &acceptStmtStruct;  break;
+                case StmtType.Struct: this.accept = &acceptStmtStruct; break;
+                case StmtType.Mod:    this.accept = &acceptStmtMod;    break;
                 default: assert(0);
                 }
         }
@@ -315,6 +317,14 @@ class StmtWhile : Stmt {
         }
 }
 
+class StmtMod : Stmt {
+        Token* id;
+        this(Token* id) {
+                super(StmtType.Mod);
+                this.id = id;
+        }
+}
+
 struct StructDefinition {
         Token* id;
         Token*[] memberNames;
@@ -326,4 +336,5 @@ struct StructDefinition {
 struct Program {
         Stmt[] stmts;
         StructDefinition[string] structDefs;
+        StmtMod mod;
 }

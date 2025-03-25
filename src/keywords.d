@@ -23,6 +23,8 @@ static const string[] keywords = [
         "while",
         "export",
         "struct",
+        "module",
+        "where"
 ];
 
 enum Keyword {
@@ -35,6 +37,8 @@ enum Keyword {
         While = keywords[6],
         Export = keywords[7],
         Struct = keywords[8],
+        Module = keywords[9],
+        Where = keywords[10],
 }
 
 enum TypeKeyword {

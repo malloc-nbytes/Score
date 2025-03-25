@@ -11,8 +11,8 @@ proc sum(a: i32, b: i32): i32 {
     return a + b;
 }
 
-proc test_fib(void): i32 {
-    printf("  test_fib()\n");
+proc test_rec(void): i32 {
+    printf("  test_rec()\n");
     if (fib(10) != 55) {
         return 0;
     }
@@ -23,7 +23,6 @@ proc test_sum(void): i32 {
     printf("  test_sum()\n");
     let x: i32 = 1;
     let y: i32 = 2;
-    printf("HERE: %d\n", sum(4, 5));
     if (sum(x, y) != 3) {
         return 0;
     }
@@ -35,7 +34,7 @@ proc test_sum(void): i32 {
 
 export proc main(void): i32 {
     printf("test-procs.scr...\n");
-    if (test_fib() == 0) {
+    if (test_rec() == 0) {
         printf("  test failed!\n");
         return 0;
     }
