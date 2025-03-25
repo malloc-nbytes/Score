@@ -23,6 +23,7 @@ struct RuntimeType {
         RuntimeTypeBase b;
         RuntimeType* nptr;           // For pointer nesting
         // Struct-specific fields
+        string structName;           // The name of the struct
         string[] memberNames;        // Names of struct members
         RuntimeType*[] memberTypes;  // Types of struct members
         size_t[] memberOffsets;      // Offsets of members in memory

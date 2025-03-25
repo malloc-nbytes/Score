@@ -1,0 +1,27 @@
+extern printf(format: u8*, ...): i32;
+
+proc basic_assignment(void): i32 {
+    printf("  basic_assignment()\n");
+    let x: i32 = 1;
+    let y: i32 = 2;
+    let z: i32 = x + (y * 2);
+    if (x != 1) {
+        return 0;
+    } else if (y != 2) {
+        return 0;
+    } else if (z != 5) {
+        return 0;
+    }
+    return 1;
+}
+
+export proc main(void): i32 {
+    printf("test-lets.scr...\n");
+    if (basic_assignment() == 0) {
+        printf("  test failed!\n");
+        return 0;
+    }
+    printf("ok\n");
+
+    return 0;
+}

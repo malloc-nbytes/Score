@@ -32,11 +32,11 @@ Token* expectWoEat(Lexer* l, TokenType e) {
         return hd;
 }
 
-private Expr[] parseCommaSepExprs(Lexer* l, TokenType end) {
+private Expr[] parseCommaSepExprs(Lexer* l, TokenType end, Program* p) {
         Expr[] exprs = [];
 
         while (l.hd && lexerPeek(l).ty != end) {
-                Expr e = parseExpr(l);
+                Expr e = parseExpr(l, p);
                 exprs ~= e;
 
                 if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
@@ -49,11 +49,11 @@ private Expr[] parseCommaSepExprs(Lexer* l, TokenType end) {
         return exprs;
 }
 
-void parseStructInstMembers(Lexer* l, ref Token*[] structMemIds, ref Expr[] structMemExprs) {
+void parseStructInstMembers(Lexer* l, ref Token*[] structMemIds, ref Expr[] structMemExprs, Program* p) {
         while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
                 Token* t = expect(l, TokenType.Ident);
                 cast(void)expect(l, TokenType.Equals);
-                Expr e = parseExpr(l);
+                Expr e = parseExpr(l, p);
                 structMemIds ~= t;
                 structMemExprs ~= e;
                 if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
@@ -66,7 +66,7 @@ void parseStructInstMembers(Lexer* l, ref Token*[] structMemIds, ref Expr[] stru
         cast(void)expect(l, TokenType.RCurlyBracket);
 }
 
-private Expr parsePrimaryExpr(Lexer* l) {
+private Expr parsePrimaryExpr(Lexer* l, Program* p) {
         Expr left = null;
 
         while (lexerPeek(l)
@@ -81,10 +81,20 @@ private Expr parsePrimaryExpr(Lexer* l) {
 
                 switch (cur.ty) {
                 case TokenType.Ident: {
+                        // if (l.hd && lexerPeek(l).ty == TokenType.LCurlyBracket) {
+                        //         assert(0 && "struct instants are unimplemented");
+                        // } else {
+                        //         left = new ExprIdent(lexerNext(l));
+                        // }
+                        Token* ident = lexerNext(l);
                         if (l.hd && lexerPeek(l).ty == TokenType.LCurlyBracket) {
-                                assert(0 && "struct instants are unimplemented");
+                                expect(l, TokenType.LCurlyBracket); // {
+                                Token*[] structMemIds = [];
+                                Expr[] structMemExprs = [];
+                                parseStructInstMembers(l, structMemIds, structMemExprs, p);
+                                left = new ExprStructInst(ident, structMemIds, structMemExprs, p);
                         } else {
-                                left = new ExprIdent(lexerNext(l));
+                                left = new ExprIdent(ident);
                         }
                 } break;
                 case TokenType.Lparen: {
@@ -95,26 +105,26 @@ private Expr parsePrimaryExpr(Lexer* l) {
                                 // Expr **exprs = parse_comma_sep_exprs(lexer, &len, &cap,
                                 //                                      nullptr, TOKEN_TYPE_RIGHT_PARENTHESIS);
                                 // left = (Expr *)expr_proc_call_alloc(left, exprs, len, cap);
-                                Expr[] exprs = parseCommaSepExprs(l, TokenType.Rparen);
+                                Expr[] exprs = parseCommaSepExprs(l, TokenType.Rparen, p);
                                 left = new ExprProcCall(left, exprs);
                         } else {
-                                left = parseExpr(l);
+                                left = parseExpr(l, p);
                         }
                         cast(void)expect(l, TokenType.Rparen);
                 } break;
                 case TokenType.IntLit: {
                         left = new ExprIntLit(lexerNext(l));
                 } break;
-                case TokenType.LCurlyBracket: {
-                        Token* errTok = expect(l, TokenType.LCurlyBracket); // {
-                        if (!left || left.ty != ExprType.Ident) {
-                                err(tokerrToStr(errTok) ~ "A struct literal must have a name before '{'");
-                        }
-                        Token*[] structMemIds = [];
-                        Expr[] structMemExprs = [];
-                        parseStructInstMembers(l, structMemIds, structMemExprs);
-                        left = new ExprStructInst((cast(ExprIdent)left).id, structMemIds, structMemExprs);
-                } break;
+                // case TokenType.LCurlyBracket: {
+                //         Token* errTok = expect(l, TokenType.LCurlyBracket); // {
+                //         if (!left || left.ty != ExprType.Ident) {
+                //                 err(tokerrToStr(errTok) ~ "A struct literal must have a name before '{'");
+                //         }
+                //         Token*[] structMemIds = [];
+                //         Expr[] structMemExprs = [];
+                //         parseStructInstMembers(l, structMemIds, structMemExprs, p);
+                //         left = new ExprStructInst((cast(ExprIdent)left).id, structMemIds, structMemExprs, p);
+                // } break;
                 case TokenType.StrLit: {
                         left = new ExprStrLit(lexerNext(l));
                 } break;
@@ -126,14 +136,14 @@ private Expr parsePrimaryExpr(Lexer* l) {
         }
 }
 
-private Expr parseMultiplicitateExpr(Lexer *l) {
-        Expr lhs = parsePrimaryExpr(l);
+private Expr parseMultiplicitateExpr(Lexer *l, Program* p) {
+        Expr lhs = parsePrimaryExpr(l, p);
         Token* cur = lexerPeek(l);
         while (cur && (cur.ty == TokenType.Asterisk
                        || cur.ty == TokenType.ForwardSlash
                        || cur.ty == TokenType.Percent)) {
                 Token* op = lexerNext(l);
-                Expr rhs = parsePrimaryExpr(l);
+                Expr rhs = parsePrimaryExpr(l, p);
                 ExprBin bin = new ExprBin(lhs, op, rhs);
                 lhs = bin;
                 cur = lexerPeek(l);
@@ -141,13 +151,13 @@ private Expr parseMultiplicitateExpr(Lexer *l) {
         return lhs;
 }
 
-private Expr parseAdditiveExpr(Lexer *l) {
-        Expr lhs = parseMultiplicitateExpr(l);
+private Expr parseAdditiveExpr(Lexer *l, Program* p) {
+        Expr lhs = parseMultiplicitateExpr(l, p);
         Token* cur = lexerPeek(l);
         while (cur && (cur.ty == TokenType.Plus
                        || cur.ty == TokenType.Minus)) {
                 Token* op = lexerNext(l);
-                Expr rhs = parseMultiplicitateExpr(l);
+                Expr rhs = parseMultiplicitateExpr(l, p);
                 ExprBin bin = new ExprBin(lhs, op, rhs);
                 lhs = bin;
                 cur = lexerPeek(l);
@@ -155,8 +165,8 @@ private Expr parseAdditiveExpr(Lexer *l) {
         return lhs;
 }
 
-private Expr parseEqualitativeExpr(Lexer *l) {
-        Expr lhs = parseAdditiveExpr(l);
+private Expr parseEqualitativeExpr(Lexer *l, Program* p) {
+        Expr lhs = parseAdditiveExpr(l, p);
         Token* cur = lexerPeek(l);
         while (cur && (cur.ty == TokenType.DoubleEquals
                        || cur.ty == TokenType.GreaterthanEquals
@@ -165,7 +175,7 @@ private Expr parseEqualitativeExpr(Lexer *l) {
                        || cur.ty == TokenType.Lessthan
                        || cur.ty == TokenType.BangEquals)) {
                 Token* op = lexerNext(l);
-                Expr rhs = parseAdditiveExpr(l);
+                Expr rhs = parseAdditiveExpr(l, p);
                 ExprBin bin = new ExprBin(lhs, op, rhs);
                 lhs = bin;
                 cur = lexerPeek(l);
@@ -173,13 +183,13 @@ private Expr parseEqualitativeExpr(Lexer *l) {
         return lhs;
 }
 
-private Expr parseLogicalExpr(Lexer *l) {
-        Expr lhs = parseEqualitativeExpr(l);
+private Expr parseLogicalExpr(Lexer *l, Program* p) {
+        Expr lhs = parseEqualitativeExpr(l, p);
         Token* cur = lexerPeek(l);
         while (cur && (cur.ty == TokenType.DoubleAmpersand
                        || cur.ty == TokenType.DoublePipe)) {
                 Token* op = lexerNext(l);
-                Expr rhs = parseEqualitativeExpr(l);
+                Expr rhs = parseEqualitativeExpr(l, p);
                 ExprBin bin = new ExprBin(lhs, op, rhs);
                 lhs = bin;
                 cur = lexerPeek(l);
@@ -187,8 +197,8 @@ private Expr parseLogicalExpr(Lexer *l) {
         return lhs;
 }
 
-private Expr parseAssignmentExpr(Lexer* l) {
-        Expr lhs = parseLogicalExpr(l);
+private Expr parseAssignmentExpr(Lexer* l, Program* p) {
+        Expr lhs = parseLogicalExpr(l, p);
 
         Token* cur = lexerPeek(l);
         if (!cur) return lhs;
@@ -204,7 +214,7 @@ private Expr parseAssignmentExpr(Lexer* l) {
         case TokenType.PipeEquals:
         case TokenType.CaretEquals: {
                 Token* op = lexerNext(l);
-                Expr rhs = parseAssignmentExpr(l);
+                Expr rhs = parseAssignmentExpr(l, p);
                 return new ExprMut(lhs, op, rhs);
         }
         default:
@@ -212,8 +222,8 @@ private Expr parseAssignmentExpr(Lexer* l) {
         }
 }
 
-private Expr parseExpr(Lexer *l) {
-        return parseAssignmentExpr(l);
+private Expr parseExpr(Lexer *l, Program* p) {
+        return parseAssignmentExpr(l, p);
 }
 
 private RuntimeType* parseType(Lexer* l) {
@@ -221,9 +231,9 @@ private RuntimeType* parseType(Lexer* l) {
         RuntimeTypeBase base = getBaseTypeFromStr(name.lx);
         RuntimeType* type = new RuntimeType(base, null);
 
-        // if (type.b == RuntimeTypeBase.Struct) {
-        //         assert(0);
-        // }
+        if (type.b == RuntimeTypeBase.Struct) {
+                type.structName = cast(string)name.lx;
+        }
 
         while (true) {
                 if (l.hd && lexerPeek(l).ty == TokenType.Asterisk) {
@@ -236,11 +246,10 @@ private RuntimeType* parseType(Lexer* l) {
                 }
         }
 
-        writeln("TYPE: ", name.lx, " ", base, " ", *type);
         return type;
 }
 
-private StmtLet parseStmtLet(Lexer* l) {
+private StmtLet parseStmtLet(Lexer* l, Program* p) {
         lexerDiscard(l); // let
 
         Token* id = expect(l, TokenType.Ident);
@@ -248,8 +257,13 @@ private StmtLet parseStmtLet(Lexer* l) {
         cast(void)expect(l, TokenType.Colon);
         RuntimeType* ty = parseType(l);
 
+        if (ty.b == RuntimeTypeBase.Struct) {
+                size_t sz = p.structDefs[ty.structName].size;
+                ty.size = sz;
+        }
+
         cast(void)expect(l, TokenType.Equals);
-        Expr e = parseExpr(l);
+        Expr e = parseExpr(l, p);
 
         cast(void)expect(l, TokenType.SemiColon);
 
@@ -295,13 +309,13 @@ private void parseFunctionArgs(Lexer* l, ref Token*[] pn, ref RuntimeType*[] pt,
         }
 }
 
-private StmtBlock parseStmtBlock(Lexer *l) {
+private StmtBlock parseStmtBlock(Lexer *l, Program* p) {
         Stmt[] stmts = [];
 
         cast(void)expect(l, TokenType.LCurlyBracket);
 
         while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
-                stmts ~= parseStmt(l);
+                stmts ~= parseStmt(l, p);
         }
 
         cast(void)expect(l, TokenType.RCurlyBracket);
@@ -309,7 +323,7 @@ private StmtBlock parseStmtBlock(Lexer *l) {
         return new StmtBlock(stmts);
 }
 
-private StmtProc parseStmtProc(Lexer* l, bool isProto, bool isExport) {
+private StmtProc parseStmtProc(Lexer* l, Program* p, bool isProto, bool isExport) {
         lexerDiscard(l); // proc
         Token* id = expect(l, TokenType.Ident);
 
@@ -323,30 +337,30 @@ private StmtProc parseStmtProc(Lexer* l, bool isProto, bool isExport) {
         cast(void)expect(l, TokenType.Colon);
         RuntimeType* rtype = parseType(l);
         if (!isProto) {
-                b = parseStmtBlock(l);
+                b = parseStmtBlock(l, p);
         }
 
         return new StmtProc(id, rtype, pn, pt, variadic, b, isExport);
 }
 
-private StmtReturn parseStmtReturn(Lexer* l) {
+private StmtReturn parseStmtReturn(Lexer* l, Program* p) {
         lexerDiscard(l); // return
-        Expr e = parseExpr(l);
+        Expr e = parseExpr(l, p);
         cast(void)expect(l, TokenType.SemiColon);
         return new StmtReturn(e);
 }
 
-private StmtExtern parseStmtExtern(Lexer* l) {
-        StmtProc p = parseStmtProc(l, /*isProto=*/true, /*isExport=*/false);
+private StmtExtern parseStmtExtern(Lexer* l, Program* p) {
+        StmtProc pr = parseStmtProc(l, p, /*isProto=*/true, /*isExport=*/false);
         cast(void)expect(l, TokenType.SemiColon);
-        return new StmtExtern(p);
+        return new StmtExtern(pr);
 }
 
-private StmtIf parseStmtIf(Lexer* l) {
+private StmtIf parseStmtIf(Lexer* l, Program* p) {
         lexerDiscard(l); // if
 
-        Expr e = parseExpr(l);
-        Stmt then = parseStmt(l);
+        Expr e = parseExpr(l, p);
+        Stmt then = parseStmt(l, p);
         Stmt else_ = null;
 
         Token *t1 = lexerPeek(l);
@@ -357,24 +371,24 @@ private StmtIf parseStmtIf(Lexer* l) {
 
         if (t1_else && t2_if) {
                 lexerDiscard(l); // else
-                else_ = parseStmtIf(l);
+                else_ = parseStmtIf(l, p);
         }
         else if (t1_else) {
                 lexerDiscard(l); // else
-                else_ = parseStmt(l);
+                else_ = parseStmt(l, p);
         }
 
         return new StmtIf(e, then, else_);
 }
 
-private StmtWhile parseStmtWhile(Lexer* l) {
+private StmtWhile parseStmtWhile(Lexer* l, Program* p) {
         lexerDiscard(l); // while
-        Expr e = parseExpr(l);
-        Stmt s = parseStmt(l);
+        Expr e = parseExpr(l, p);
+        Stmt s = parseStmt(l, p);
         return new StmtWhile(e, s);
 }
 
-private StmtStruct parseStmtStruct(Lexer* l) {
+private StmtStruct parseStmtStruct(Lexer* l, Program* p) {
         lexerDiscard(l); // struct
         Token* id = expect(l, TokenType.Ident);
         Token*[] members = [];
@@ -394,35 +408,38 @@ private StmtStruct parseStmtStruct(Lexer* l) {
                 }
         }
         cast(void)expect(l, TokenType.RCurlyBracket);
-        return new StmtStruct(id, members, memberTypes);
+
+        StmtStruct stmt = new StmtStruct(id, members, memberTypes);
+
+        return stmt;
 }
 
-private Stmt parseStmtKW(Lexer* l) {
+private Stmt parseStmtKW(Lexer* l, Program* p) {
         switch (lexerPeek(l).lx) {
         case Keyword.Export: {
                 lexerDiscard(l); // export
-                return parseStmtProc(l, /*isProto=*/false, /*isExport=*/true);
+                return parseStmtProc(l, p, /*isProto=*/false, /*isExport=*/true);
         } break;
         case Keyword.Proc: {
-                return parseStmtProc(l, /*isProto=*/false, /*isExport=*/false);
+                return parseStmtProc(l, p, /*isProto=*/false, /*isExport=*/false);
         } break;
         case Keyword.If: {
-                return parseStmtIf(l);
+                return parseStmtIf(l, p);
         } break;
         case Keyword.Return: {
-                return parseStmtReturn(l);
+                return parseStmtReturn(l, p);
         } break;
         case Keyword.Let: {
-                return parseStmtLet(l);
+                return parseStmtLet(l, p);
         } break;
         case Keyword.Extern: {
-                return parseStmtExtern(l);
+                return parseStmtExtern(l, p);
         } break;
         case Keyword.While: {
-                return parseStmtWhile(l);
+                return parseStmtWhile(l, p);
         } break;
         case Keyword.Struct: {
-                return parseStmtStruct(l);
+                return parseStmtStruct(l, p);
         } break;
         default: {
                 err(format("invalid keyword '%s' for statement", lexerPeek(l).lx));
@@ -431,34 +448,41 @@ private Stmt parseStmtKW(Lexer* l) {
         assert(0 && "unreachable");
 }
 
-private StmtExpr parseStmtExpr(Lexer* l) {
-        Expr e = parseExpr(l);
+private StmtExpr parseStmtExpr(Lexer* l, Program* p) {
+        Expr e = parseExpr(l, p);
         cast(void)expect(l, TokenType.SemiColon);
         return new StmtExpr(e);
 }
 
-Stmt parseStmt(Lexer* l) {
+Stmt parseStmt(Lexer* l, Program* p) {
         switch (lexerPeek(l).ty) {
         case TokenType.Keyword: {
-                return parseStmtKW(l);
+                return parseStmtKW(l, p);
         } break;
         case TokenType.LCurlyBracket: {
-                return parseStmtBlock(l);
+                return parseStmtBlock(l, p);
         } break;
         default: {
                 writeln("parsing stmt expression");
-                return parseStmtExpr(l);
+                return parseStmtExpr(l, p);
         } break;
         }
         assert(0 && "unreachable");
 }
 
 Program parseProgram(Lexer* l) {
-        Stmt[] stmts;
+        Program p;
 
         while (l.hd && lexerPeek(l).ty != TokenType.Eof) {
-                stmts ~= parseStmt(l);
+                Stmt s = parseStmt(l, &p);
+                if (s.ty == StmtType.Struct) {
+                        StmtStruct st = cast(StmtStruct)s;
+                        p.structDefs[st.id.lx.idup] = StructDefinition(st.id, st.members,
+                                                                       st.memberTypes, st.memberOffsets,
+                                                                       st.size);
+                }
+                p.stmts ~= s;
         }
 
-        return Program(stmts);
+        return p;
 }

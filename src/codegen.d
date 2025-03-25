@@ -382,44 +382,97 @@ void compileExprMut(Visitor* v, ExprMut e) {
         }
 }
 
-// TODO: handle more than 6 function args and clean
-//       up the stack after pushing them.
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
         Context* c = cast(Context*)v.context;
         c.addComment("Calling procedure");
         if (auto ident = cast(ExprIdent)e.l) {
-                string proc_name = ident.id.lx.idup;
+                string procName = ident.id.lx.idup;
                 string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-                Context.Symbol* sym = c.findSymbol(proc_name);
+                Context.Symbol* sym = c.findSymbol(procName);
                 bool isVariadic = sym !is null && sym.variadic;
 
-                // Evaluate arguments
+                // Step 1: Evaluate all arguments and store on stack
                 size_t argCount = min(e.exprs.length, 6);
+                foreach (i, expr; e.exprs) {
+                        if (i < argCount) {
+                                expr.accept(expr, v); // Result in rax
+                                c.text ~= c.s ~ "push rax"; // Save result on stack
+                        }
+                }
+
+                // Step 2: Preserve caller-saved registers if needed
                 string[] usedRegs = regs[0..argCount];
                 foreach (const ref string r; usedRegs) {
                         c.text ~= c.s ~ "push " ~ r;
                 }
-                for (size_t i = 0; i < argCount; i++) {
-                        e.exprs[i].accept(e.exprs[i], v);
-                        c.text ~= c.s ~ "mov " ~ regs[i] ~ ", rax";
+
+                // Step 3: Load arguments into registers in correct order
+                foreach (i; 0..argCount) {
+                        size_t stackOffset = (argCount - i - 1) * 8; // Reverse order of pushes
+                        c.text ~= c.s ~ "mov " ~ regs[i] ~ ", qword [rsp + " ~ (stackOffset + usedRegs.length * 8).to!string ~ "]";
                 }
 
-                // Align stack to 16 bytes (assuming rsp was aligned at function entry)
-                //c.text ~= c.s ~ "sub rsp, 8"; // Adjust for alignment
+                // Step 4: Align stack to 16 bytes before call
+                size_t totalPushes = argCount + usedRegs.length; // Total 8-byte pushes
+                if (totalPushes % 2 != 0) { // If odd number of pushes, rsp is misaligned
+                        c.text ~= c.s ~ "sub rsp, 8"; // Add 8 bytes to align to 16
+                }
+
+                // Step 5: Make the call
                 if (isVariadic) {
                         c.text ~= c.s ~ "xor al, al"; // No FP args
                 }
-                c.text ~= c.s ~ "call " ~ proc_name;
-                foreach (const ref string r; usedRegs) {
-                        c.text ~= c.s ~ "pop " ~ r;
-                }
-                //c.text ~= c.s ~ "add rsp, 8"; // Restore stack
+                c.text ~= c.s ~ "call " ~ procName;
+
+                // Step 6: Clean up stack
+                size_t stackAdjust = (totalPushes + (totalPushes % 2)) * 8; // Include alignment adjustment
+                c.text ~= c.s ~ "add rsp, " ~ stackAdjust.to!string;
+
         } else {
                 c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
         }
         c.addComment("End calling procedure");
 }
+
+// TODO: handle more than 6 function args and clean
+//       up the stack after pushing them.
+// void compileExprProcCall(Visitor* v, ExprProcCall e) {
+//         Context* c = cast(Context*)v.context;
+//         c.addComment("Calling procedure");
+//         if (auto ident = cast(ExprIdent)e.l) {
+//                 string procName = ident.id.lx.idup;
+//                 string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+
+//                 Context.Symbol* sym = c.findSymbol(procName);
+//                 bool isVariadic = sym !is null && sym.variadic;
+
+//                 // Evaluate arguments
+//                 size_t argCount = min(e.exprs.length, 6);
+//                 string[] usedRegs = regs[0..argCount];
+//                 foreach (const ref string r; usedRegs) {
+//                         c.text ~= c.s ~ "push " ~ r;
+//                 }
+//                 for (size_t i = 0; i < argCount; i++) {
+//                         e.exprs[i].accept(e.exprs[i], v);
+//                         c.text ~= c.s ~ "mov " ~ regs[i] ~ ", rax";
+//                 }
+
+//                 // Align stack to 16 bytes (assuming rsp was aligned at function entry)
+//                 //c.text ~= c.s ~ "sub rsp, 8"; // Adjust for alignment
+//                 if (isVariadic) {
+//                         c.text ~= c.s ~ "xor al, al"; // No FP args
+//                 }
+//                 c.text ~= c.s ~ "call " ~ procName;
+//                 foreach (const ref string r; usedRegs) {
+//                         c.text ~= c.s ~ "pop " ~ r;
+//                 }
+//                 //c.text ~= c.s ~ "add rsp, 8"; // Restore stack
+//         } else {
+//                 c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
+//         }
+//         c.addComment("End calling procedure");
+// }
 
 void compileStmtLet(Visitor* v, StmtLet s) {
         Context* c = cast(Context*)v.context;
@@ -661,7 +714,72 @@ void compileStmtStruct(Visitor* v, StmtStruct s) {
 }
 
 void compileExprStructInst(Visitor* v, ExprStructInst e) {
-        assert(0);
+        Context* c = cast(Context*)v.context;
+        c.addComment("Instantiating struct " ~ e.structId.lx.idup);
+
+        // Step 1: Lookup the struct definition
+        string structName = e.structId.lx.idup;
+        Context.Symbol* sym = c.findSymbol(structName);
+        if (sym is null || sym.type.b != RuntimeTypeBase.Struct) {
+                c.text ~= c.s ~ "; ERROR: Undefined or non-struct type " ~ structName;
+                return;
+        }
+        RuntimeType* structType = sym.type;
+        size_t structSize = structType.size;
+
+        // Step 2: Allocate stack space for the struct
+        // Align stack to 16 bytes if needed
+        size_t totalStackAdjust = structSize;
+        if ((c.stackOffset + structSize + 8) % 16 != 0) { // +8 accounts for saved rbp
+                size_t padding = 16 - ((c.stackOffset + structSize + 8) % 16);
+                totalStackAdjust += padding;
+                c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
+        }
+        c.text ~= c.s ~ "sub rsp, " ~ totalStackAdjust.to!string;
+        c.stackOffset += totalStackAdjust; // Update stack offset
+
+        // Base address of the struct is now at [rbp - c.stackOffset]
+        string baseAddr = "rbp - " ~ c.stackOffset.to!string;
+        c.addComment("Struct " ~ structName ~ " allocated at [" ~ baseAddr ~ "]");
+
+        // Step 3: Initialize struct members
+        foreach (i, memId; e.structMemIds) {
+                string memberName = memId.lx.idup;
+                size_t memberIndex = -1;
+                foreach (j, name; structType.memberNames) {
+                        if (name == memberName) {
+                                memberIndex = j;
+                                break;
+                        }
+                }
+                if (memberIndex == -1) {
+                        c.text ~= c.s ~ "; ERROR: Unknown member " ~ memberName ~ " in struct " ~ structName;
+                        continue;
+                }
+
+                // Evaluate the member expression (result in rax)
+                e.structMemExprs[i].accept(e.structMemExprs[i], v);
+
+                // Determine member size and offset
+                RuntimeType* memberType = structType.memberTypes[memberIndex];
+                size_t memberSize = getTypeSize(memberType);
+                size_t memberOffset = structType.memberOffsets[memberIndex];
+                string sizeSpec = memberSize == 8 ? "qword" :
+                        memberSize == 4 ? "dword" :
+                        memberSize == 2 ? "word" : "byte";
+                string reg = memberSize == 8 ? "rax" :
+                        memberSize == 4 ? "eax" :
+                        memberSize == 2 ? "ax" : "al";
+
+                // Store the value at the correct offset within the struct
+                string destAddr = "[rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]";
+                c.text ~= c.s ~ "mov " ~ sizeSpec ~ " " ~ destAddr ~ ", " ~ reg;
+                c.addComment("Initialized " ~ memberName ~ " at " ~ destAddr);
+        }
+
+        // Step 4: Return pointer to the struct in rax
+        c.text ~= c.s ~ "lea rax, [" ~ baseAddr ~ "]";
+        c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
 }
 
 Visitor createCodegenContext(Context* c) {

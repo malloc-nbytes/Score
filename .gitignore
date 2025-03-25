@@ -1,6 +1,7 @@
 build
 scr
 output
+src/output.asm
 
 *.annot
 *.cmo
