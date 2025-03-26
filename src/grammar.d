@@ -18,6 +18,7 @@ enum ExprType {
         Mut,
         ProcCall,
         StructInst,
+        Get,
 }
 
 //////////////////
@@ -38,8 +39,18 @@ class Expr {
                 case ExprType.Mut:        this.accept = &acceptExprMut;        break;
                 case ExprType.ProcCall:   this.accept = &acceptExprProcCall;   break;
                 case ExprType.StructInst: this.accept = &acceptExprStructInst; break;
+                case ExprType.Get:        this.accept = &acceptExprGet;        break;
                 default: assert(0);
                 }
+        }
+}
+
+class ExprGet : Expr {
+        Expr l, r;
+        this(Expr l, Expr r) {
+                super(ExprType.Get);
+                this.l = l;
+                this.r = r;
         }
 }
 

@@ -105,7 +105,8 @@ int main(string[] args) {
         }
 
         for (size_t i = 0; i < programs.length; ++i) {
-                symTbls ~= semSymCheck(&programs[i], igs, dts[i], &igs[i]); // Pass current ig
+                // Pass current ig
+                symTbls ~= semSymCheck(&programs[i], igs, dts[i], &igs[i]);
         }
 
         // Check for multiple main definitions
@@ -152,61 +153,3 @@ int main(string[] args) {
         return 0;
 }
 
-// int main(string[] args) {
-//         if (args.length < 2) {
-//                 usage();
-//         }
-
-//         args = args[1..$];
-
-//         FlagParser fp = handleArgs(args);
-//         Lexer[] lexers = [];
-//         Program[] programs = [];
-//         IdentGatherer[] igs = [];
-//         DepTbl[] dts = [];
-//         SymTblChecker[] symTbls = [];
-
-//         if (fp.flags & FlagType.Help) {
-//                 usage();
-//         }
-
-//         // Perform all pre-codegen analysis
-//         for (size_t i = 0; i < fp.paths.length; ++i) {
-//                 const string src = readText(fp.paths[i]);
-//                 lexers   ~= lexFile(src, fp.paths[i]);
-//                 programs ~= parseProgram(&lexers[i]);
-//                 igs      ~= getIdents(&programs[i]);
-//                 dts      ~= determineDeps(&programs[i], fp.paths[i]);
-//         }
-
-//         for (size_t i = 0; i < programs.length; ++i) {
-//                 symTbls ~= semSymCheck(&programs[i], igs, dts[i]);
-//         }
-
-//         assert(fp.paths.length == lexers.length);
-//         assert(fp.paths.length == programs.length);
-//         assert(fp.paths.length == igs.length);
-//         assert(fp.paths.length == symTbls.length);
-//         assert(fp.paths.length == dts.length);
-
-//         // Do not do codegen if any errors were encountered.
-//         for (size_t i = 0; i < igs.length; ++i) {
-//                 if (!igs[i].ok || !symTbls[i].ok) {
-//                         exit(1);
-//                 }
-//         }
-
-//         // Perform codegen.
-//         for (size_t i = 0; i < programs.length; ++i) {
-//                 char[] asm_ = gen(&programs[i], igs);
-//                 if (fp.flags & FlagType.ShowAsm) {
-//                         writeln("--- Generated assembly for file: ", fp.paths[i], " ---");
-//                         writeln(asm_);
-//                 }
-//                 writeX86_64AsmFile(asm_, fp.paths[i]);
-//         }
-
-//         assembleX86_64AsmFiles(fp);
-
-//         return 0;
-// }

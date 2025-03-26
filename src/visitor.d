@@ -16,6 +16,7 @@ struct Visitor {
         void function(Visitor* v, ExprMut e)        visitExprMut;
         void function(Visitor* v, ExprProcCall e)   visitExprProcCall;
         void function(Visitor* v, ExprStructInst e) visitExprStructInst;
+        void function(Visitor* v, ExprGet e)        visitExprGet;
 
         /*
          * Statement Visitors
@@ -36,6 +37,12 @@ struct Visitor {
 /*
  * Expression acceptors
  */
+
+void acceptExprGet(Expr e, Visitor* v) {
+        if (v.visitExprGet) {
+                v.visitExprGet(v, cast(ExprGet)e);
+        }
+}
 
 void acceptExprStructInst(Expr e, Visitor* v) {
         if (v.visitExprStructInst) {
@@ -158,6 +165,11 @@ void acceptStmtImport(Stmt s, Visitor* v) {
 /*
  * Expression visitors
  */
+
+void visitExprGet(Visitor* v, ExprGet e) {
+        e.l.accept(e.l, v);
+        e.r.accept(e.r, v);
+}
 
 void visitExprStructInst(Visitor* v, ExprStructInst e) {
         for (size_t i = 0; i < e.structMemExprs.length; ++i) {

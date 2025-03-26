@@ -71,17 +71,29 @@ class Context {
                 this.text ~= this.s ~ "; " ~ msg;
         }
 
+        // void pushScope() {
+        //         this.symbols ~= [[]]; // Add a new scope
+        //         //this.stackOffset = 0; // Reset offset for new scope
+        //         this.oldStackOffset = this.stackOffset;
+        // }
+
+        // void popScope() {
+        //         if (this.symbols.length > 1) { // Preserve global scope
+        //                 this.symbols = this.symbols[0 .. $ - 1];
+        //                 this.stackOffset = this.symbols.length > 0 ? this.symbols[$ - 1].map!(s => s.offset + getTypeSize(s.type)).maxElement(0) : 0;
+        //                 this.stackOffset = this.oldStackOffset;
+        //         }
+        // }
+
         void pushScope() {
-                this.symbols ~= [[]]; // Add a new scope
-                //this.stackOffset = 0; // Reset offset for new scope
-                this.oldStackOffset = this.stackOffset;
+                this.symbols ~= [[]];
+                this.oldStackOffset = this.stackOffset;  // Save previous offset
         }
 
         void popScope() {
-                if (this.symbols.length > 1) { // Preserve global scope
+                if (this.symbols.length > 1) {
                         this.symbols = this.symbols[0 .. $ - 1];
-                        this.stackOffset = this.symbols.length > 0 ? this.symbols[$ - 1].map!(s => s.offset + getTypeSize(s.type)).maxElement(0) : 0;
-                        this.stackOffset = this.oldStackOffset;
+                        this.stackOffset = this.oldStackOffset;  // Restore previous offset
                 }
         }
 
@@ -540,12 +552,16 @@ void compileStmtProc(Visitor* v, StmtProc s) {
         c.pushScope();
 
         string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-        size_t paramOffset = 8;
+        size_t paramOffset = 8; // Start at 8 bytes below rbp for first param
 
+        // Reset stackOffset for this procedure's local variables
+        c.stackOffset = 0;
+
+        // Handle parameters
         foreach (i, param_name; s.pn) {
                 RuntimeType* param_type = s.pt[i];
                 size_t param_size = getTypeSize(param_type);
-                if (param_size < 8) param_size = 8;
+                if (param_size < 8) param_size = 8; // Ensure 8-byte alignment
 
                 c.addSymbol(param_name.lx.idup, param_type, false, false, true);
 
@@ -560,17 +576,20 @@ void compileStmtProc(Visitor* v, StmtProc s) {
 
                         c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
                         c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
-                        paramOffset += 8;
+                        paramOffset += 8; // Increment offset for next parameter
                 } else {
                         c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
                         paramOffset += 8;
                 }
         }
 
-        size_t paramSpace = paramOffset - 8;
+        // Calculate total parameter space
+        size_t paramSpace = paramOffset - 8; // Total space used by parameters
         size_t totalStackSpace = paramSpace;
+
+        // Align stack if necessary
         if (totalStackSpace > 0) {
-                if ((totalStackSpace + 8) % 16 != 0) {
+                if ((totalStackSpace + 8) % 16 != 0) { // +8 for saved rbp
                         size_t padding = 16 - ((totalStackSpace + 8) % 16);
                         totalStackSpace += padding;
                         c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
@@ -578,12 +597,16 @@ void compileStmtProc(Visitor* v, StmtProc s) {
                 c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
         }
 
-        // c.stackOffset = 0; // Reset stackOffset for local variables
+        // Set stackOffset to paramSpace for local variables
         c.stackOffset = paramSpace;
+
+        // Compile the procedure body
         s.b.accept(s.b, v);
 
-        if (totalStackSpace > 0 || c.stackOffset > 0) {
-                c.text ~= c.s ~ "add rsp, " ~ (totalStackSpace + c.stackOffset).to!string;
+        // Clean up stack, including local variables and parameters
+        if (totalStackSpace > 0 || c.stackOffset > paramSpace) {
+                size_t localSpace = c.stackOffset - paramSpace;
+                c.text ~= c.s ~ "add rsp, " ~ (totalStackSpace + localSpace).to!string;
         }
         c.text ~= c.s ~ "leave";
         c.text ~= c.s ~ "ret";
@@ -738,7 +761,6 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
         Context* c = cast(Context*)v.context;
         c.addComment("Instantiating struct " ~ e.structId.lx.idup);
 
-        // Step 1: Lookup the struct definition
         string structName = e.structId.lx.idup;
         Context.Symbol* sym = c.findSymbol(structName);
         if (sym is null || sym.type.b != RuntimeTypeBase.Struct) {
@@ -748,22 +770,13 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
         RuntimeType* structType = sym.type;
         size_t structSize = structType.size;
 
-        // Step 2: Allocate stack space for the struct
-        // Align stack to 16 bytes if needed
-        size_t totalStackAdjust = structSize;
-        if ((c.stackOffset + structSize + 8) % 16 != 0) { // +8 accounts for saved rbp
-                size_t padding = 16 - ((c.stackOffset + structSize + 8) % 16);
-                totalStackAdjust += padding;
-                c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
-        }
-        c.text ~= c.s ~ "sub rsp, " ~ totalStackAdjust.to!string;
-        c.stackOffset += totalStackAdjust; // Update stack offset
-
-        // Base address of the struct is now at [rbp - c.stackOffset]
+        // Allocate space for the struct
+        c.stackOffset += structSize;
+        c.text ~= c.s ~ "sub rsp, " ~ structSize.to!string;
         string baseAddr = "rbp - " ~ c.stackOffset.to!string;
         c.addComment("Struct " ~ structName ~ " allocated at [" ~ baseAddr ~ "]");
 
-        // Step 3: Initialize struct members
+        // Initialize members
         foreach (i, memId; e.structMemIds) {
                 string memberName = memId.lx.idup;
                 size_t memberIndex = -1;
@@ -778,13 +791,10 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
                         continue;
                 }
 
-                // Evaluate the member expression (result in rax)
                 e.structMemExprs[i].accept(e.structMemExprs[i], v);
-
-                // Determine member size and offset
+                size_t memberOffset = structType.memberOffsets[memberIndex];
                 RuntimeType* memberType = structType.memberTypes[memberIndex];
                 size_t memberSize = getTypeSize(memberType);
-                size_t memberOffset = structType.memberOffsets[memberIndex];
                 string sizeSpec = memberSize == 8 ? "qword" :
                         memberSize == 4 ? "dword" :
                         memberSize == 2 ? "word" : "byte";
@@ -792,21 +802,158 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
                         memberSize == 4 ? "eax" :
                         memberSize == 2 ? "ax" : "al";
 
-                // Store the value at the correct offset within the struct
-                string destAddr = "[rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]";
-                c.text ~= c.s ~ "mov " ~ sizeSpec ~ " " ~ destAddr ~ ", " ~ reg;
-                c.addComment("Initialized " ~ memberName ~ " at " ~ destAddr);
+                c.text ~= c.s ~ "mov " ~ sizeSpec ~ " [rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "], " ~ reg;
+                c.addComment("Initialized " ~ memberName ~ " at [rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]");
         }
 
-        // Step 4: Return pointer to the struct in rax
+        // Return pointer to struct
         c.text ~= c.s ~ "lea rax, [" ~ baseAddr ~ "]";
         c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
 }
+
+// void compileExprStructInst(Visitor* v, ExprStructInst e) {
+//         Context* c = cast(Context*)v.context;
+//         c.addComment("Instantiating struct " ~ e.structId.lx.idup);
+
+//         // Step 1: Lookup the struct definition
+//         string structName = e.structId.lx.idup;
+//         Context.Symbol* sym = c.findSymbol(structName);
+//         if (sym is null || sym.type.b != RuntimeTypeBase.Struct) {
+//                 c.text ~= c.s ~ "; ERROR: Undefined or non-struct type " ~ structName;
+//                 return;
+//         }
+//         RuntimeType* structType = sym.type;
+//         size_t structSize = structType.size;
+
+//         // Step 2: Allocate stack space for the struct
+//         // Align stack to 16 bytes if needed
+//         size_t totalStackAdjust = structSize;
+//         if ((c.stackOffset + structSize + 8) % 16 != 0) { // +8 accounts for saved rbp
+//                 size_t padding = 16 - ((c.stackOffset + structSize + 8) % 16);
+//                 totalStackAdjust += padding;
+//                 c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
+//         }
+//         c.text ~= c.s ~ "sub rsp, " ~ totalStackAdjust.to!string;
+//         c.stackOffset += totalStackAdjust; // Update stack offset
+
+//         // Base address of the struct is now at [rbp - c.stackOffset]
+//         string baseAddr = "rbp - " ~ c.stackOffset.to!string;
+//         c.addComment("Struct " ~ structName ~ " allocated at [" ~ baseAddr ~ "]");
+
+//         // Step 3: Initialize struct members
+//         foreach (i, memId; e.structMemIds) {
+//                 string memberName = memId.lx.idup;
+//                 size_t memberIndex = -1;
+//                 foreach (j, name; structType.memberNames) {
+//                         if (name == memberName) {
+//                                 memberIndex = j;
+//                                 break;
+//                         }
+//                 }
+//                 if (memberIndex == -1) {
+//                         c.text ~= c.s ~ "; ERROR: Unknown member " ~ memberName ~ " in struct " ~ structName;
+//                         continue;
+//                 }
+
+//                 // Evaluate the member expression (result in rax)
+//                 e.structMemExprs[i].accept(e.structMemExprs[i], v);
+
+//                 // Determine member size and offset
+//                 RuntimeType* memberType = structType.memberTypes[memberIndex];
+//                 size_t memberSize = getTypeSize(memberType);
+//                 size_t memberOffset = structType.memberOffsets[memberIndex];
+//                 string sizeSpec = memberSize == 8 ? "qword" :
+//                         memberSize == 4 ? "dword" :
+//                         memberSize == 2 ? "word" : "byte";
+//                 string reg = memberSize == 8 ? "rax" :
+//                         memberSize == 4 ? "eax" :
+//                         memberSize == 2 ? "ax" : "al";
+
+//                 // Store the value at the correct offset within the struct
+//                 string destAddr = "[rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]";
+//                 c.text ~= c.s ~ "mov " ~ sizeSpec ~ " " ~ destAddr ~ ", " ~ reg;
+//                 c.addComment("Initialized " ~ memberName ~ " at " ~ destAddr);
+//         }
+
+//         // Step 4: Return pointer to the struct in rax
+//         c.text ~= c.s ~ "lea rax, [" ~ baseAddr ~ "]";
+//         c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
+// }
 
 void compileStmtImport(Visitor* v, StmtImport s) {
         Context* c = cast(Context*)v.context;
         c.makeProcsExterns(s.id.lx);
         return;
+}
+
+void compileExprGet(Visitor* v, ExprGet e) {
+        Context* c = cast(Context*)v.context;
+        c.addComment("Accessing struct member");
+
+        // Step 1: Evaluate the left-hand side (expecting an identifier for now)
+        if (auto ident = cast(ExprIdent)e.l) {
+                string varName = ident.id.lx.idup;
+                Context.Symbol* sym = c.findSymbol(varName);
+        
+                if (sym is null) {
+                        c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ varName;
+                        return;
+                }
+        
+                RuntimeType* structType = sym.type;
+                if (structType.b != RuntimeTypeBase.Struct) {
+                        c.text ~= c.s ~ "; ERROR: " ~ varName ~ " is not a struct";
+                        return;
+                }
+
+                // Step 2: Get the member name from the right-hand side
+                if (auto memberIdent = cast(ExprIdent)e.r) {
+                        string memberName = memberIdent.id.lx.idup;
+                        size_t memberIndex = -1;
+                        foreach (i, name; structType.memberNames) {
+                                if (name == memberName) {
+                                        memberIndex = i;
+                                        break;
+                                }
+                        }
+            
+                        if (memberIndex == -1) {
+                                c.text ~= c.s ~ "; ERROR: Member " ~ memberName ~ " not found in struct " ~ varName;
+                                return;
+                        }
+
+                        // Step 3: Load the member value
+                        size_t memberOffset = structType.memberOffsets[memberIndex];
+                        RuntimeType* memberType = structType.memberTypes[memberIndex];
+                        size_t memberSize = getTypeSize(memberType);
+            
+                        string sizeSpec = memberSize == 8 ? "qword" :
+                                memberSize == 4 ? "dword" :
+                                memberSize == 2 ? "word" : "byte";
+                        string reg = memberSize == 8 ? "rax" :
+                                memberSize == 4 ? "eax" :
+                                memberSize == 2 ? "ax" : "al";
+
+                        // Load from stack location of the struct
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ sizeSpec ~ " [rbp - " ~ (sym.offset - memberOffset).to!string ~ "]";
+            
+                        // Extend to 64-bit if necessary
+                        if (memberSize < 8) {
+                                if (memberType.b == RuntimeTypeBase.U8 || 
+                                    memberType.b == RuntimeTypeBase.U16 || 
+                                    memberType.b == RuntimeTypeBase.U32) {
+                                        c.text ~= c.s ~ "movzx rax, " ~ reg;
+                                } else {
+                                        c.text ~= c.s ~ "movsx rax, " ~ reg;
+                                }
+                        }
+                        c.addComment("Loaded " ~ memberName ~ " from " ~ varName ~ " into rax");
+                } else {
+                        c.text ~= c.s ~ "; ERROR: Right side of '.' must be an identifier";
+                }
+        } else {
+                c.text ~= c.s ~ "; ERROR: Left side of '.' must be an identifier (complex expressions not yet supported)";
+        }
 }
 
 Visitor createCodegenContext(Context* c) {
@@ -821,6 +968,7 @@ Visitor createCodegenContext(Context* c) {
         v.visitExprMut        = &compileExprMut;
         v.visitExprProcCall   = &compileExprProcCall;
         v.visitExprStructInst = &compileExprStructInst;
+        v.visitExprGet        = &compileExprGet;
 
         v.visitStmtLet        = &compileStmtLet;
         v.visitStmtExpr       = &compileStmtExpr;

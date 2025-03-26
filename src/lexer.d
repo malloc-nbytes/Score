@@ -9,6 +9,8 @@ import token;
 import keywords;
 import utils;
 
+static private const size_t SIZE_MAX = 1000000;
+
 struct Lexer {
         Token* hd, tl;
 }
@@ -123,9 +125,10 @@ private TokenType determineTypeFromOp(const ref char[] op, size_t *sz) {
                 }
         }
 
-        *sz = 0;
-        err(format("invalid operator: '%s'", op));
-        return cast(TokenType)0; // unreachable
+        *sz = SIZE_MAX;
+        // err(format("invalid operator: '%s'", op));
+        // return cast(TokenType)0; // unreachable
+        return cast(TokenType)0;
 }
 
 Lexer lexFile(const ref string src, const ref string fp) {
@@ -173,7 +176,10 @@ Lexer lexFile(const ref string src, const ref string fp) {
                         char[] op = consumeWhile(src[i..$], (dchar c) { return isOp(c); });
                         size_t sz = 0;
                         TokenType ty = determineTypeFromOp(op, &sz);
-                        Token *t = tokenCreate(src[i..i+sz].dup, ty, r, c, fp);
+                        Token *t = tokenCreate(src[i..i+(sz == SIZE_MAX ? 0 : sz)].dup, ty, r, c, fp);
+                        if (sz == SIZE_MAX) {
+                                err(tokerrToStr(t)~format("invalid operator: '%s'", op));
+                        }
                         lexerAppend(&lexer, t);
                         i += sz, c += sz;
                 }

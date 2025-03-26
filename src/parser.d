@@ -92,11 +92,6 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
 
                 switch (cur.ty) {
                 case TokenType.Ident: {
-                        // if (l.hd && lexerPeek(l).ty == TokenType.LCurlyBracket) {
-                        //         assert(0 && "struct instants are unimplemented");
-                        // } else {
-                        //         left = new ExprIdent(lexerNext(l));
-                        // }
                         Token* ident = lexerNext(l);
                         if (l.hd && lexerPeek(l).ty == TokenType.LCurlyBracket) {
                                 expect(l, TokenType.LCurlyBracket); // {
@@ -105,17 +100,15 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
                                 parseStructInstMembers(l, structMemIds, structMemExprs, p);
                                 left = new ExprStructInst(ident, structMemIds, structMemExprs, p);
                         } else {
+                                if (left) {
+                                err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
+                                }
                                 left = new ExprIdent(ident);
                         }
                 } break;
                 case TokenType.Lparen: {
                         lexerDiscard(l); // (
                         if (left) {
-                                // size_t len = 0, cap = 0;
-                                // bool unused = false;
-                                // Expr **exprs = parse_comma_sep_exprs(lexer, &len, &cap,
-                                //                                      nullptr, TOKEN_TYPE_RIGHT_PARENTHESIS);
-                                // left = (Expr *)expr_proc_call_alloc(left, exprs, len, cap);
                                 Expr[] exprs = parseCommaSepExprs(l, TokenType.Rparen, p);
                                 left = new ExprProcCall(left, exprs);
                         } else {
@@ -124,12 +117,26 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
                         cast(void)expect(l, TokenType.Rparen);
                 } break;
                 case TokenType.IntLit: {
+                        if (left) {
+                                err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
+                        }
                         left = new ExprIntLit(lexerNext(l));
                 } break;
                 case TokenType.StrLit: {
+                        if (left) {
+                                err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
+                        }
                         left = new ExprStrLit(lexerNext(l));
                 } break;
+                case TokenType.Period: {
+                        lexerDiscard(l); // .
+                        Expr right = parseExpr(l, p);
+                        left = new ExprGet(left, right);
+                } break;
                 case TokenType.Keyword: {
+                        if (left) {
+                                err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
+                        }
                         assert(0);
                 } break;
                 default: return left;
