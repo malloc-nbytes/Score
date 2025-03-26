@@ -2,6 +2,7 @@ module test_procs where
 
 extern printf(format: u8*, ...): i32;
 extern exit(c: i32): void;
+extern strcmp(s1: u8*, s2: u8*): i32;
 
 proc fib(n: i32): i32 {
         if (n < 2) {
@@ -12,6 +13,23 @@ proc fib(n: i32): i32 {
 
 proc sum(a: i32, b: i32): i32 {
         return a + b;
+}
+
+proc test_pass_str_helper(s: u8*): u8* {
+        if (strcmp(s, "foo") != 0) {
+                return "";
+        }
+        return s;
+}
+
+proc test_pass_str(void): i32 {
+        printf("  test_pass_str()\n");
+        let s: u8* = "foo";
+        let res: u8* = test_pass_str_helper(s);
+        if (strcmp(s, res) != 0) {
+                return 0;
+        }
+        return 1;
 }
 
 proc test_rec(void): i32 {
@@ -46,6 +64,9 @@ export proc main(void): i32 {
                 fail();
         }
         if (test_sum() == 0) {
+                fail();
+        }
+        if (test_pass_str() == 0) {
                 fail();
         }
         printf("ok\n");

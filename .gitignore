@@ -1,7 +1,13 @@
 build
 scr
 output
-src/output.asm
+input
+
+# Ignore everything in src/tests
+/src/tests/*
+
+# Except .scr files
+!/src/tests/*.scr
 
 *.annot
 *.cmo
@@ -9,6 +15,7 @@ src/output.asm
 *.cmi
 *.a
 *.o
+*.asm
 *.cmx
 *.cmxs
 *.cmxa

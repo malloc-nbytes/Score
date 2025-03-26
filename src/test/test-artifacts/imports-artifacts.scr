@@ -1,0 +1,14 @@
+module imports_artifacts where
+
+export proc sub(a: i32, b: i32): i32 {
+        return a-b;
+}
+
+proc get_1_helper(void): i32 {
+        let a: i32 = 1;
+        return a;
+}
+
+export proc get_1(void): i32 {
+        return get_1_helper();
+}
