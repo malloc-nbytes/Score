@@ -409,6 +409,8 @@ void compileExprMut(Visitor* v, ExprMut e) {
         }
 }
 
+// TODO: handle more than 6 function args and clean
+//       up the stack after pushing them.
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
         Context* c = cast(Context*)v.context;
         c.addComment("Calling procedure");
@@ -461,45 +463,6 @@ void compileExprProcCall(Visitor* v, ExprProcCall e) {
         }
         c.addComment("End calling procedure");
 }
-
-// TODO: handle more than 6 function args and clean
-//       up the stack after pushing them.
-// void compileExprProcCall(Visitor* v, ExprProcCall e) {
-//         Context* c = cast(Context*)v.context;
-//         c.addComment("Calling procedure");
-//         if (auto ident = cast(ExprIdent)e.l) {
-//                 string procName = ident.id.lx.idup;
-//                 string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-
-//                 Context.Symbol* sym = c.findSymbol(procName);
-//                 bool isVariadic = sym !is null && sym.variadic;
-
-//                 // Evaluate arguments
-//                 size_t argCount = min(e.exprs.length, 6);
-//                 string[] usedRegs = regs[0..argCount];
-//                 foreach (const ref string r; usedRegs) {
-//                         c.text ~= c.s ~ "push " ~ r;
-//                 }
-//                 for (size_t i = 0; i < argCount; i++) {
-//                         e.exprs[i].accept(e.exprs[i], v);
-//                         c.text ~= c.s ~ "mov " ~ regs[i] ~ ", rax";
-//                 }
-
-//                 // Align stack to 16 bytes (assuming rsp was aligned at function entry)
-//                 //c.text ~= c.s ~ "sub rsp, 8"; // Adjust for alignment
-//                 if (isVariadic) {
-//                         c.text ~= c.s ~ "xor al, al"; // No FP args
-//                 }
-//                 c.text ~= c.s ~ "call " ~ procName;
-//                 foreach (const ref string r; usedRegs) {
-//                         c.text ~= c.s ~ "pop " ~ r;
-//                 }
-//                 //c.text ~= c.s ~ "add rsp, 8"; // Restore stack
-//         } else {
-//                 c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
-//         }
-//         c.addComment("End calling procedure");
-// }
 
 void compileStmtLet(Visitor* v, StmtLet s) {
         Context* c = cast(Context*)v.context;
@@ -894,12 +857,12 @@ void compileExprGet(Visitor* v, ExprGet e) {
         if (auto ident = cast(ExprIdent)e.l) {
                 string varName = ident.id.lx.idup;
                 Context.Symbol* sym = c.findSymbol(varName);
-        
+
                 if (sym is null) {
                         c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ varName;
                         return;
                 }
-        
+
                 RuntimeType* structType = sym.type;
                 if (structType.b != RuntimeTypeBase.Struct) {
                         c.text ~= c.s ~ "; ERROR: " ~ varName ~ " is not a struct";
@@ -916,7 +879,7 @@ void compileExprGet(Visitor* v, ExprGet e) {
                                         break;
                                 }
                         }
-            
+
                         if (memberIndex == -1) {
                                 c.text ~= c.s ~ "; ERROR: Member " ~ memberName ~ " not found in struct " ~ varName;
                                 return;
@@ -926,7 +889,7 @@ void compileExprGet(Visitor* v, ExprGet e) {
                         size_t memberOffset = structType.memberOffsets[memberIndex];
                         RuntimeType* memberType = structType.memberTypes[memberIndex];
                         size_t memberSize = getTypeSize(memberType);
-            
+
                         string sizeSpec = memberSize == 8 ? "qword" :
                                 memberSize == 4 ? "dword" :
                                 memberSize == 2 ? "word" : "byte";
@@ -936,11 +899,11 @@ void compileExprGet(Visitor* v, ExprGet e) {
 
                         // Load from stack location of the struct
                         c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ sizeSpec ~ " [rbp - " ~ (sym.offset - memberOffset).to!string ~ "]";
-            
+
                         // Extend to 64-bit if necessary
                         if (memberSize < 8) {
-                                if (memberType.b == RuntimeTypeBase.U8 || 
-                                    memberType.b == RuntimeTypeBase.U16 || 
+                                if (memberType.b == RuntimeTypeBase.U8 ||
+                                    memberType.b == RuntimeTypeBase.U16 ||
                                     memberType.b == RuntimeTypeBase.U32) {
                                         c.text ~= c.s ~ "movzx rax, " ~ reg;
                                 } else {

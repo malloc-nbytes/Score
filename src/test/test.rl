@@ -1,5 +1,9 @@
 #!/usr/local/bin/earl
 
+# This is the entrypoint for the Score tests.
+# This file is written in EARL and can be found
+# here: https://github.com/malloc-nbytes/EARL/
+
 module Test
 
 import "std/system.rl"; as sys
@@ -37,7 +41,7 @@ fn cleanup_test_env() {
     }
 }
 
-fn compile(files, asm) {
+fn compile(files: list, asm: bool) {
     let special_test_deps = {
         "./test-imports": "./test-artifacts/imports-artifacts.scr"
     };
