@@ -1,5 +1,4 @@
 module codegen;
-
 import std.stdio;
 import std.conv;
 import std.algorithm;
@@ -23,7 +22,6 @@ class Context {
         string[] exports         = [];
         const string noexecstack = "section .note.GNU-stack noalloc noexec nowrite progbits";
         const string s           = "    ";
-        RuntimeType* current_return_type;
         size_t labelCounter = 0;
         size_t oldStackOffset;
 
@@ -49,6 +47,18 @@ class Context {
                         this.symbols = [[]];
                 }
                 this.oldStackOffset = 0;
+
+                for (size_t i = 0; i < this.igs.length; ++i) {
+                        for (size_t j = 0; j < this.igs[i].procs.length; ++j) {
+                                StmtProc* s = &this.igs[i].procs[j];
+                                assert(s);
+                                if (s.isExport) {
+                                        this.addSymbol(s.id.lx.idup,
+                                                       s.rtype, true,
+                                                       s.isExport, false);
+                                }
+                        }
+                }
         }
 
         void makeProcsExterns(ref const char[] modName) {
@@ -71,20 +81,6 @@ class Context {
                 this.text ~= this.s ~ "; " ~ msg;
         }
 
-        // void pushScope() {
-        //         this.symbols ~= [[]]; // Add a new scope
-        //         //this.stackOffset = 0; // Reset offset for new scope
-        //         this.oldStackOffset = this.stackOffset;
-        // }
-
-        // void popScope() {
-        //         if (this.symbols.length > 1) { // Preserve global scope
-        //                 this.symbols = this.symbols[0 .. $ - 1];
-        //                 this.stackOffset = this.symbols.length > 0 ? this.symbols[$ - 1].map!(s => s.offset + getTypeSize(s.type)).maxElement(0) : 0;
-        //                 this.stackOffset = this.oldStackOffset;
-        //         }
-        // }
-
         void pushScope() {
                 this.symbols ~= [[]];
                 this.oldStackOffset = this.stackOffset;  // Save previous offset
@@ -99,8 +95,9 @@ class Context {
 
         void addSymbol(string name, RuntimeType* type, bool isFunction = false, bool variadic = false, bool param = false) {
                 size_t size = isFunction ? 0 : getTypeSize(type);
+                if (size < 8 && !isFunction) size = 8;
                 stackOffset += size;
-                this.symbols[$ - 1] ~= Symbol(name, stackOffset, type, isFunction, variadic, param); // Add to current scope
+                this.symbols[$ - 1] ~= Symbol(name, stackOffset, type, isFunction, variadic, param);
         }
 
         Symbol* findSymbol(string name) {
@@ -112,6 +109,7 @@ class Context {
                                 }
                         }
                 }
+
                 return null;
         }
 
@@ -123,16 +121,24 @@ class Context {
                 this.exports ~= "global " ~ name;
         }
 
-        void prologue(string label) {
+        void prolog(string label) {
                 this.text ~= label ~ ":";
                 this.text ~= this.s ~ "push rbp";
                 this.text ~= this.s ~ "mov rbp, rsp";
         }
 
-        void epilogue() {
+        void epilog() {
                 this.text ~= this.s ~ "add rsp, " ~ this.stackOffset.to!string;
                 this.text ~= this.s ~ "leave";
                 this.text ~= this.s ~ "ret";
+        }
+
+        void leave(){
+                this.text~=this.s~"leave";
+        }
+
+        void ret(){
+                this.text~=this.s~"ret";
         }
 
         char[] write() {
@@ -145,6 +151,59 @@ class Context {
                 foreach (const ref string s; this.text)    res ~= s ~ '\n';
                 res ~= '\n' ~ this.noexecstack ~ '\n';
                 return res;
+        }
+}
+
+
+RuntimeType* getExprType(Expr e, Context* c) {
+        final switch (e.ty) {
+        case ExprType.Ident:
+                ExprIdent ident = cast(ExprIdent)e;
+                Context.Symbol* sym = c.findSymbol(ident.id.lx.idup);
+                if (sym is null) assert(0, "Undefined identifier: " ~ ident.id.lx.idup);
+                return sym.type;
+
+        case ExprType.IntLit:
+                // Assume i64 for simplicity (could infer from value or context)
+                return new RuntimeType(RuntimeTypeBase.I64, null);
+
+        case ExprType.StrLit:
+                // String literals could be treated as pointers (char*)
+                RuntimeType* charType = new RuntimeType(RuntimeTypeBase.U8, null);
+                RuntimeType* ptrType = new RuntimeType(RuntimeTypeBase.Ptr, charType);
+                return ptrType;
+
+        case ExprType.ProcCall:
+                ExprProcCall procCall = cast(ExprProcCall)e;
+                ExprIdent procIdent = cast(ExprIdent)procCall.l;
+                Context.Symbol* procSym = c.findSymbol(procIdent.id.lx.idup);
+                if (procSym is null) assert(0, "Undefined procedure: " ~ procIdent.id.lx.idup);
+                // Assume StmtProc stored return type in symbol (needs adjustment)
+                return procSym.type;  // Placeholder; needs rtype from StmtProc
+
+        case ExprType.Bin: return getExprType((cast(ExprBin)e).l, c);
+        case ExprType.Un:
+                assert(0, "Type inference for binary/unary expressions not implemented");
+
+        case ExprType.Mut:
+                assert(0, "Type inference for mutation expressions not implemented");
+
+        case ExprType.StructInst:
+                ExprStructInst structInst = cast(ExprStructInst)e;
+                return structInst.structType;
+
+        case ExprType.Get:
+                ExprGet getExpr = cast(ExprGet)e;
+                RuntimeType* baseType = getExprType(getExpr.l, c);
+                if (baseType.b != RuntimeTypeBase.Struct) {
+                        assert(0, "Cannot get member of non-struct type");
+                }
+                ExprIdent memberIdent = cast(ExprIdent)getExpr.r;
+                string memberName = memberIdent.id.lx.idup;
+                foreach (i, name; baseType.memberNames) {
+                        if (name == memberName) return baseType.memberTypes[i];
+                }
+                assert(0, "Unknown member: " ~ memberName);
         }
 }
 
@@ -287,7 +346,7 @@ void compileExprIntLit(Visitor* v, ExprIntLit e) {
         Context* c = cast(Context*)v.context;
 
         // TODO: use appropriate register
-        c.text ~= c.s ~ "mov eax, " ~ e.i.lx.idup;
+        c.text ~= c.s ~ "mov rax, " ~ e.i.lx.idup;
 }
 
 void compileExprIdent(Visitor* v, ExprIdent e) {
@@ -296,40 +355,33 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
         string name = e.id.lx.idup;
         Context.Symbol* sym = c.findSymbol(name);
 
-        if (sym is null) {
-                c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ name;
-                return;
-        }
+        assert(sym);
 
         c.addComment("Retrieving identifier: " ~ name);
 
-        size_t size = getTypeSize(sym.type);
-        string size_spec = size == 8 ? "qword" :
-                size == 4 ? "dword" :
-                size == 2 ? "word" : "byte";
-        string reg = size == 8 ? "rax" :
-                size == 4 ? "eax" :
-                size == 2 ? "ax" : "al";
+        size_t varSize = getTypeSize(sym.type);
+        string reg = "";
+        string spec = "";
+        getGenPReg(varSize, &reg, &spec);
 
-        // Load the value from memory into the appropriate register size
-        if (sym.param) {
-                c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ (2*sym.offset).to!string ~ "]";
-        } else {
-                c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ sym.offset.to!string ~ "]";
-        }
+        // Load the value from the stack into the register
+        c.text ~= c.s ~ "mov " ~ spec ~ " " ~ reg ~ ", [" ~ "rbp - " ~ sym.offset.to!string ~ "]";
 
-        // Extend to 64-bit rax if needed
-        if (size < 8) {
-                if (sym.type.b == RuntimeTypeBase.U8 ||
-                    sym.type.b == RuntimeTypeBase.U16 ||
-                    sym.type.b == RuntimeTypeBase.U32) {
-                        c.text ~= c.s ~ "movzx rax, " ~ reg;  // Zero-extend for unsigned
-                } else {
-                        c.text ~= c.s ~ "movsx rax, " ~ reg;  // Sign-extend for signed
-                }
+        // Zero-extend unsigned types if necessary
+        if (varSize < 8
+            && (sym.type.b == RuntimeTypeBase.U8
+                || sym.type.b == RuntimeTypeBase.U16
+                || sym.type.b == RuntimeTypeBase.U32)) {
+                c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg;
         }
 }
 
+void compileExprGet(Visitor* v, ExprGet e) {
+        assert(0);
+}
+
+// TODO: -= operator fails with i32 because
+//       of size operand mismatch.
 void compileExprMut(Visitor* v, ExprMut e) {
         Context* c = cast(Context*)v.context;
 
@@ -342,62 +394,59 @@ void compileExprMut(Visitor* v, ExprMut e) {
                         return;
                 }
 
-                size_t size = getTypeSize(sym.type);
-                string size_spec = size == 8 ? "qword" :
-                        size == 4 ? "dword" :
-                        size == 2 ? "word" : "byte";
-                string reg = size == 8 ? "rax" :
-                        size == 4 ? "eax" :
-                        size == 2 ? "ax" : "al";
-                string offset = sym.param ? (2 * sym.offset).to!string : sym.offset.to!string;
+                size_t varSize = getTypeSize(sym.type);
+                string reg = "";
+                string spec = "";
+                getGenPReg(varSize, &reg, &spec);
+                string offset = sym.offset.to!string;
 
                 // Evaluate right-hand side
                 e.r.accept(e.r, v);
 
                 switch (e.eqty.ty) {
                 case TokenType.Equals:
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
 
                 case TokenType.PlusEquals:
-                        c.text ~= c.s ~ "add " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "add " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.MinusEquals:
                         c.text ~= c.s ~ "mov rbx, " ~ reg; // Save right operand
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "sub " ~ reg ~ ", rbx";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.AsteriskEquals:
-                        c.text ~= c.s ~ "imul " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "imul " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.ForwardSlashEquals:
                         c.text ~= c.s ~ "mov rbx, rax"; // Save right operand
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "cqo";
                         c.text ~= c.s ~ "idiv rbx";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.PercentEquals:
                         c.text ~= c.s ~ "mov rbx, rax"; // Save right operand
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
                         c.text ~= c.s ~ "cqo";
                         c.text ~= c.s ~ "idiv rbx";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], rdx";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], rdx";
                         break;
                 case TokenType.AmpersandEquals:
-                        c.text ~= c.s ~ "and " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "and " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.PipeEquals:
-                        c.text ~= c.s ~ "or " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "or " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
                 case TokenType.CaretEquals:
-                        c.text ~= c.s ~ "xor " ~ reg ~ ", " ~ size_spec ~ " [rbp - " ~ offset ~ "]";
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
+                        c.text ~= c.s ~ "xor " ~ reg ~ ", " ~ spec ~ " [rbp - " ~ offset ~ "]";
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ offset ~ "], " ~ reg;
                         break;
 
                 default:
@@ -409,59 +458,75 @@ void compileExprMut(Visitor* v, ExprMut e) {
         }
 }
 
-// TODO: handle more than 6 function args and clean
-//       up the stack after pushing them.
 void compileExprProcCall(Visitor* v, ExprProcCall e) {
         Context* c = cast(Context*)v.context;
-        c.addComment("Calling procedure");
-        if (auto ident = cast(ExprIdent)e.l) {
-                string procName = ident.id.lx.idup;
-                string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-                Context.Symbol* sym = c.findSymbol(procName);
-                bool isVariadic = sym !is null && sym.variadic;
-
-                // Step 1: Evaluate all arguments and store on stack
-                size_t argCount = min(e.exprs.length, 6);
-                foreach (i, expr; e.exprs) {
-                        if (i < argCount) {
-                                expr.accept(expr, v); // Result in rax
-                                c.text ~= c.s ~ "push rax"; // Save result on stack
-                        }
-                }
-
-                // Step 2: Preserve caller-saved registers if needed
-                string[] usedRegs = regs[0..argCount];
-                foreach (const ref string r; usedRegs) {
-                        c.text ~= c.s ~ "push " ~ r;
-                }
-
-                // Step 3: Load arguments into registers in correct order
-                foreach (i; 0..argCount) {
-                        size_t stackOffset = (argCount - i - 1) * 8; // Reverse order of pushes
-                        c.text ~= c.s ~ "mov " ~ regs[i] ~ ", qword [rsp + " ~ (stackOffset + usedRegs.length * 8).to!string ~ "]";
-                }
-
-                // Step 4: Align stack to 16 bytes before call
-                size_t totalPushes = argCount + usedRegs.length; // Total 8-byte pushes
-                if (totalPushes % 2 != 0) { // If odd number of pushes, rsp is misaligned
-                        c.text ~= c.s ~ "sub rsp, 8"; // Add 8 bytes to align to 16
-                }
-
-                // Step 5: Make the call
-                if (isVariadic) {
-                        c.text ~= c.s ~ "xor al, al"; // No FP args
-                }
-                c.text ~= c.s ~ "call " ~ procName;
-
-                // Step 6: Clean up stack
-                size_t stackAdjust = (totalPushes + (totalPushes % 2)) * 8; // Include alignment adjustment
-                c.text ~= c.s ~ "add rsp, " ~ stackAdjust.to!string;
-
-        } else {
-                c.text ~= c.s ~ "; ERROR: Procedure call must use identifier";
+        // Get procedure symbol
+        if (e.l.ty != ExprType.Ident) {
+                assert(0, "Procedure call target must be an identifier");
         }
-        c.addComment("End calling procedure");
+        ExprIdent procIdent = cast(ExprIdent)e.l;
+        string procName = procIdent.id.lx.idup;
+        Context.Symbol* procSym = c.findSymbol(procName);
+        if (procSym is null) {
+                c.extern_(procName);
+        } else {
+                assert(procSym.fun, "Identifier " ~ procName ~ " is not a function");
+        }
+
+        // Calculate stack space for arguments beyond 6 and temporaries
+        size_t argCount = e.exprs.length;
+        size_t stackArgs = (argCount > 6) ? (argCount - 6) : 0;
+        size_t tempSpace = argCount * 8;  // Space for all args temporarily
+        size_t totalStackSpace = tempSpace + (stackArgs * 8);
+        if (totalStackSpace > 0) {
+                size_t totalWithCall = totalStackSpace + 8;
+                if (totalWithCall % 16 != 0) {
+                        totalStackSpace += 16 - (totalWithCall % 16);
+                }
+                c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
+        }
+
+        // Evaluate arguments and store temporarily on stack
+        foreach (i, argExpr; e.exprs) {
+                argExpr.accept(argExpr, v);  // Result in rax
+                RuntimeType* argType = getExprType(argExpr, c);
+                size_t argSize = getTypeSize(argType);
+                if (argSize < 8) argSize = 8;
+                string spec = (argSize == 8) ? "qword" : "unknown";  // Simplified for now
+                size_t tempOffset = i * 8;
+                c.text ~= c.s ~ "mov " ~ spec ~ " [rsp + " ~ tempOffset.to!string ~ "], rax";
+        }
+
+        // Move arguments to registers or stack
+        foreach (i; 0 .. argCount) {
+                RuntimeType* argType = getExprType(e.exprs[i], c);
+                size_t argSize = getTypeSize(argType);
+                if (argSize < 8) argSize = 8;
+                string reg = "";
+                string spec = "";
+                size_t tempOffset = i * 8;
+                if (i < 6) {
+                        getReg(argSize, i, &reg, &spec);
+                        c.text ~= c.s ~ "mov " ~ spec ~ " " ~ reg ~ ", [rsp + " ~ tempOffset.to!string ~ "]";
+                } else {
+                        size_t stackOffset = (argCount - i - 1) * 8 + tempSpace;
+                        c.text ~= c.s ~ "mov " ~ spec ~ " [rsp + " ~ stackOffset.to!string ~ "], [rsp + " ~ tempOffset.to!string ~ "]";
+                }
+        }
+
+        // Handle variadic functions
+        if (procSym && procSym.variadic) {
+                c.text ~= c.s ~ "mov rax, 0";
+        }
+
+        // Emit the call
+        c.text ~= c.s ~ "call " ~ procName;
+
+        // Clean up stack
+        if (totalStackSpace > 0) {
+                c.text ~= c.s ~ "add rsp, " ~ totalStackSpace.to!string;
+        }
 }
 
 void compileStmtLet(Visitor* v, StmtLet s) {
@@ -469,131 +534,153 @@ void compileStmtLet(Visitor* v, StmtLet s) {
 
         size_t varSize = getTypeSize(s.t);
         if (varSize == 0) {
-                assert(0, "Cannot allocate variable with void type");
+                assert(0, "Cannot create variable of type void");
         }
-
-        string varName = s.id.lx.idup;
-        c.addSymbol(varName, s.t);
+        // Align varSize to 8 bytes for consistency with parameters
+        if (varSize < 8) varSize = 8;
 
         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
 
-        c.addComment(varName ~ " at [rbp - " ~ c.stackOffset.to!string ~ "]");
+        // Add symbol after allocation, store at current stackOffset + varSize
+        string varName = s.id.lx.idup;
+        c.addSymbol(varName, s.t);
 
-        if (s.e !is null) {
-                s.e.accept(s.e, v); // Result in rax
+        s.e.accept(s.e, v);
 
-                string size_spec = varSize == 8 ? "qword" :
-                        varSize == 4 ? "dword" :
-                        varSize == 2 ? "word" : "byte";
-                string reg = varSize == 8 ? "rax" :
-                        varSize == 4 ? "eax" :
-                        varSize == 2 ? "ax" : "al";
+        string reg = "";
+        string spec = "";
+        getGenPReg(varSize, &reg, &spec);
 
-                if (varSize < 8 && (s.t.b == RuntimeTypeBase.U8 || s.t.b == RuntimeTypeBase.U16 || s.t.b == RuntimeTypeBase.U32)) {
-                        c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg;
-                }
-                c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ (c.stackOffset).to!string ~ "], " ~ reg;
+        // Zero-extend for unsigned types if needed
+        if (varSize < 8 && (s.t.b == RuntimeTypeBase.U8 || s.t.b == RuntimeTypeBase.U16 || s.t.b == RuntimeTypeBase.U32)) {
+                c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg;  // e.g., movzx eax, al
         }
+        // Store result at [rbp - stackOffset]
+        c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ c.stackOffset.to!string ~ "], " ~ reg;
 }
 
 void compileStmtExpr(Visitor* v, StmtExpr s) {
         Context* c = cast(Context*)v.context;
         s.e.accept(s.e, v);
-        c.addComment("Expression result in rax (discarded)");
+}
+
+void getGenPReg(size_t sz, string* reg, string* spec) {
+        string sizeSpec, reg_;
+        switch (sz) {
+        case 8: sizeSpec = "qword"; reg_ = "rax"; break;
+        case 4: sizeSpec = "dword"; reg_ = "eax"; break;
+        case 2: sizeSpec = "word";  reg_ = "ax";  break;
+        case 1: sizeSpec = "byte";  reg_ = "al";  break;
+        default: assert(0, "Invalid variable size: " ~ sz.to!string);
+        }
+        *reg = reg_;
+        *spec = sizeSpec;
+}
+
+void getReg(size_t sz, size_t i, string* reg, string* spec) {
+        string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        if (i >= regs.length) {
+                assert(0, "Too many parameters for register passing");
+        }
+        string reg_ = (sz == 8) ? regs[i] :
+                (sz == 4) ? regs[i][0..2] ~ "i" :
+                (sz == 2) ? regs[i][2..$] :
+                regs[i][3..$];
+        string spec_ = (sz == 8) ? "qword" :
+                (sz == 4) ? "dword" :
+                (sz == 2) ? "word" : "byte";
+        *reg = reg_;
+        *spec = spec_;
 }
 
 void compileStmtProc(Visitor* v, StmtProc s) {
         Context* c = cast(Context*)v.context;
+        c.prolog(s.id.lx.idup);
+        c.addSymbol(s.id.lx.idup, s.rtype, true, s.variadic, false);
 
-        string proc_name = s.id.lx.idup;
-        c.current_return_type = s.rtype;
-        if (s.isExport) {
-                c.export_(proc_name);
-        }
-
-        c.prologue(proc_name);
         c.pushScope();
 
-        string[] regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-        size_t paramOffset = 8; // Start at 8 bytes below rbp for first param
-
-        // Reset stackOffset for this procedure's local variables
-        c.stackOffset = 0;
-
-        // Handle parameters
-        foreach (i, param_name; s.pn) {
-                RuntimeType* param_type = s.pt[i];
-                size_t param_size = getTypeSize(param_type);
-                if (param_size < 8) param_size = 8; // Ensure 8-byte alignment
-
-                c.addSymbol(param_name.lx.idup, param_type, false, false, true);
-
-                if (i < 6) {
-                        string reg = param_size == 8 ? regs[i] :
-                                param_size == 4 ? regs[i][0 .. 2] ~ "i" :
-                                param_size == 2 ? regs[i][2 .. $] :
-                                regs[i][3 .. $];
-                        string size_spec = param_size == 8 ? "qword" :
-                                param_size == 4 ? "dword" :
-                                param_size == 2 ? "word" : "byte";
-
-                        c.text ~= c.s ~ "mov " ~ size_spec ~ " [rbp - " ~ paramOffset.to!string ~ "], " ~ reg;
-                        c.addComment(param_name.lx.idup ~ " at [rbp - " ~ paramOffset.to!string ~ "]");
-                        paramOffset += 8; // Increment offset for next parameter
-                } else {
-                        c.text ~= c.s ~ "; " ~ param_name.lx.idup ~ " at [rbp + " ~ (16 + (i - 6) * 8).to!string ~ "] (stack param)";
-                        paramOffset += 8;
-                }
+        if (s.isExport) {
+                c.export_(s.id.lx.idup);
         }
 
-        // Calculate total parameter space
-        size_t paramSpace = paramOffset - 8; // Total space used by parameters
-        size_t totalStackSpace = paramSpace;
+        // Reset stackOffset for this scope
+        c.stackOffset = 0;
 
-        // Align stack if necessary
+        // First pass: Calculate total parameter space
+        size_t paramSpace = 0;
+        foreach (i, paramName; s.pn) {
+                RuntimeType* paramType = s.pt[i];
+                size_t paramSize = getTypeSize(paramType);
+                if (paramSize < 8) paramSize = 8; // Minimum 8-byte alignment
+                paramSpace += paramSize;
+        }
+
+        // Align stack to 16 bytes (including push rbp)
+        size_t totalStackSpace = paramSpace;
         if (totalStackSpace > 0) {
-                if ((totalStackSpace + 8) % 16 != 0) { // +8 for saved rbp
-                        size_t padding = 16 - ((totalStackSpace + 8) % 16);
+                size_t totalWithRbp = totalStackSpace + 8;  // +8 for saved RBP
+                if (totalWithRbp % 16 != 0) {
+                        size_t padding = 16 - (totalWithRbp % 16);
                         totalStackSpace += padding;
-                        c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
                 }
+                // Allocate stack space upfront
                 c.text ~= c.s ~ "sub rsp, " ~ totalStackSpace.to!string;
         }
 
-        // Set stackOffset to paramSpace for local variables
-        c.stackOffset = paramSpace;
+        // Second pass: Store parameters and add symbols
+        size_t currentOffset = 0;
+        foreach (i, paramName; s.pn) {
+                RuntimeType* paramType = s.pt[i];
+                size_t paramSize = getTypeSize(paramType);
+                if (paramSize < 8) paramSize = 8;
 
-        // Compile the procedure body
+                // Increment currentOffset before storing (offset is end of param)
+                currentOffset += paramSize;
+                c.addSymbol(paramName.lx.idup, paramType, false, false, true);
+
+                string reg = "";
+                string spec = "";
+                getReg(paramSize, i, &reg, &spec);
+
+                // Store parameter at [rbp - currentOffset]
+                c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ currentOffset.to!string ~ "], " ~ reg;
+        }
+
+        // Compile the body (may increase stackOffset for locals)
         s.b.accept(s.b, v);
 
-        // Clean up stack, including local variables and parameters
-        if (totalStackSpace > 0 || c.stackOffset > paramSpace) {
-                size_t localSpace = c.stackOffset - paramSpace;
-                c.text ~= c.s ~ "add rsp, " ~ (totalStackSpace + localSpace).to!string;
+        // Clean up stack, including any local variables
+        size_t localSpace = (c.stackOffset > paramSpace) ? (c.stackOffset - paramSpace) : 0;
+        size_t totalCleanup = totalStackSpace + localSpace;
+        if (totalCleanup > 0) {
+                size_t totalWithRbp = totalCleanup + 8;
+                if (totalWithRbp % 16 != 0) {
+                        size_t padding = 16 - (totalWithRbp % 16);
+                        totalCleanup += padding;
+                }
+                c.text ~= c.s ~ "add rsp, " ~ totalCleanup.to!string;
         }
-        c.text ~= c.s ~ "leave";
-        c.text ~= c.s ~ "ret";
 
+        c.leave();
+        c.ret();
         c.popScope();
 }
 
 void compileStmtBlock(Visitor* v, StmtBlock s) {
-        Context* c = cast(Context*)v.context;
-
+        Context* c=cast(Context*)v.context;
         c.pushScope();
-
-        for (size_t i = 0; i < s.stmts.length; ++i) {
-                s.stmts[i].accept(s.stmts[i], v);
+        for(size_t i=0;i<s.stmts.length;++i){
+                s.stmts[i].accept(s.stmts[i],v);
         }
-
         c.popScope();
 }
 
 void compileStmtReturn(Visitor* v, StmtReturn s) {
         Context* c = cast(Context*)v.context;
-
-        s.e.accept(s.e, v); // Result in rax
-        c.epilogue();
+        s.e.accept(s.e, v);
+        c.leave();
+        c.ret();
 }
 
 void compileStmtExtern(Visitor* v, StmtExtern s) {
@@ -618,11 +705,10 @@ void compileStmtExtern(Visitor* v, StmtExtern s) {
         // Add extern directive
         c.extern_(proc_name);
 
-        // Add to global scope (symbols[0]) as a function
         if (c.symbols[0].length == 0 && c.symbols.length == 1) {
-                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic); // Add directly to global scope
+                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic);
         } else {
-                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic); // Append to global scope
+                c.symbols[0] ~= Context.Symbol(proc_name, 0, s.proto.rtype, true, s.proto.variadic);
         }
 }
 
@@ -673,250 +759,20 @@ void compileStmtWhile(Visitor* v, StmtWhile s) {
 }
 
 void compileStmtStruct(Visitor* v, StmtStruct s) {
-        Context* c = cast(Context*)v.context;
-
-        // Extract struct name
-        string structName = s.id.lx.idup;
-
-        // Check for redefinition
-        if (c.findSymbol(structName) !is null) {
-                c.text ~= c.s ~ "; ERROR: Redefinition of symbol " ~ structName;
-                return;
-        }
-
-        // Calculate member offsets and total size
-        size_t totalSize = 0;
-        size_t[] memberOffsets;
-        foreach (memberType; s.memberTypes) {
-                size_t memberSize = getTypeSize(memberType);
-                // Align to next 8-byte boundary if needed (for x86-64 compatibility)
-                if (totalSize % 8 != 0) {
-                        size_t padding = 8 - (totalSize % 8);
-                        totalSize += padding;
-                }
-                memberOffsets ~= totalSize;
-                totalSize += memberSize;
-        }
-
-        // Create a RuntimeType for the struct
-        RuntimeType* structType = new RuntimeType();
-        structType.b = RuntimeTypeBase.Struct;
-        structType.size = totalSize;
-        structType.memberNames = s.members.map!(m => m.lx.idup).array; // Convert Token*[] to string[]
-        structType.memberTypes = s.memberTypes.dup;                    // Copy member types
-        structType.memberOffsets = memberOffsets.dup;                  // Copy offsets
-        structType.nptr = null;                                        // Not a pointer yet
-
-        // Add the struct to the global scope
-        c.addSymbol(structName, structType, false, false, false); // Not a function, not variadic, not a param
-
-        // Add a comment for debugging
-        c.addComment("Defined struct " ~ structName ~ " with size " ~ totalSize.to!string ~ " bytes");
+        assert(0);
 }
 
 void compileStmtMod(Visitor* v, StmtMod s) {
-        Context* c = cast(Context*)v.context;
-        c.addComment("MODULE " ~ s.id.lx.idup);
         return;
 }
 
 void compileExprStructInst(Visitor* v, ExprStructInst e) {
-        Context* c = cast(Context*)v.context;
-        c.addComment("Instantiating struct " ~ e.structId.lx.idup);
-
-        string structName = e.structId.lx.idup;
-        Context.Symbol* sym = c.findSymbol(structName);
-        if (sym is null || sym.type.b != RuntimeTypeBase.Struct) {
-                c.text ~= c.s ~ "; ERROR: Undefined or non-struct type " ~ structName;
-                return;
-        }
-        RuntimeType* structType = sym.type;
-        size_t structSize = structType.size;
-
-        // Allocate space for the struct
-        c.stackOffset += structSize;
-        c.text ~= c.s ~ "sub rsp, " ~ structSize.to!string;
-        string baseAddr = "rbp - " ~ c.stackOffset.to!string;
-        c.addComment("Struct " ~ structName ~ " allocated at [" ~ baseAddr ~ "]");
-
-        // Initialize members
-        foreach (i, memId; e.structMemIds) {
-                string memberName = memId.lx.idup;
-                size_t memberIndex = -1;
-                foreach (j, name; structType.memberNames) {
-                        if (name == memberName) {
-                                memberIndex = j;
-                                break;
-                        }
-                }
-                if (memberIndex == -1) {
-                        c.text ~= c.s ~ "; ERROR: Unknown member " ~ memberName ~ " in struct " ~ structName;
-                        continue;
-                }
-
-                e.structMemExprs[i].accept(e.structMemExprs[i], v);
-                size_t memberOffset = structType.memberOffsets[memberIndex];
-                RuntimeType* memberType = structType.memberTypes[memberIndex];
-                size_t memberSize = getTypeSize(memberType);
-                string sizeSpec = memberSize == 8 ? "qword" :
-                        memberSize == 4 ? "dword" :
-                        memberSize == 2 ? "word" : "byte";
-                string reg = memberSize == 8 ? "rax" :
-                        memberSize == 4 ? "eax" :
-                        memberSize == 2 ? "ax" : "al";
-
-                c.text ~= c.s ~ "mov " ~ sizeSpec ~ " [rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "], " ~ reg;
-                c.addComment("Initialized " ~ memberName ~ " at [rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]");
-        }
-
-        // Return pointer to struct
-        c.text ~= c.s ~ "lea rax, [" ~ baseAddr ~ "]";
-        c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
+        assert(0);
 }
-
-// void compileExprStructInst(Visitor* v, ExprStructInst e) {
-//         Context* c = cast(Context*)v.context;
-//         c.addComment("Instantiating struct " ~ e.structId.lx.idup);
-
-//         // Step 1: Lookup the struct definition
-//         string structName = e.structId.lx.idup;
-//         Context.Symbol* sym = c.findSymbol(structName);
-//         if (sym is null || sym.type.b != RuntimeTypeBase.Struct) {
-//                 c.text ~= c.s ~ "; ERROR: Undefined or non-struct type " ~ structName;
-//                 return;
-//         }
-//         RuntimeType* structType = sym.type;
-//         size_t structSize = structType.size;
-
-//         // Step 2: Allocate stack space for the struct
-//         // Align stack to 16 bytes if needed
-//         size_t totalStackAdjust = structSize;
-//         if ((c.stackOffset + structSize + 8) % 16 != 0) { // +8 accounts for saved rbp
-//                 size_t padding = 16 - ((c.stackOffset + structSize + 8) % 16);
-//                 totalStackAdjust += padding;
-//                 c.text ~= c.s ~ "; Added " ~ padding.to!string ~ " bytes padding for 16-byte alignment";
-//         }
-//         c.text ~= c.s ~ "sub rsp, " ~ totalStackAdjust.to!string;
-//         c.stackOffset += totalStackAdjust; // Update stack offset
-
-//         // Base address of the struct is now at [rbp - c.stackOffset]
-//         string baseAddr = "rbp - " ~ c.stackOffset.to!string;
-//         c.addComment("Struct " ~ structName ~ " allocated at [" ~ baseAddr ~ "]");
-
-//         // Step 3: Initialize struct members
-//         foreach (i, memId; e.structMemIds) {
-//                 string memberName = memId.lx.idup;
-//                 size_t memberIndex = -1;
-//                 foreach (j, name; structType.memberNames) {
-//                         if (name == memberName) {
-//                                 memberIndex = j;
-//                                 break;
-//                         }
-//                 }
-//                 if (memberIndex == -1) {
-//                         c.text ~= c.s ~ "; ERROR: Unknown member " ~ memberName ~ " in struct " ~ structName;
-//                         continue;
-//                 }
-
-//                 // Evaluate the member expression (result in rax)
-//                 e.structMemExprs[i].accept(e.structMemExprs[i], v);
-
-//                 // Determine member size and offset
-//                 RuntimeType* memberType = structType.memberTypes[memberIndex];
-//                 size_t memberSize = getTypeSize(memberType);
-//                 size_t memberOffset = structType.memberOffsets[memberIndex];
-//                 string sizeSpec = memberSize == 8 ? "qword" :
-//                         memberSize == 4 ? "dword" :
-//                         memberSize == 2 ? "word" : "byte";
-//                 string reg = memberSize == 8 ? "rax" :
-//                         memberSize == 4 ? "eax" :
-//                         memberSize == 2 ? "ax" : "al";
-
-//                 // Store the value at the correct offset within the struct
-//                 string destAddr = "[rbp - " ~ (c.stackOffset - memberOffset).to!string ~ "]";
-//                 c.text ~= c.s ~ "mov " ~ sizeSpec ~ " " ~ destAddr ~ ", " ~ reg;
-//                 c.addComment("Initialized " ~ memberName ~ " at " ~ destAddr);
-//         }
-
-//         // Step 4: Return pointer to the struct in rax
-//         c.text ~= c.s ~ "lea rax, [" ~ baseAddr ~ "]";
-//         c.addComment("Returning pointer to struct " ~ structName ~ " in rax");
-// }
 
 void compileStmtImport(Visitor* v, StmtImport s) {
         Context* c = cast(Context*)v.context;
         c.makeProcsExterns(s.id.lx);
-        return;
-}
-
-void compileExprGet(Visitor* v, ExprGet e) {
-        Context* c = cast(Context*)v.context;
-        c.addComment("Accessing struct member");
-
-        // Step 1: Evaluate the left-hand side (expecting an identifier for now)
-        if (auto ident = cast(ExprIdent)e.l) {
-                string varName = ident.id.lx.idup;
-                Context.Symbol* sym = c.findSymbol(varName);
-
-                if (sym is null) {
-                        c.text ~= c.s ~ "; ERROR: Undefined symbol " ~ varName;
-                        return;
-                }
-
-                RuntimeType* structType = sym.type;
-                if (structType.b != RuntimeTypeBase.Struct) {
-                        c.text ~= c.s ~ "; ERROR: " ~ varName ~ " is not a struct";
-                        return;
-                }
-
-                // Step 2: Get the member name from the right-hand side
-                if (auto memberIdent = cast(ExprIdent)e.r) {
-                        string memberName = memberIdent.id.lx.idup;
-                        size_t memberIndex = -1;
-                        foreach (i, name; structType.memberNames) {
-                                if (name == memberName) {
-                                        memberIndex = i;
-                                        break;
-                                }
-                        }
-
-                        if (memberIndex == -1) {
-                                c.text ~= c.s ~ "; ERROR: Member " ~ memberName ~ " not found in struct " ~ varName;
-                                return;
-                        }
-
-                        // Step 3: Load the member value
-                        size_t memberOffset = structType.memberOffsets[memberIndex];
-                        RuntimeType* memberType = structType.memberTypes[memberIndex];
-                        size_t memberSize = getTypeSize(memberType);
-
-                        string sizeSpec = memberSize == 8 ? "qword" :
-                                memberSize == 4 ? "dword" :
-                                memberSize == 2 ? "word" : "byte";
-                        string reg = memberSize == 8 ? "rax" :
-                                memberSize == 4 ? "eax" :
-                                memberSize == 2 ? "ax" : "al";
-
-                        // Load from stack location of the struct
-                        c.text ~= c.s ~ "mov " ~ reg ~ ", " ~ sizeSpec ~ " [rbp - " ~ (sym.offset - memberOffset).to!string ~ "]";
-
-                        // Extend to 64-bit if necessary
-                        if (memberSize < 8) {
-                                if (memberType.b == RuntimeTypeBase.U8 ||
-                                    memberType.b == RuntimeTypeBase.U16 ||
-                                    memberType.b == RuntimeTypeBase.U32) {
-                                        c.text ~= c.s ~ "movzx rax, " ~ reg;
-                                } else {
-                                        c.text ~= c.s ~ "movsx rax, " ~ reg;
-                                }
-                        }
-                        c.addComment("Loaded " ~ memberName ~ " from " ~ varName ~ " into rax");
-                } else {
-                        c.text ~= c.s ~ "; ERROR: Right side of '.' must be an identifier";
-                }
-        } else {
-                c.text ~= c.s ~ "; ERROR: Left side of '.' must be an identifier (complex expressions not yet supported)";
-        }
 }
 
 Visitor createCodegenContext(Context* c) {
@@ -949,6 +805,7 @@ Visitor createCodegenContext(Context* c) {
 }
 
 char[] gen(Program* p, IdentGatherer[] igs) {
+        cast(void)igs;
         Context c = new Context(igs);
         Visitor v = createCodegenContext(&c);
 
