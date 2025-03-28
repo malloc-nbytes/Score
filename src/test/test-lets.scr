@@ -1,11 +1,11 @@
 module test_lets where
 
-extern printf(format: u8*, ...): i32;
+import test_utils;
+
 extern strcmp(s1: u8*, s2: u8*): i32;
-extern exit(c: i32): void;
 
 proc test_i64(void): i32 {
-        printf("  test_i64()\n");
+        start("test_i64");
         let x: i64 = 1;
         let y: i64 = 2;
         let n: i64 = 0-10;
@@ -24,7 +24,7 @@ proc test_i64(void): i32 {
 }
 
 proc test_str_assignments(void): i32 {
-        printf("  test_str_assignments()\n");
+        start("test_str_assignments");
         let s1: u8* = "hello world";
         let s2: u8* = "foo";
         let s3: u8* = "hello world";
@@ -54,7 +54,7 @@ proc test_str_assignments(void): i32 {
 }
 
 proc test_basic_assignment(void): i32 {
-        printf("  test_basic_assignment()\n");
+        start("test_basic_assignment");
 
         let x: i32 = 1;
         let y: i32 = 2;
@@ -71,13 +71,8 @@ proc test_basic_assignment(void): i32 {
         return 1;
 }
 
-proc fail(void): void {
-        printf("  test failed!\n");
-        exit(1);
-}
-
 export proc main(void): i32 {
-        printf("test-lets.scr...\n");
+        begin("test-lets");
         if (test_basic_assignment() == 0) {
                 fail();
         }
@@ -87,7 +82,7 @@ export proc main(void): i32 {
         if (test_i64() == 0) {
                 fail();
         }
-        printf("ok\n");
+        ok();
 
         return 0;
 }

@@ -125,7 +125,6 @@ class ExprStructInst : Expr {
         Token* structId;
         Token*[] structMemIds;
         Expr[] structMemExprs;
-        RuntimeType* structType; // Add reference to resolved type
         Program* program;
 
         this(Token* structId, Token*[] structMemIds, Expr[] structMemExprs, Program* program) {
@@ -134,42 +133,6 @@ class ExprStructInst : Expr {
                 this.structMemIds = structMemIds;
                 this.structMemExprs = structMemExprs;
                 this.program = program;
-                this.structType = resolveStructType(); // Resolve type from symbol table
-                validateMembers(); // Check member correctness
-        }
-
-        private RuntimeType* resolveStructType() {
-                string structName = structId.lx.idup;
-                if (structName in program.structDefs) {
-                        StructDefinition def = program.structDefs[structName];
-                        RuntimeType* rt = new RuntimeType(RuntimeTypeBase.Struct, null);
-                        rt.memberNames = def.memberNames.map!(m => m.lx.idup).array;
-                        rt.memberTypes = def.memberTypes.dup;
-                        rt.memberOffsets = def.memberOffsets.dup;
-                        rt.size = def.size;
-                        return rt;
-                }
-                err(format("Unknown struct '%s' in instantiation", structName));
-                return null; // Unreachable due to err
-        }
-
-        private void validateMembers() {
-                string structName = structId.lx.idup;
-                StructDefinition def = program.structDefs[structName];
-                foreach (i, memId; structMemIds) {
-                        string memName = memId.lx.idup;
-                        bool found = false;
-                        foreach (j, defMem; def.memberNames) {
-                                if (defMem.lx == memName) {
-                                        found = true;
-                                        // Optionally: Type-check structMemExprs[i] against def.memberTypes[j]
-                                        break;
-                                }
-                        }
-                        if (!found) {
-                                err(format("Unknown member '%s' in struct '%s'", memName, structName));
-                        }
-                }
         }
 }
 
@@ -217,28 +180,12 @@ class StmtStruct : Stmt {
         Token* id;
         Token*[] members;
         RuntimeType*[] memberTypes;
-        size_t[] memberOffsets;
-        size_t size;
 
         this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
                 super(StmtType.Struct);
                 this.id = id;
                 this.members = members;
                 this.memberTypes = memberTypes;
-                this.memberOffsets = new size_t[members.length];
-                this.size = computeLayout();
-        }
-
-        private size_t computeLayout() {
-                size_t offset = 0;
-                foreach (i, mt; memberTypes) {
-                        size_t memberSize = getTypeSize(mt);
-                        // Simple alignment (e.g., 8-byte boundary)
-                        offset = (offset + 7) & ~7; // Align to 8 bytes
-                        memberOffsets[i] = offset;
-                        offset += memberSize;
-                }
-                return offset; // Total size
         }
 }
 
@@ -346,16 +293,7 @@ class StmtImport : Stmt {
         }
 }
 
-struct StructDefinition {
-        Token* id;
-        Token*[] memberNames;
-        RuntimeType*[] memberTypes;
-        size_t[] memberOffsets;
-        size_t size;
-}
-
 struct Program {
         Stmt[] stmts;
-        StructDefinition[string] structDefs;
         StmtMod mod;
 }

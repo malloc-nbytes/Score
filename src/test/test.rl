@@ -8,12 +8,11 @@ module Test
 
 import "std/system.rl"; as sys
 
-set_flag("-xe");
+set_flag("-e");
 
 assert(__OS__ == "LINUX");
 
 fn build_compiler() {
-    $"cd ../ && ./build.sh";
     ```
     cd ../
     ./build.sh
@@ -52,8 +51,8 @@ fn compile(files: list, asm: bool) {
         println(f"Compiling: {f}...");
 
         let prefix = sys::name_and_ext(f)[0].unwrap();
-        let basic_compile_cmd = f"../scr -o {prefix} {f} ../std/*.scr";
-        let debug_compile_cmd = f"../scr --no-cleanup -o {prefix} {f} ../std/*.scr";
+        let basic_compile_cmd = f"../scr -o {prefix} {f} ./test-artifacts/test-utils.scr";
+        let debug_compile_cmd = f"../scr --no-cleanup -o {prefix} {f} ./test-artifacts/test-utils.scr";
 
         let cmd = "";
 
@@ -84,11 +83,36 @@ fn run(prog_names) {
     }
 }
 
-build_compiler();
-cleanup_test_env();
+fn usage() {
+    println("Usage: ", argv()[0], " [options]");
+    println("Options:");
+    println("  help  - show this message");
+    println("  asm   - do not cleanup asm files");
+    println("  clean - clean up all generated files");
+    exit(0);
+}
 
-with asm = len(argv()) > 1 && argv()[1] == "asm",
-     files = get_usable_files(),
-     prog_names = compile(files, asm) in
+with A = len(argv()) > 1 in
+let asm, clean, help_ = (
+    A && argv()[1] == "asm",
+    A && argv()[1] == "clean",
+    A && argv()[1] == "help",
+);
 
-run(prog_names);
+@world fn main() {
+    if help_ {
+        usage();
+    } else if clean {
+        cleanup_test_env();
+        exit(0);
+    } else {
+        build_compiler();
+        cleanup_test_env();
+
+        with files = get_usable_files(),
+        prog_names = compile(files, asm) in
+        run(prog_names);
+    }
+}
+
+main();

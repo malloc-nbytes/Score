@@ -234,14 +234,10 @@ private Expr parseExpr(Lexer *l, Program* p) {
         return parseAssignmentExpr(l, p);
 }
 
-private RuntimeType* parseType(Lexer* l) {
+private RuntimeType* parseType(Lexer* l, Program* p) {
         Token* name = lexerNext(l);
         RuntimeTypeBase base = getBaseTypeFromStr(name.lx);
         RuntimeType* type = new RuntimeType(base, null);
-
-        if (type.b == RuntimeTypeBase.Struct) {
-                type.structName = cast(string)name.lx;
-        }
 
         while (true) {
                 if (l.hd && lexerPeek(l).ty == TokenType.Asterisk) {
@@ -263,12 +259,7 @@ private StmtLet parseStmtLet(Lexer* l, Program* p) {
         Token* id = expect(l, TokenType.Ident);
 
         cast(void)expect(l, TokenType.Colon);
-        RuntimeType* ty = parseType(l);
-
-        if (ty.b == RuntimeTypeBase.Struct) {
-                size_t sz = p.structDefs[ty.structName].size;
-                ty.size = sz;
-        }
+        RuntimeType* ty = parseType(l, p);
 
         cast(void)expect(l, TokenType.Equals);
         Expr e = parseExpr(l, p);
@@ -278,7 +269,7 @@ private StmtLet parseStmtLet(Lexer* l, Program* p) {
         return new StmtLet(id, ty, e);
 }
 
-private void parseFunctionArgs(Lexer* l, ref Token*[] pn, ref RuntimeType*[] pt, ref bool variadic) {
+private void parseFunctionArgs(Lexer* l, ref Token*[] pn, ref RuntimeType*[] pt, ref bool variadic, Program* p) {
         variadic = false;
 
         cast(void)expect(l, TokenType.Lparen);
@@ -305,7 +296,7 @@ private void parseFunctionArgs(Lexer* l, ref Token*[] pn, ref RuntimeType*[] pt,
                 pn ~= id;
 
                 cast(void)expect(l, TokenType.Colon);
-                RuntimeType* ty = parseType(l);
+                RuntimeType* ty = parseType(l, p);
                 pt ~= ty;
 
                 if (lexerPeek(l).ty != TokenType.Comma) {
@@ -340,10 +331,10 @@ private StmtProc parseStmtProc(Lexer* l, Program* p, bool isProto, bool isExport
         StmtBlock b = null;
 
         bool variadic = false;
-        parseFunctionArgs(l, pn, pt, variadic);
+        parseFunctionArgs(l, pn, pt, variadic, p);
 
         cast(void)expect(l, TokenType.Colon);
-        RuntimeType* rtype = parseType(l);
+        RuntimeType* rtype = parseType(l, p);
         if (!isProto) {
                 b = parseStmtBlock(l, p);
         }
@@ -405,7 +396,7 @@ private StmtStruct parseStmtStruct(Lexer* l, Program* p) {
         while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
                 Token* member = expect(l, TokenType.Ident);
                 cast(void)expect(l, TokenType.Colon);
-                RuntimeType* memberType = parseType(l);
+                RuntimeType* memberType = parseType(l, p);
                 members ~= member;
                 memberTypes ~= memberType;
                 if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
@@ -502,12 +493,6 @@ Program parseProgram(Lexer* l) {
 
         while (l.hd && lexerPeek(l).ty != TokenType.Eof) {
                 Stmt s = parseStmt(l, &p);
-                if (s.ty == StmtType.Struct) {
-                        StmtStruct st = cast(StmtStruct)s;
-                        p.structDefs[st.id.lx.idup] = StructDefinition(st.id, st.members,
-                                                                       st.memberTypes, st.memberOffsets,
-                                                                       st.size);
-                }
                 p.stmts ~= s;
         }
 

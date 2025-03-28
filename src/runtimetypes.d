@@ -1,5 +1,7 @@
 module runtimeTypes;
 
+import std.stdio;
+
 import keywords;
 import std.conv;
 
@@ -22,11 +24,6 @@ enum RuntimeTypeBase {
 struct RuntimeType {
         RuntimeTypeBase b;
         RuntimeType* nptr;           // For pointer nesting
-        // Struct-specific fields
-        string structName;           // The name of the struct
-        string[] memberNames;        // Names of struct members
-        RuntimeType*[] memberTypes;  // Types of struct members
-        size_t[] memberOffsets;      // Offsets of members in memory
         size_t size;                 // Total size (for structs)
 }
 
@@ -37,16 +34,6 @@ void typeToPtr(RuntimeType* t) {
         t.nptr = new RuntimeType;
         t.nptr.b = oldBase;
         t.nptr.nptr = null;
-        // Preserve struct metadata if it exists
-        t.nptr.memberNames = t.memberNames;
-        t.nptr.memberTypes = t.memberTypes;
-        t.nptr.memberOffsets = t.memberOffsets;
-        t.nptr.size = t.size;
-        // Clear struct fields in the original (now a pointer)
-        t.memberNames = null;
-        t.memberTypes = null;
-        t.memberOffsets = null;
-        t.size = 0;
 }
 
 RuntimeTypeBase getBaseTypeFromStr(const char[] s) {
@@ -62,21 +49,33 @@ RuntimeTypeBase getBaseTypeFromStr(const char[] s) {
                 case TypeKeyword.U64: return U64;
                 case TypeKeyword.Usize: return Usize;
                 case TypeKeyword.Void: return Void;
-                default: return Struct; // Assume unknown types might be structs
+                default: assert(0);
                 }
 }
 
 size_t getTypeSize(RuntimeType* t) {
         if (t is null) return 0;
         switch (t.b) {
-        case RuntimeTypeBase.I8:  case RuntimeTypeBase.U8:  return 1;
-        case RuntimeTypeBase.I16: case RuntimeTypeBase.U16: return 2;
-        case RuntimeTypeBase.I32: case RuntimeTypeBase.U32: return 4;
-        case RuntimeTypeBase.I64: case RuntimeTypeBase.U64:
-        case RuntimeTypeBase.Usize: case RuntimeTypeBase.Ptr: return 8;
+        case RuntimeTypeBase.I8:
+        case RuntimeTypeBase.U8:  return 1;
+
+        case RuntimeTypeBase.I16:
+        case RuntimeTypeBase.U16: return 2;
+
+        case RuntimeTypeBase.I32:
+        case RuntimeTypeBase.U32: return 4;
+
+        case RuntimeTypeBase.I64:
+        case RuntimeTypeBase.U64:
+        case RuntimeTypeBase.Usize:
+        case RuntimeTypeBase.Ptr: return 8;
+
         case RuntimeTypeBase.Void: return 0;
-        case RuntimeTypeBase.Struct:
-                return t.size; // Use precomputed size for structs
+
+        case RuntimeTypeBase.Struct: {
+                assert(0);
+        } break;
+
         case RuntimeTypeBase.Unknown:
                 assert(0, "Unsupported type size for " ~ t.b.to!string);
         default: assert(0, "Unknown RuntimeTypeBase");
