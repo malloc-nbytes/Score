@@ -239,6 +239,10 @@ private RuntimeType* parseType(Lexer* l, Program* p) {
         RuntimeTypeBase base = getBaseTypeFromStr(name.lx);
         RuntimeType* type = new RuntimeType(base, null);
 
+        if (base == RuntimeTypeBase.Struct) {
+                type.structName = name.lx.idup;
+        }
+
         while (true) {
                 if (l.hd && lexerPeek(l).ty == TokenType.Asterisk) {
                         typeToPtr(type);

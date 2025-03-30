@@ -24,6 +24,12 @@ enum RuntimeTypeBase {
 struct RuntimeType {
         RuntimeTypeBase b;
         RuntimeType* nptr;           // For pointer nesting
+
+        // structs
+        string structName;           // The name of the struct
+        string[] memberNames;        // Names of struct members
+        RuntimeType*[] memberTypes;  // Types of struct members
+        size_t[] memberOffsets;      // Offsets of members in memory
         size_t size;                 // Total size (for structs)
 }
 
@@ -49,7 +55,7 @@ RuntimeTypeBase getBaseTypeFromStr(const char[] s) {
                 case TypeKeyword.U64: return U64;
                 case TypeKeyword.Usize: return Usize;
                 case TypeKeyword.Void: return Void;
-                default: assert(0);
+                default: return Struct;
                 }
 }
 
@@ -73,7 +79,7 @@ size_t getTypeSize(RuntimeType* t) {
         case RuntimeTypeBase.Void: return 0;
 
         case RuntimeTypeBase.Struct: {
-                assert(0);
+                return t.size;
         } break;
 
         case RuntimeTypeBase.Unknown:

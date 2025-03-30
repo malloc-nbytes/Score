@@ -180,14 +180,46 @@ class StmtStruct : Stmt {
         Token* id;
         Token*[] members;
         RuntimeType*[] memberTypes;
+        size_t[] memberOffsets;
+        size_t size;
 
         this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
                 super(StmtType.Struct);
                 this.id = id;
                 this.members = members;
                 this.memberTypes = memberTypes;
+                this.memberOffsets = [];
+                size_t off = 0;
+                for (size_t i = 0; i < memberTypes.length; ++i) {
+                        this.memberOffsets ~= off;
+                        off += getTypeSize(memberTypes[i]);
+                }
+                this.size = off;
         }
 }
+
+// class StmtStruct : Stmt {
+//         Token* id;
+//         Token*[] members;
+//         RuntimeType*[] memberTypes;
+//         size_t[] memberOffsets;
+//         size_t size;
+
+//         this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
+//                 super(StmtType.Struct);
+//                 this.id = id;
+//                 this.members = members;
+//                 this.memberTypes = memberTypes;
+//                 for (size_t i = 0; i < memberTypes.length; ++i) {
+//                         size_t off = 0;
+//                         if (i != 0) {
+//                                 off = this.memberOffsets[i-1];
+//                         }
+//                         this.memberOffsets ~= getTypeSize(memberTypes[i]) + off;
+//                         this.size += this.memberOffsets[i] - off;
+//                 }
+//         }
+// }
 
 class StmtLet : Stmt {
         Token* id;
