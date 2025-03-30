@@ -398,45 +398,23 @@ void compileExprIdent(Visitor* v, ExprIdent e) {
 
 void compileExprGet(Visitor* v, ExprGet e) {
         Context* c = cast(Context*)v.context;
+        e.l.accept(e.l, v); // rax = address of p
+        c.text ~= c.s ~ "mov rbx, rax";
+        c.text ~= c.s ~ "mov rbx, [rbx]"; // Dereference p
 
-        // Step 1: Evaluate the base expression (e.g., 'p')
-        e.l.accept(e.l, v); // Result is in rax (address of the struct or value)
-        c.text ~= c.s ~ "mov rbx, rax"; // Save the base address/value in rbx
-
-        // Step 2: Check that the left-hand side is an identifier (for now)
-        if (e.l.ty != ExprType.Ident) {
-                c.text ~= c.s ~ "; ERROR: Left side of '.' must be an identifier (complex expressions not yet supported)";
-                return;
-        }
         ExprIdent baseIdent = cast(ExprIdent)e.l;
         string baseName = baseIdent.id.lx.idup;
         Context.Symbol* baseSym = c.findSymbol(baseName);
-        if (baseSym is null) {
-                c.text ~= c.s ~ "; ERROR: Undefined variable " ~ baseName;
-                return;
-        }
+        assert(baseSym);
 
-        // Step 3: Determine the type of the base
         RuntimeType* baseType = baseSym.type;
-        if (baseType.b == RuntimeTypeBase.Ptr) {
-                // If base is a pointer, dereference it to get the struct type
-                baseType = baseType.nptr;
-                c.text ~= c.s ~ "mov rbx, [rbx]"; // Dereference the pointer
-        }
         if (baseType.b != RuntimeTypeBase.Struct) {
-                c.text ~= c.s ~ "; ERROR: " ~ baseName ~ " is not a struct or pointer to struct";
+                c.text ~= c.s ~ "; ERROR: " ~ baseName ~ " is not a struct";
                 return;
         }
 
-        // Step 4: Check that the right-hand side is an identifier
-        if (e.r.ty != ExprType.Ident) {
-                c.text ~= c.s ~ "; ERROR: Right side of '.' must be an identifier (complex expressions not yet supported)";
-                return;
-        }
         ExprIdent memberIdent = cast(ExprIdent)e.r;
         string memberName = memberIdent.id.lx.idup;
-
-        // Step 5: Resolve the member name in the struct
         ptrdiff_t memberIndex = -1;
         for (size_t i = 0; i < baseType.memberNames.length; i++) {
                 if (baseType.memberNames[i] == memberName) {
@@ -449,27 +427,90 @@ void compileExprGet(Visitor* v, ExprGet e) {
                 return;
         }
 
-        // Step 6: Get member details
         size_t memberOffset = baseType.memberOffsets[memberIndex];
         RuntimeType* memberType = baseType.memberTypes[memberIndex];
         size_t memberSize = getTypeSize(memberType);
 
-        // Step 7: Load the member value into rax
-        string reg = "";
-        string spec = "";
+        string reg = ""; string spec = "";
         getGenPReg(memberSize, &reg, &spec);
-
-        // Load from [rbx + memberOffset], where rbx is the struct’s base address
         c.text ~= c.s ~ "mov " ~ spec ~ " " ~ reg ~ ", [rbx + " ~ memberOffset.to!string ~ "]";
         c.addComment("Loaded " ~ baseName ~ "." ~ memberName ~ " into " ~ reg);
-
-        // Step 8: Handle unsigned types if necessary
-        if (memberSize < 8 && (memberType.b == RuntimeTypeBase.U8 || 
-                               memberType.b == RuntimeTypeBase.U16 || 
-                               memberType.b == RuntimeTypeBase.U32)) {
-                c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg; // Zero-extend to 64-bit
-        }
 }
+
+// void compileExprGet(Visitor* v, ExprGet e) {
+//         Context* c = cast(Context*)v.context;
+
+//         // Step 1: Evaluate the base expression (e.g., 'p')
+//         e.l.accept(e.l, v); // Result is in rax (address of the struct or value)
+//         c.text ~= c.s ~ "mov rbx, rax"; // Save the base address/value in rbx
+
+//         // Step 2: Check that the left-hand side is an identifier (for now)
+//         if (e.l.ty != ExprType.Ident) {
+//                 c.text ~= c.s ~ "; ERROR: Left side of '.' must be an identifier (complex expressions not yet supported)";
+//                 return;
+//         }
+//         ExprIdent baseIdent = cast(ExprIdent)e.l;
+//         string baseName = baseIdent.id.lx.idup;
+//         Context.Symbol* baseSym = c.findSymbol(baseName);
+//         if (baseSym is null) {
+//                 c.text ~= c.s ~ "; ERROR: Undefined variable " ~ baseName;
+//                 return;
+//         }
+
+//         // Step 3: Determine the type of the base
+//         RuntimeType* baseType = baseSym.type;
+//         if (baseType.b == RuntimeTypeBase.Ptr) {
+//                 // If base is a pointer, dereference it to get the struct type
+//                 baseType = baseType.nptr;
+//                 c.text ~= c.s ~ "mov rbx, [rbx]"; // Dereference the pointer
+//         }
+//         if (baseType.b != RuntimeTypeBase.Struct) {
+//                 c.text ~= c.s ~ "; ERROR: " ~ baseName ~ " is not a struct or pointer to struct";
+//                 return;
+//         }
+
+//         // Step 4: Check that the right-hand side is an identifier
+//         if (e.r.ty != ExprType.Ident) {
+//                 c.text ~= c.s ~ "; ERROR: Right side of '.' must be an identifier (complex expressions not yet supported)";
+//                 return;
+//         }
+//         ExprIdent memberIdent = cast(ExprIdent)e.r;
+//         string memberName = memberIdent.id.lx.idup;
+
+//         // Step 5: Resolve the member name in the struct
+//         ptrdiff_t memberIndex = -1;
+//         for (size_t i = 0; i < baseType.memberNames.length; i++) {
+//                 if (baseType.memberNames[i] == memberName) {
+//                         memberIndex = i;
+//                         break;
+//                 }
+//         }
+//         if (memberIndex == -1) {
+//                 c.text ~= c.s ~ "; ERROR: Member " ~ memberName ~ " not found in struct " ~ baseType.structName;
+//                 return;
+//         }
+
+//         // Step 6: Get member details
+//         size_t memberOffset = baseType.memberOffsets[memberIndex];
+//         RuntimeType* memberType = baseType.memberTypes[memberIndex];
+//         size_t memberSize = getTypeSize(memberType);
+
+//         // Step 7: Load the member value into rax
+//         string reg = "";
+//         string spec = "";
+//         getGenPReg(memberSize, &reg, &spec);
+
+//         // Load from [rbx + memberOffset], where rbx is the struct’s base address
+//         c.text ~= c.s ~ "mov " ~ spec ~ " " ~ reg ~ ", [rbx + " ~ memberOffset.to!string ~ "]";
+//         c.addComment("Loaded " ~ baseName ~ "." ~ memberName ~ " into " ~ reg);
+
+//         // Step 8: Handle unsigned types if necessary
+//         if (memberSize < 8 && (memberType.b == RuntimeTypeBase.U8 || 
+//                                memberType.b == RuntimeTypeBase.U16 || 
+//                                memberType.b == RuntimeTypeBase.U32)) {
+//                 c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg; // Zero-extend to 64-bit
+//         }
+// }
 
 // TODO: -= operator fails with i32 because
 //       of size operand mismatch.
@@ -622,44 +663,73 @@ void compileExprProcCall(Visitor* v, ExprProcCall e) {
 
 void compileStmtLet(Visitor* v, StmtLet s) {
         Context* c = cast(Context*)v.context;
-
         size_t varSize = getTypeSize(s.t);
         RuntimeType* varType = s.t;
 
         if (s.t.b == RuntimeTypeBase.Struct) {
                 Context.Symbol* strct = c.findSymbol(s.t.structName.idup);
                 assert(strct, "Struct " ~ s.t.structName.idup ~ " not found");
-                writeln("Let ", s.id.lx.idup, " struct symbol: ", strct.name, " ", *strct.type);
-                varSize = strct.type.size;
-                varType = strct.type; // Use the full struct type from the symbol table
+                varSize = 8; // Pointer size
+                varType = strct.type;
         }
 
         if (varSize == 0) {
                 assert(0, "Cannot create variable of type void");
         }
 
-        // Align varSize to 8 bytes for consistency with parameters
-        if (varSize < 8) varSize = 8;
-
+        // Allocate space for the variable (pointer for structs)
         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
-
-        // Add symbol after allocation, store at current stackOffset + varSize
         string varName = s.id.lx.idup;
-        c.addSymbol(varName, varType); // Use the full type, not s.t
+        c.addSymbol(varName, varType);
 
+        // Compile the expression (struct address in rax)
         s.e.accept(s.e, v);
 
-        string reg = "";
-        string spec = "";
+        string reg = ""; string spec = "";
         getGenPReg(varSize, &reg, &spec);
-
-        // Zero-extend for unsigned types if needed
-        if (varSize < 8 && (varType.b == RuntimeTypeBase.U8 || varType.b == RuntimeTypeBase.U16 || varType.b == RuntimeTypeBase.U32)) {
-                c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg;
-        }
-        // Store result at [rbp - stackOffset]
         c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ c.stackOffset.to!string ~ "], " ~ reg;
 }
+
+// void compileStmtLet(Visitor* v, StmtLet s) {
+//         Context* c = cast(Context*)v.context;
+
+//         size_t varSize = getTypeSize(s.t);
+//         RuntimeType* varType = s.t;
+
+//         if (s.t.b == RuntimeTypeBase.Struct) {
+//                 Context.Symbol* strct = c.findSymbol(s.t.structName.idup);
+//                 assert(strct, "Struct " ~ s.t.structName.idup ~ " not found");
+//                 writeln("Let ", s.id.lx.idup, " struct symbol: ", strct.name, " ", *strct.type);
+//                 varSize = strct.type.size;
+//                 varType = strct.type; // Use the full struct type from the symbol table
+//         }
+
+//         if (varSize == 0) {
+//                 assert(0, "Cannot create variable of type void");
+//         }
+
+//         // Align varSize to 8 bytes for consistency with parameters
+//         if (varSize < 8) varSize = 8;
+
+//         c.text ~= c.s ~ "sub rsp, " ~ varSize.to!string;
+
+//         // Add symbol after allocation, store at current stackOffset + varSize
+//         string varName = s.id.lx.idup;
+//         c.addSymbol(varName, varType); // Use the full type, not s.t
+
+//         s.e.accept(s.e, v);
+
+//         string reg = "";
+//         string spec = "";
+//         getGenPReg(varSize, &reg, &spec);
+
+//         // Zero-extend for unsigned types if needed
+//         if (varSize < 8 && (varType.b == RuntimeTypeBase.U8 || varType.b == RuntimeTypeBase.U16 || varType.b == RuntimeTypeBase.U32)) {
+//                 c.text ~= c.s ~ "movzx " ~ reg ~ ", " ~ reg;
+//         }
+//         // Store result at [rbp - stackOffset]
+//         c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ c.stackOffset.to!string ~ "], " ~ reg;
+// }
 
 // 1
 // void compileStmtLet(Visitor* v, StmtLet s) {
@@ -936,6 +1006,7 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
         c.text ~= c.s ~ "sub rsp, " ~ alignedSize.to!string;
         c.addComment("Allocated " ~ alignedSize.to!string ~ " bytes for struct " ~ structName);
 
+        size_t baseOffset = c.stackOffset + alignedSize;
         foreach (i, memberId; e.structMemIds) {
                 string memberName = memberId.lx.idup;
                 Expr memberExpr = e.structMemExprs[i];
@@ -959,15 +1030,62 @@ void compileExprStructInst(Visitor* v, ExprStructInst e) {
                 string reg = ""; string spec = "";
                 getGenPReg(memberSize, &reg, &spec);
 
-                // Store at [rbp - (stackOffset + alignedSize - memberOffset)]
-                size_t stackPosition = c.stackOffset + alignedSize - memberOffset - memberSize;
+                size_t stackPosition = baseOffset - memberOffset - memberSize;
                 c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ stackPosition.to!string ~ "], " ~ reg;
                 c.addComment("Stored " ~ memberName ~ " at offset " ~ memberOffset.to!string);
         }
 
-        c.text ~= c.s ~ "lea rax, [rbp - " ~ (c.stackOffset + alignedSize).to!string ~ "]";
+        c.text ~= c.s ~ "lea rax, [rbp - " ~ baseOffset.to!string ~ "]";
         c.addComment("Struct " ~ structName ~ " address in rax");
 }
+
+// void compileExprStructInst(Visitor* v, ExprStructInst e) {
+//         Context* c = cast(Context*)v.context;
+//         string structName = e.structId.lx.idup;
+//         Context.Symbol* structSym = c.findSymbol(structName);
+//         if (structSym is null || structSym.type.b != RuntimeTypeBase.Struct) {
+//                 c.text ~= c.s ~ "; ERROR: Struct " ~ structName ~ " not defined";
+//                 return;
+//         }
+//         RuntimeType* structType = structSym.type;
+//         size_t structSize = structType.size;
+
+//         size_t alignedSize = (structSize + 7) & ~7;
+//         c.text ~= c.s ~ "sub rsp, " ~ alignedSize.to!string;
+//         c.addComment("Allocated " ~ alignedSize.to!string ~ " bytes for struct " ~ structName);
+
+//         foreach (i, memberId; e.structMemIds) {
+//                 string memberName = memberId.lx.idup;
+//                 Expr memberExpr = e.structMemExprs[i];
+//                 ptrdiff_t memberIndex = -1;
+//                 for (size_t j = 0; j < structType.memberNames.length; j++) {
+//                         if (structType.memberNames[j] == memberName) {
+//                                 memberIndex = j;
+//                                 break;
+//                         }
+//                 }
+//                 if (memberIndex == -1) {
+//                         c.text ~= c.s ~ "; ERROR: Member " ~ memberName ~ " not found in struct " ~ structName;
+//                         return;
+//                 }
+
+//                 size_t memberOffset = structType.memberOffsets[memberIndex];
+//                 RuntimeType* memberType = structType.memberTypes[memberIndex];
+//                 size_t memberSize = getTypeSize(memberType);
+
+//                 memberExpr.accept(memberExpr, v);
+//                 string reg = ""; string spec = "";
+//                 getGenPReg(memberSize, &reg, &spec);
+
+//                 // Store at [rbp - (stackOffset + alignedSize - memberOffset)]
+//                 size_t stackPosition = c.stackOffset + alignedSize - memberOffset - memberSize;
+//                 c.text ~= c.s ~ "mov " ~ spec ~ " [rbp - " ~ stackPosition.to!string ~ "], " ~ reg;
+//                 c.addComment("Stored " ~ memberName ~ " at offset " ~ memberOffset.to!string);
+//         }
+
+//         c.text ~= c.s ~ "lea rax, [rbp - " ~ (c.stackOffset + alignedSize).to!string ~ "]";
+//         c.addComment("Struct " ~ structName ~ " address in rax");
+// }
 
 // 1
 // void compileExprStructInst(Visitor* v, ExprStructInst e) {
