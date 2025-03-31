@@ -146,10 +146,10 @@ int main(string[] args) {
                         writeln("--- Generated assembly for file: ", fp.paths[i], " ---");
                         writeln(asm_);
                 }
-                writeX86_64AsmFile(asm_, fp.paths[i]);
+                // writeX86_64AsmFile(asm_, fp.paths[i]);
         }
 
-        assembleX86_64AsmFiles(fp);
+        // assembleX86_64AsmFiles(fp);
         return 0;
 }
 

@@ -59,6 +59,24 @@ RuntimeTypeBase getBaseTypeFromStr(const char[] s) {
                 }
 }
 
+string scrTypeToQbeType(RuntimeType* t) {
+        switch (t.b) {
+        case RuntimeTypeBase.I8: return "w";
+        case RuntimeTypeBase.I16: return "w";
+        case RuntimeTypeBase.I32: return "w";
+        case RuntimeTypeBase.I64: return "l";
+        case RuntimeTypeBase.U8: return "w";
+        case RuntimeTypeBase.U16: return "w";
+        case RuntimeTypeBase.U32: return "w";
+        case RuntimeTypeBase.U64: return "l";
+        case RuntimeTypeBase.Usize: return "l";
+        case RuntimeTypeBase.Ptr: return "l";
+        case RuntimeTypeBase.Void: return "";
+        case RuntimeTypeBase.Struct: assert(0);
+        default: assert(0);
+        }
+}
+
 size_t getTypeSize(RuntimeType* t) {
         if (t is null) return 0;
         switch (t.b) {
