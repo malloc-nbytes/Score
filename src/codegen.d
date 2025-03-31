@@ -525,16 +525,57 @@ string compileExprGet(ExprGet e, Context c) {
         }
 }
 
+string compileExprUn(ExprUn e, Context c) {
+        // Compile the operand first
+        string operand = compileExpr(e.e, c);
+        string result = c.genTmpVar();
+
+        switch (e.op.ty) {
+        case TokenType.Plus:
+                c.add(format("%s =w copy %s", result, operand));
+                break;
+
+        case TokenType.Minus:
+                c.add(format("%s =w neg %s", result, operand));
+                break;
+
+        case TokenType.Bang:
+                c.add(format("%s =w ceqw %s, 0", result, operand));
+                break;
+
+        case TokenType.Asterisk:
+                // Determine the type being dereferenced (assuming pointer to word for now)
+                // This is simplified - in a full implementation, we'd need type info
+                string typeSize = "w";
+                c.add(format("%s =w load%s %s", result, typeSize, operand));
+                break;
+
+        case TokenType.Ampersand:
+                if (e.e.ty == ExprType.Ident) {
+                        string varName = (cast(ExprIdent)e.e).id.lx.idup;
+                        return "%" ~ varName;
+                } else {
+                        assert(0, "Address-of operator can only be applied to identifiers");
+                }
+                break;
+
+        default:
+                assert(0, "Unsupported unary operator: " ~ e.op.ty.to!string);
+        }
+
+        return result;
+}
+
 string compileExpr(Expr e, Context c) {
         switch (e.ty) {
         case ExprType.Bin: return compileExprBin(cast(ExprBin)e, c);
-        case ExprType.Un: assert(0); break;
-        case ExprType.StrLit: return compileExprStrLit(cast(ExprStrLit)e, c); break;
+        case ExprType.Un: return compileExprUn(cast(ExprUn)e, c);
+        case ExprType.StrLit: return compileExprStrLit(cast(ExprStrLit)e, c);
         case ExprType.IntLit: return compileExprIntlit(cast(ExprIntLit)e, c);
         case ExprType.Ident: return compileExprIdent(cast(ExprIdent)e, c);
         case ExprType.Mut: return compileExprMut(cast(ExprMut)e, c); break;
         case ExprType.ProcCall: return compileExprProcCall(cast(ExprProcCall)e, c);
-        case ExprType.StructInst: return compileExprStructInst(cast(ExprStructInst)e, c); break;
+        case ExprType.StructInst: return compileExprStructInst(cast(ExprStructInst)e, c);
         case ExprType.Get: return compileExprGet(cast(ExprGet)e, c); break;
         default: assert(0);
         }

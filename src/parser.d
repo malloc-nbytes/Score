@@ -80,12 +80,6 @@ void parseStructInstMembers(Lexer* l, ref Token*[] structMemIds, ref Expr[] stru
 private Expr parsePrimaryExpr(Lexer* l, Program* p) {
         Expr left = null;
 
-        while (lexerPeek(l)
-               && (lexerPeek(l).ty == TokenType.Minus
-               || lexerPeek(l).ty == TokenType.Bang)) {
-                assert(0 && "parsing unary expressions are unimplemented");
-        }
-
         while (true) {
                 Token* cur = lexerPeek(l);
                 if (!cur) return left;
@@ -144,14 +138,28 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
         }
 }
 
+private Expr parseUnaryExpr(Lexer* l, Program* p) {
+        Token* cur = lexerPeek(l);
+        if (cur && (cur.ty == TokenType.Minus
+                    || cur.ty == TokenType.Plus
+                    || cur.ty == TokenType.Bang
+                    || cur.ty == TokenType.Asterisk
+                    || cur.ty == TokenType.Ampersand)) {
+                Token* op = lexerNext(l);
+                Expr operand = parseUnaryExpr(l, p);
+                return new ExprUn(op, operand);
+        }
+        return parsePrimaryExpr(l, p);
+}
+
 private Expr parseMultiplicitateExpr(Lexer *l, Program* p) {
-        Expr lhs = parsePrimaryExpr(l, p);
+        Expr lhs = parseUnaryExpr(l, p);
         Token* cur = lexerPeek(l);
         while (cur && (cur.ty == TokenType.Asterisk
                        || cur.ty == TokenType.ForwardSlash
                        || cur.ty == TokenType.Percent)) {
                 Token* op = lexerNext(l);
-                Expr rhs = parsePrimaryExpr(l, p);
+                Expr rhs = parseUnaryExpr(l, p);
                 ExprBin bin = new ExprBin(lhs, op, rhs);
                 lhs = bin;
                 cur = lexerPeek(l);

@@ -132,7 +132,7 @@ void symCheckVisitExprBin(Visitor* v, ExprBin s) {
 }
 
 void symCheckVisitExprUn(Visitor* v, ExprUn s) {
-        assert(0);
+        s.e.accept(s.e, v);
 }
 
 void symCheckVisitExprStrLit(Visitor* v, ExprStrLit s) {
