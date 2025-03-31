@@ -583,35 +583,39 @@ void compileStmtProc(StmtProc s, Context c) {
                 string scrTy = scrTypeToQbeType(s.pt[i]);
                 if (s.pt[i].b == RuntimeTypeBase.Struct) {
                         scrTy = ":" ~ s.pt[i].structName.idup;
+                        procDef ~= scrTy ~ " %" ~ s.pn[i].lx;
+                } else {
+                        procDef ~= scrTy ~ " %__" ~ s.pn[i].lx;
                 }
-                procDef ~= scrTy  ~ " %__" ~ s.pn[i].lx;
                 Var v = new Var(s.pn[i].lx, s.pt[i]);
                 c.scpe.add(v);
         }
-        procDef ~= ") {";
+        procDef ~= ")";
+        if (s.variadic) {
+                procDef ~= ", ...";
+        }
+        procDef ~= " {";
         c.add(procDef, 0);
         c.add("@start", false);
 
-        // Stack alloc parameters
+        // Handle parameters based on type
         for (size_t i = 0; i < s.pn.length; ++i) {
-                string sz = getTypeSize(s.pt[i]).to!string;
                 if (s.pt[i].b == RuntimeTypeBase.Struct) {
-                        Sym sym = c.scpe.get(s.pt[i].structName.dup);
-                        assert(sym && sym.type == SymType.Struct);
-                        sz = (cast(Struct)sym).stmt.size.to!string;
+                        // Structs: Use the pointer directly, no alloc/store needed
+                        continue;
+                } else {
+                        // Primitives: Allocate stack space and store the parameter value
+                        string sz = getTypeSize(s.pt[i]).to!string;
+                        string paramName = s.pn[i].lx.idup;
+                        c.add("%" ~ paramName ~ " =l alloc8 " ~ sz, true);
+                        string typeSize = scrTypeToQbeType(s.pt[i]);
+                        c.add(format("store%s %%__%s, %%%s", typeSize, paramName, paramName));
                 }
-                c.add("%" ~ s.pn[i].lx.idup ~ " =l" ~ " alloc8 " ~ sz, true);
-        }
-
-        for (size_t i = 0; i < s.pn.length; ++i) {
-                c.add("store" ~ scrTypeToQbeType(s.pt[i]) ~ " %__" ~ s.pn[i].lx.idup ~ ", %" ~ s.pn[i].lx.idup);
         }
 
         compileStmtBlock(s.b, c);
-
         c.scpe.pop();
 
-        // Return checks
         if (s.rtype.b == RuntimeTypeBase.Void) {
                 c.add("@epilog", false);
                 c.add("ret");
@@ -619,9 +623,106 @@ void compileStmtProc(StmtProc s, Context c) {
                 c.add("@epilog", false);
                 c.add("ret 0");
         }
-
         c.add("}", 0);
 }
+
+// structs
+// void compileStmtProc(StmtProc s, Context c) {
+//         c.scpe.add(new Proc(s));
+//         string procDef = "";
+//         if (s.isExport) {
+//                 procDef ~= "export ";
+//         }
+//         procDef ~= "function ";
+//         procDef ~= scrTypeToQbeType(s.rtype);
+//         procDef ~= " $" ~ s.id.lx ~ "(";
+//         c.scpe.push();
+//         for (size_t i = 0; i < s.pn.length; ++i) {
+//                 if (i != 0) {
+//                         procDef ~= ", ";
+//                 }
+//                 string scrTy = scrTypeToQbeType(s.pt[i]);
+//                 if (s.pt[i].b == RuntimeTypeBase.Struct) {
+//                         scrTy = ":" ~ s.pt[i].structName.idup;
+//                 }
+//                 procDef ~= scrTy ~ " %" ~ s.pn[i].lx;  // Use parameter name directly
+//                 Var v = new Var(s.pn[i].lx, s.pt[i]);
+//                 c.scpe.add(v);
+//         }
+//         procDef ~= ") {";
+//         c.add(procDef, 0);
+//         c.add("@start", false);
+
+//         compileStmtBlock(s.b, c);
+//         c.scpe.pop();
+
+//         if (s.rtype.b == RuntimeTypeBase.Void) {
+//                 c.add("@epilog", false);
+//                 c.add("ret");
+//         } else if (s.id.lx == "main") {
+//                 c.add("@epilog", false);
+//                 c.add("ret 0");
+//         }
+//         c.add("}", 0);
+// }
+
+// original
+// void compileStmtProc(StmtProc s, Context c) {
+//         c.scpe.add(new Proc(s));
+//         string procDef = "";
+//         if (s.isExport) {
+//                 procDef ~= "export ";
+//         }
+//         procDef ~= "function ";
+//         procDef ~= scrTypeToQbeType(s.rtype);
+//         procDef ~= " $" ~ s.id.lx ~ "(";
+//         c.scpe.push();
+//         for (size_t i = 0; i < s.pn.length; ++i) {
+//                 if (i != 0) {
+//                         procDef ~= ", ";
+//                 }
+//                 string scrTy = scrTypeToQbeType(s.pt[i]);
+//                 if (s.pt[i].b == RuntimeTypeBase.Struct) {
+//                         scrTy = ":" ~ s.pt[i].structName.idup;
+//                 }
+//                 procDef ~= scrTy  ~ " %__" ~ s.pn[i].lx;
+//                 Var v = new Var(s.pn[i].lx, s.pt[i]);
+//                 c.scpe.add(v);
+//         }
+//         procDef ~= ") {";
+//         c.add(procDef, 0);
+//         c.add("@start", false);
+
+//         // Stack alloc parameters
+//         for (size_t i = 0; i < s.pn.length; ++i) {
+//                 string sz = getTypeSize(s.pt[i]).to!string;
+//                 if (s.pt[i].b == RuntimeTypeBase.Struct) {
+//                         Sym sym = c.scpe.get(s.pt[i].structName.dup);
+//                         assert(sym && sym.type == SymType.Struct);
+//                         sz = (cast(Struct)sym).stmt.size.to!string;
+//                 }
+//                 c.add("%" ~ s.pn[i].lx.idup ~ " =l" ~ " alloc8 " ~ sz, true);
+//         }
+
+//         for (size_t i = 0; i < s.pn.length; ++i) {
+//                 c.add("store" ~ scrTypeToQbeType(s.pt[i]) ~ " %__" ~ s.pn[i].lx.idup ~ ", %" ~ s.pn[i].lx.idup);
+//         }
+
+//         compileStmtBlock(s.b, c);
+
+//         c.scpe.pop();
+
+//         // Return checks
+//         if (s.rtype.b == RuntimeTypeBase.Void) {
+//                 c.add("@epilog", false);
+//                 c.add("ret");
+//         } else if (s.id.lx == "main") {
+//                 c.add("@epilog", false);
+//                 c.add("ret 0");
+//         }
+
+//         c.add("}", 0);
+// }
 
 void compileStmtReturn(StmtReturn s, Context c) {
         string e = compileExpr(s.e, c);
