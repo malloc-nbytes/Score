@@ -308,92 +308,274 @@ string compileExprStrLit(ExprStrLit e, Context c) {
 }
 
 string compileExprMut(ExprMut e, Context c) {
-        // Ensure left-hand side is an identifier
-        string varName;
-        if (e.l.ty == ExprType.Ident) {
-                varName = (cast(ExprIdent)e.l).id.lx.idup;
-        } else {
-                assert(0, "Left-hand side of assignment must be an identifier");
-        }
-
-        // Look up the variable to get its type
-        Sym sym = c.scpe.get(varName.dup);
-        assert(sym && sym.type == SymType.Var, "Assigned symbol must be a variable");
-        Var var = cast(Var)sym;
-        string typeSize = scrTypeToQbeType(var.t);
-
-        // Compile the right-hand side
+        // Compile the right-hand side (value to assign or operate with)
         string rhs = compileExpr(e.r, c);
 
-        // Handle different assignment operators
-        switch (e.eqty.ty) {
-        case TokenType.Equals:  // Simple assignment
-                c.add(format("store%s %s, %%%s", typeSize, rhs, varName));
-                break;
+        // Handle different types of left-hand side expressions
+        switch (e.l.ty) {
+        case ExprType.Ident: {
+                // Simple variable assignment or compound assignment: x = 1, x += 2
+                ExprIdent ident = cast(ExprIdent)e.l;
+                Sym sym = c.scpe.get(ident.id.lx);
+                assert(sym && sym.type == SymType.Var, "Assignment target must be a variable");
+                Var var = cast(Var)sym;
+                string typeSize = scrTypeToQbeType(var.t);
+                string varName = "%" ~ ident.id.lx.idup;
 
-        case TokenType.PlusEquals:  // +=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s add %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.MinusEquals:  // -=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s sub %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.AsteriskEquals:  // *=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s mul %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.ForwardSlashEquals:  // /=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s div %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.PercentEquals:  // %=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s rem %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.AmpersandEquals:  // &=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s and %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.PipeEquals:  // |=
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s or %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        case TokenType.CaretEquals:  // ^= (XOR)
-                string tmp = c.genTmpVar();
-                c.add(format("%s =%s load%s %%%s", tmp, typeSize, typeSize, varName));
-                c.add(format("%s =%s xor %s, %s", tmp, typeSize, tmp, rhs));
-                c.add(format("store%s %s, %%%s", typeSize, tmp, varName));
-                break;
-
-        default:
-                assert(0, "Unsupported assignment operator: " ~ e.eqty.ty.to!string);
+                // Handle different assignment operators
+                switch (e.eqty.ty) {
+                case TokenType.Equals: {
+                        // Simple assignment
+                        c.add(format("store%s %s, %s", typeSize, rhs, varName));
+                        return rhs;
+                }
+                case TokenType.PlusEquals:
+                case TokenType.MinusEquals:
+                case TokenType.AsteriskEquals:
+                case TokenType.ForwardSlashEquals:
+                case TokenType.PercentEquals:
+                case TokenType.AmpersandEquals:
+                case TokenType.PipeEquals:
+                case TokenType.CaretEquals: {
+                        // Compound assignment
+                        string currentVal = c.genTmpVar();
+                        c.add(format("%s =%s load%s %s", currentVal, typeSize, typeSize, varName));
+                    
+                        string result = c.genTmpVar();
+                        string op;
+                        switch (e.eqty.ty) {
+                        case TokenType.PlusEquals:      op = "add"; break;
+                        case TokenType.MinusEquals:     op = "sub"; break;
+                        case TokenType.AsteriskEquals:  op = "mul"; break;
+                        case TokenType.ForwardSlashEquals: op = "div"; break;
+                        case TokenType.PercentEquals:   op = "rem"; break;
+                        case TokenType.AmpersandEquals: op = "and"; break;
+                        case TokenType.PipeEquals:      op = "or";  break;
+                        case TokenType.CaretEquals:     op = "xor"; break;
+                        default: assert(0); // Unreachable
+                        }
+                        c.add(format("%s =%s %s %s, %s", result, typeSize, op, currentVal, rhs));
+                        c.add(format("store%s %s, %s", typeSize, result, varName));
+                        return result;
+                }
+                default:
+                        assert(0, "Unsupported assignment operator: " ~ e.eqty.ty.to!string);
+                }
         }
 
-        // Return the variable name as the expression result
-        return "%" ~ varName;
+        case ExprType.Un: {
+                // Pointer dereference assignment: *p = 3, *p += 2
+                ExprUn un = cast(ExprUn)e.l;
+                assert(un.op.ty == TokenType.Asterisk, "Mutation unary operator must be dereference (*)");
+                string ptr = compileExpr(un.e, c);
+                string typeSize = "w";  // Default, ideally get from type info
+
+                switch (e.eqty.ty) {
+                case TokenType.Equals: {
+                        c.add(format("store%s %s, %s", typeSize, rhs, ptr));
+                        return rhs;
+                }
+                case TokenType.PlusEquals:
+                case TokenType.MinusEquals:
+                case TokenType.AsteriskEquals:
+                case TokenType.ForwardSlashEquals:
+                case TokenType.PercentEquals:
+                case TokenType.AmpersandEquals:
+                case TokenType.PipeEquals:
+                case TokenType.CaretEquals: {
+                        string currentVal = c.genTmpVar();
+                        c.add(format("%s =%s load%s %s", currentVal, typeSize, typeSize, ptr));
+                    
+                        string result = c.genTmpVar();
+                        string op;
+                        switch (e.eqty.ty) {
+                        case TokenType.PlusEquals:      op = "add"; break;
+                        case TokenType.MinusEquals:     op = "sub"; break;
+                        case TokenType.AsteriskEquals:  op = "mul"; break;
+                        case TokenType.ForwardSlashEquals: op = "div"; break;
+                        case TokenType.PercentEquals:   op = "rem"; break;
+                        case TokenType.AmpersandEquals: op = "and"; break;
+                        case TokenType.PipeEquals:      op = "or";  break;
+                        case TokenType.CaretEquals:     op = "xor"; break;
+                        default: assert(0); // Unreachable
+                        }
+                        c.add(format("%s =%s %s %s, %s", result, typeSize, op, currentVal, rhs));
+                        c.add(format("store%s %s, %s", typeSize, result, ptr));
+                        return result;
+                }
+                default:
+                        assert(0, "Unsupported assignment operator for pointer: " ~ e.eqty.ty.to!string);
+                }
+        }
+
+        case ExprType.Get: {
+                // Struct member assignment: p.x = 4, p.x += 2
+                ExprGet get = cast(ExprGet)e.l;
+                string base = compileExpr(get.l, c);
+                assert(get.r.ty == ExprType.Ident, "Struct member must be an identifier");
+                ExprIdent member = cast(ExprIdent)get.r;
+
+                // Look up struct type
+                Sym baseSym;
+                if (get.l.ty == ExprType.Ident) {
+                        baseSym = c.scpe.get((cast(ExprIdent)get.l).id.lx);
+                }
+                assert(baseSym && baseSym.type == SymType.Var);
+                Var var = cast(Var)baseSym;
+                assert(var.t.b == RuntimeTypeBase.Struct || 
+                       (var.t.b == RuntimeTypeBase.Ptr && var.t.nptr.b == RuntimeTypeBase.Struct));
+            
+                RuntimeType* structType = (var.t.b == RuntimeTypeBase.Ptr) ? var.t.nptr : var.t;
+                StmtStruct structDef;
+                Sym structSym = c.scpe.get(structType.structName.dup);
+                assert(structSym && structSym.type == SymType.Struct);
+                structDef = (cast(Struct)structSym).stmt;
+
+                // Find member info
+                size_t memberIndex = -1;
+                for (size_t i = 0; i < structDef.members.length; i++) {
+                        if (structDef.members[i].lx == member.id.lx) {
+                                memberIndex = i;
+                                break;
+                        }
+                }
+                assert(memberIndex != -1, "Member not found in struct");
+            
+                size_t offset = structDef.memberOffsets[memberIndex];
+                string typeSize = scrTypeToQbeType(structDef.memberTypes[memberIndex]);
+                string ptrTmp = c.genTmpVar();
+                c.add(format("%s =l add %s, %d", ptrTmp, base, offset));
+
+                switch (e.eqty.ty) {
+                case TokenType.Equals: {
+                        c.add(format("store%s %s, %s", typeSize, rhs, ptrTmp));
+                        return rhs;
+                }
+                case TokenType.PlusEquals:
+                case TokenType.MinusEquals:
+                case TokenType.AsteriskEquals:
+                case TokenType.ForwardSlashEquals:
+                case TokenType.PercentEquals:
+                case TokenType.AmpersandEquals:
+                case TokenType.PipeEquals:
+                case TokenType.CaretEquals: {
+                        string currentVal = c.genTmpVar();
+                        c.add(format("%s =%s load%s %s", currentVal, typeSize, typeSize, ptrTmp));
+                    
+                        string result = c.genTmpVar();
+                        string op;
+                        switch (e.eqty.ty) {
+                        case TokenType.PlusEquals:      op = "add"; break;
+                        case TokenType.MinusEquals:     op = "sub"; break;
+                        case TokenType.AsteriskEquals:  op = "mul"; break;
+                        case TokenType.ForwardSlashEquals: op = "div"; break;
+                        case TokenType.PercentEquals:   op = "rem"; break;
+                        case TokenType.AmpersandEquals: op = "and"; break;
+                        case TokenType.PipeEquals:      op = "or";  break;
+                        case TokenType.CaretEquals:     op = "xor"; break;
+                        default: assert(0); // Unreachable
+                        }
+                        c.add(format("%s =%s %s %s, %s", result, typeSize, op, currentVal, rhs));
+                        c.add(format("store%s %s, %s", typeSize, result, ptrTmp));
+                        return result;
+                }
+                default:
+                        assert(0, "Unsupported assignment operator for struct member: " ~ e.eqty.ty.to!string);
+                }
+        }
+
+        default:
+                assert(0, "Unsupported mutation target: " ~ e.l.ty.to!string);
+        }
 }
+
+// string compileExprMut(ExprMut e, Context c) {
+//         // Compile the right-hand side (value to assign)
+//         string rhs = compileExpr(e.r, c);
+
+//         // Handle different types of left-hand side expressions
+//         switch (e.l.ty) {
+//         case ExprType.Ident: {
+//                 // Simple variable assignment: x = 1
+//                 ExprIdent ident = cast(ExprIdent)e.l;
+//                 Sym sym = c.scpe.get(ident.id.lx);
+//                 assert(sym && sym.type == SymType.Var, "Assignment target must be a variable");
+//                 Var var = cast(Var)sym;
+
+//                 string typeSize = scrTypeToQbeType(var.t);
+//                 c.add(format("store%s %s, %%%s", typeSize, rhs, ident.id.lx.idup));
+//                 return rhs;  // Return the value just assigned
+//         }
+
+//         case ExprType.Un: {
+//                 // Pointer dereference assignment: *p = 3
+//                 ExprUn un = cast(ExprUn)e.l;
+//                 assert(un.op.ty == TokenType.Asterisk, "Mutation unary operator must be dereference (*)");
+
+//                 // Compile the pointer expression
+//                 string ptr = compileExpr(un.e, c);
+//                 string typeSize = "w";  // Default to word size, adjust based on type info if available
+
+//                 // In a full implementation, you'd need type info from the pointer to determine the correct size
+//                 // For now, assuming word-sized values
+//                 c.add(format("store%s %s, %s", typeSize, rhs, ptr));
+//                 return rhs;
+//         }
+
+//         case ExprType.Get: {
+//                 // Struct member assignment: p.x = 4
+//                 ExprGet get = cast(ExprGet)e.l;
+
+//                 // Left part should be the struct (or pointer to struct)
+//                 string base = compileExpr(get.l, c);
+
+//                 // Right part should be the member identifier
+//                 assert(get.r.ty == ExprType.Ident, "Struct member must be an identifier");
+//                 ExprIdent member = cast(ExprIdent)get.r;
+
+//                 // Look up the struct type
+//                 Sym baseSym;
+//                 if (get.l.ty == ExprType.Ident) {
+//                         baseSym = c.scpe.get((cast(ExprIdent)get.l).id.lx);
+//                 }
+//                 assert(baseSym && baseSym.type == SymType.Var);
+
+//                 Var var = cast(Var)baseSym;
+//                 assert(var.t.b == RuntimeTypeBase.Struct || 
+//                        (var.t.b == RuntimeTypeBase.Ptr && var.t.nptr.b == RuntimeTypeBase.Struct),
+//                        "Left side of . must be struct or struct pointer");
+
+//                 RuntimeType* structType = (var.t.b == RuntimeTypeBase.Ptr) ? var.t.nptr : var.t;
+//                 StmtStruct structDef;
+//                 Sym structSym = c.scpe.get(structType.structName.dup);
+//                 assert(structSym && structSym.type == SymType.Struct);
+//                 structDef = (cast(Struct)structSym).stmt;
+
+//                 // Find the member offset and type
+//                 size_t memberIndex = -1;
+//                 for (size_t i = 0; i < structDef.members.length; i++) {
+//                         if (structDef.members[i].lx == member.id.lx) {
+//                                 memberIndex = i;
+//                                 break;
+//                         }
+//                 }
+//                 assert(memberIndex != -1, "Member not found in struct");
+
+//                 size_t offset = structDef.memberOffsets[memberIndex];
+//                 string typeSize = scrTypeToQbeType(structDef.memberTypes[memberIndex]);
+
+//                 // Generate the store
+//                 string ptrTmp = c.genTmpVar();
+//                 c.add(format("%s =l add %s, %d", ptrTmp, base, offset));
+//                 c.add(format("store%s %s, %s", typeSize, rhs, ptrTmp));
+
+//                 return rhs;
+//         }
+
+//         default:
+//                 assert(0, "Unsupported mutation target: " ~ e.l.ty.to!string);
+//         }
+// }
 
 string compileExprStructInst(ExprStructInst e, Context c) {
         // Look up the struct definition
@@ -422,107 +604,57 @@ string compileExprStructInst(ExprStructInst e, Context c) {
 }
 
 string compileExprGet(ExprGet e, Context c) {
+        // Compile the left-hand side (the struct or pointer-to-struct)
         string base = compileExpr(e.l, c);
 
-        // Right-hand side must be an identifier or a procedure call
-        if (e.r.ty == ExprType.Ident) {
-                // Field access (e.g., p.x)
-                string fieldName = (cast(ExprIdent)e.r).id.lx.idup;
+        // Right-hand side should be an identifier (the member name)
+        assert(e.r.ty == ExprType.Ident, "Right side of . must be an identifier");
+        ExprIdent member = cast(ExprIdent)e.r;
 
-                // Determine the type of the left-hand side
-                Sym sym = null;
-                if (e.l.ty == ExprType.Ident) {
-                        sym = c.scpe.get((cast(ExprIdent)e.l).id.lx);
-                } else {
-                        // For chained expressions, we need type info from elsewhere
-                        assert(0, "Chained field access requires type inference not yet implemented");
-                }
-                assert(sym && sym.type == SymType.Var, "Left-hand side must be a variable");
-                Var var = cast(Var)sym;
-
-                // Check if it's a struct
-                if (var.t.b == RuntimeTypeBase.Struct) {
-                        Sym structSym = c.scpe.get(var.t.structName.dup);
-                        assert(structSym && structSym.type == SymType.Struct, "Must reference a defined struct");
-                        Struct st = cast(Struct)structSym;
-
-                        // Find the field offset and type
-                        size_t offset = 0;
-                        string typeSize = "";
-                        for (size_t i = 0; i < st.stmt.members.length; i++) {
-                                if (st.stmt.members[i].lx == fieldName) {
-                                        offset = st.stmt.memberOffsets[i];
-                                        typeSize = scrTypeToQbeType(st.stmt.memberTypes[i]);
-                                        break;
-                                }
-                        }
-                        assert(typeSize != "", "Field not found in struct: " ~ fieldName);
-
-                        // Generate code to access the field
-                        string ptrTmp = c.genTmpVar();
-                        string result = c.genTmpVar();
-                        c.add(format("%s =l add %s, %d", ptrTmp, base, offset));
-                        c.add(format("%s =%s load%s %s", result, typeSize, typeSize, ptrTmp));
-                        return result;
-                } else {
-                        assert(0, "Member access on non-struct type");
-                }
-        } else if (e.r.ty == ExprType.ProcCall) {
-                // Method call (e.g., p.f())
-                ExprProcCall call = cast(ExprProcCall)e.r;
-                assert(call.l.ty == ExprType.Ident, "Method name must be an identifier");
-                string procName = (cast(ExprIdent)call.l).id.lx.idup;
-
-                // Compile arguments
-                string[] args;
-                foreach (arg; call.exprs) {
-                        args ~= compileExpr(arg, c);
-                }
-
-                // Look up the procedure
-                Sym procSym = c.scpe.get(procName.dup);
-                assert(procSym && procSym.type == SymType.Proc, "Called symbol must be a procedure");
-                Proc proc = cast(Proc)procSym;
-                string returnType = scrTypeToQbeType(proc.stmt.rtype);
-                bool isVariadic = proc.stmt.variadic;
-
-                // Generate the call, passing the base as the first argument (like 'self')
-                string result = c.genTmpVar();
-                string callLine = "";
-                if (proc.stmt.rtype.b != RuntimeTypeBase.Void) {
-                        callLine = format("%s =%s call $%s(", result, returnType, procName);
-                } else {
-                        callLine = format("call $%s(", procName);
-                }
-
-                // Add the base as the first argument (assuming struct pointer)
-                Sym baseSym = c.scpe.get((cast(ExprIdent)e.l).id.lx);
-                assert(baseSym && baseSym.type == SymType.Var);
-                Var baseVar = cast(Var)baseSym;
-                string baseType = baseVar.t.b == RuntimeTypeBase.Struct ?
-                        ":" ~ baseVar.t.structName.idup : scrTypeToQbeType(baseVar.t);
-                callLine ~= format("%s %s", baseType, base);
-
-                // Add remaining arguments
-                for (size_t i = 0; i < args.length; ++i) {
-                        callLine ~= ", ";
-                        if (isVariadic && i >= proc.stmt.pt.length - 1) { // -1 because base is first param
-                                callLine ~= format("w %s", args[i]);
-                        } else {
-                                string argType = scrTypeToQbeType(proc.stmt.pt[i + 1]); // +1 for base
-                                callLine ~= format("%s %s", argType, args[i]);
-                        }
-                }
-
-                if (isVariadic && args.length > 0) {
-                        callLine ~= ", ...";
-                }
-                callLine ~= ")";
-                c.add(callLine);
-                return result;
+        // Determine the type of the left-hand side
+        Sym baseSym;
+        if (e.l.ty == ExprType.Ident) {
+                baseSym = c.scpe.get((cast(ExprIdent)e.l).id.lx);
+                assert(baseSym && baseSym.type == SymType.Var, "Left side of . must be a variable");
         } else {
-                assert(0, "Right-hand side of get expression must be an identifier or procedure call");
+                // For now, assume it's a variable; could be extended for nested expressions
+                assert(0, "Complex left-hand side of . not yet supported");
         }
+
+        Var var = cast(Var)baseSym;
+        assert(var.t.b == RuntimeTypeBase.Struct || 
+               (var.t.b == RuntimeTypeBase.Ptr && var.t.nptr.b == RuntimeTypeBase.Struct),
+               "Left side of . must be struct or struct pointer");
+
+        // Get the struct type (dereference if it's a pointer)
+        RuntimeType* structType = (var.t.b == RuntimeTypeBase.Ptr) ? var.t.nptr : var.t;
+
+        // Look up the struct definition
+        Sym structSym = c.scpe.get(structType.structName.dup);
+        assert(structSym && structSym.type == SymType.Struct, "Struct type must be defined");
+        StmtStruct structDef = (cast(Struct)structSym).stmt;
+
+        // Find the member in the struct
+        size_t memberIndex = -1;
+        for (size_t i = 0; i < structDef.members.length; i++) {
+                if (structDef.members[i].lx == member.id.lx) {
+                        memberIndex = i;
+                        break;
+                }
+        }
+        assert(memberIndex != -1, "Member " ~ member.id.lx.idup ~ " not found in struct " ~ structType.structName);
+
+        // Calculate the address of the member
+        size_t offset = structDef.memberOffsets[memberIndex];
+        string typeSize = scrTypeToQbeType(structDef.memberTypes[memberIndex]);
+        string ptrTmp = c.genTmpVar();
+        c.add(format("%s =l add %s, %d", ptrTmp, base, offset));
+
+        // Load the member's value
+        string result = c.genTmpVar();
+        c.add(format("%s =%s load%s %s", result, typeSize, typeSize, ptrTmp));
+
+        return result;
 }
 
 string compileExprUn(ExprUn e, Context c) {

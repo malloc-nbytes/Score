@@ -122,11 +122,11 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
                         }
                         left = new ExprStrLit(lexerNext(l));
                 } break;
-                case TokenType.Period: {
-                        lexerDiscard(l); // .
-                        Expr right = parseExpr(l, p);
-                        left = new ExprGet(left, right);
-                } break;
+                // case TokenType.Period: {
+                //         lexerDiscard(l); // .
+                //         Expr right = parseExpr(l, p);
+                //         left = new ExprGet(left, right);
+                // } break;
                 case TokenType.Keyword: {
                         if (left) {
                                 err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
@@ -136,6 +136,31 @@ private Expr parsePrimaryExpr(Lexer* l, Program* p) {
                 default: return left;
                 }
         }
+}
+
+private Expr parseMemberExpr(Lexer* l, Program* p) {
+        Expr lhs = parsePrimaryExpr(l, p);
+        // if (lhs is null) return null;
+        Token* cur = lexerPeek(l);
+        while (cur && cur.ty == TokenType.Period) {
+                lexerDiscard(l); // .
+                Expr rhs = parsePrimaryExpr(l, p); // Right side should be an identifier or struct instantiation
+                if (rhs is null) {
+                        err("Expected identifier or struct instantiation after '.'");
+                }
+                lhs = new ExprGet(lhs, rhs);
+
+                // Check for procedure call after member access (e.g., p.f())
+                cur = lexerPeek(l);
+                if (cur && cur.ty == TokenType.Lparen) {
+                        lexerDiscard(l); // (
+                        Expr[] exprs = parseCommaSepExprs(l, TokenType.Rparen, p);
+                        lhs = new ExprProcCall(lhs, exprs);
+                        cast(void)expect(l, TokenType.Rparen);
+                }
+                cur = lexerPeek(l);
+        }
+        return lhs;
 }
 
 private Expr parseUnaryExpr(Lexer* l, Program* p) {
@@ -149,7 +174,7 @@ private Expr parseUnaryExpr(Lexer* l, Program* p) {
                 Expr operand = parseUnaryExpr(l, p);
                 return new ExprUn(op, operand);
         }
-        return parsePrimaryExpr(l, p);
+        return parseMemberExpr(l, p);
 }
 
 private Expr parseMultiplicitateExpr(Lexer *l, Program* p) {
