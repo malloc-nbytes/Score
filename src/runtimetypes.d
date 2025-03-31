@@ -72,7 +72,7 @@ string scrTypeToQbeType(RuntimeType* t) {
         case RuntimeTypeBase.Usize: return "l";
         case RuntimeTypeBase.Ptr: return "l";
         case RuntimeTypeBase.Void: return "";
-        case RuntimeTypeBase.Struct: assert(0);
+        case RuntimeTypeBase.Struct:  return "l";
         default: assert(0);
         }
 }

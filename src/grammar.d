@@ -4,6 +4,7 @@ import std.array;
 import std.algorithm;
 import utils;
 import std.format;
+import std.stdio;
 
 import token;
 import runtimeTypes;

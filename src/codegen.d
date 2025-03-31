@@ -88,6 +88,7 @@ class Context {
         IdentGatherer[] igs;
         string[] data;
         string[] globals;
+        string [] strcts;
         Scope scpe;
 
         int lc;
@@ -97,6 +98,7 @@ class Context {
                 this.igs = igs;
                 this.data = [];
                 this.globals = [];
+                this.strcts = [];
                 this.scpe = new Scope;
                 this.lc = 0;
                 this.gc = 0;
@@ -134,10 +136,17 @@ class Context {
                 this.globals ~= s;
         }
 
+        void addStruct(string s) {
+                this.strcts ~= s;
+        }
+
         char[] write() {
                 char[] res = [];
                 for (size_t i = 0; i < this.globals.length; ++i) {
                         res ~= this.globals[i] ~ "\n";
+                }
+                for (size_t i = 0; i < this.strcts.length; ++i) {
+                        res ~= this.strcts[i] ~ "\n";
                 }
                 for (size_t i = 0; i < this.data.length; ++i) {
                         res ~= this.data[i] ~ "\n";
@@ -386,6 +395,136 @@ string compileExprMut(ExprMut e, Context c) {
         return "%" ~ varName;
 }
 
+string compileExprStructInst(ExprStructInst e, Context c) {
+        // Look up the struct definition
+        Sym sym = c.scpe.get(e.structId.lx);
+        assert(sym && sym.type == SymType.Struct, "Must reference a defined struct");
+        Struct st = cast(Struct)sym;
+
+        // Allocate space for the struct
+        string structVar = c.genTmpVar();
+        size_t size = st.stmt.size;  // Total size from StmtStruct
+        c.add(format("%s =l alloc8 %d", structVar, size));
+
+        // Compile and store each member
+        for (size_t i = 0; i < e.structMemExprs.length; i++) {
+                string value = compileExpr(e.structMemExprs[i], c);
+                string typeSize = scrTypeToQbeType(st.stmt.memberTypes[i]);
+                size_t offset = st.stmt.memberOffsets[i];
+
+                // Store at offset
+                string ptrTmp = c.genTmpVar();
+                c.add(format("%s =l add %s, %d", ptrTmp, structVar, offset));
+                c.add(format("store%s %s, %s", typeSize, value, ptrTmp));
+        }
+
+        return structVar;
+}
+
+string compileExprGet(ExprGet e, Context c) {
+        string base = compileExpr(e.l, c);
+
+        // Right-hand side must be an identifier or a procedure call
+        if (e.r.ty == ExprType.Ident) {
+                // Field access (e.g., p.x)
+                string fieldName = (cast(ExprIdent)e.r).id.lx.idup;
+
+                // Determine the type of the left-hand side
+                Sym sym = null;
+                if (e.l.ty == ExprType.Ident) {
+                        sym = c.scpe.get((cast(ExprIdent)e.l).id.lx);
+                } else {
+                        // For chained expressions, we need type info from elsewhere
+                        assert(0, "Chained field access requires type inference not yet implemented");
+                }
+                assert(sym && sym.type == SymType.Var, "Left-hand side must be a variable");
+                Var var = cast(Var)sym;
+
+                // Check if it's a struct
+                if (var.t.b == RuntimeTypeBase.Struct) {
+                        Sym structSym = c.scpe.get(var.t.structName.dup);
+                        assert(structSym && structSym.type == SymType.Struct, "Must reference a defined struct");
+                        Struct st = cast(Struct)structSym;
+
+                        // Find the field offset and type
+                        size_t offset = 0;
+                        string typeSize = "";
+                        for (size_t i = 0; i < st.stmt.members.length; i++) {
+                                if (st.stmt.members[i].lx == fieldName) {
+                                        offset = st.stmt.memberOffsets[i];
+                                        typeSize = scrTypeToQbeType(st.stmt.memberTypes[i]);
+                                        break;
+                                }
+                        }
+                        assert(typeSize != "", "Field not found in struct: " ~ fieldName);
+
+                        // Generate code to access the field
+                        string ptrTmp = c.genTmpVar();
+                        string result = c.genTmpVar();
+                        c.add(format("%s =l add %s, %d", ptrTmp, base, offset));
+                        c.add(format("%s =%s load%s %s", result, typeSize, typeSize, ptrTmp));
+                        return result;
+                } else {
+                        assert(0, "Member access on non-struct type");
+                }
+        } else if (e.r.ty == ExprType.ProcCall) {
+                // Method call (e.g., p.f())
+                ExprProcCall call = cast(ExprProcCall)e.r;
+                assert(call.l.ty == ExprType.Ident, "Method name must be an identifier");
+                string procName = (cast(ExprIdent)call.l).id.lx.idup;
+
+                // Compile arguments
+                string[] args;
+                foreach (arg; call.exprs) {
+                        args ~= compileExpr(arg, c);
+                }
+
+                // Look up the procedure
+                Sym procSym = c.scpe.get(procName.dup);
+                assert(procSym && procSym.type == SymType.Proc, "Called symbol must be a procedure");
+                Proc proc = cast(Proc)procSym;
+                string returnType = scrTypeToQbeType(proc.stmt.rtype);
+                bool isVariadic = proc.stmt.variadic;
+
+                // Generate the call, passing the base as the first argument (like 'self')
+                string result = c.genTmpVar();
+                string callLine = "";
+                if (proc.stmt.rtype.b != RuntimeTypeBase.Void) {
+                        callLine = format("%s =%s call $%s(", result, returnType, procName);
+                } else {
+                        callLine = format("call $%s(", procName);
+                }
+
+                // Add the base as the first argument (assuming struct pointer)
+                Sym baseSym = c.scpe.get((cast(ExprIdent)e.l).id.lx);
+                assert(baseSym && baseSym.type == SymType.Var);
+                Var baseVar = cast(Var)baseSym;
+                string baseType = baseVar.t.b == RuntimeTypeBase.Struct ?
+                        ":" ~ baseVar.t.structName.idup : scrTypeToQbeType(baseVar.t);
+                callLine ~= format("%s %s", baseType, base);
+
+                // Add remaining arguments
+                for (size_t i = 0; i < args.length; ++i) {
+                        callLine ~= ", ";
+                        if (isVariadic && i >= proc.stmt.pt.length - 1) { // -1 because base is first param
+                                callLine ~= format("w %s", args[i]);
+                        } else {
+                                string argType = scrTypeToQbeType(proc.stmt.pt[i + 1]); // +1 for base
+                                callLine ~= format("%s %s", argType, args[i]);
+                        }
+                }
+
+                if (isVariadic && args.length > 0) {
+                        callLine ~= ", ...";
+                }
+                callLine ~= ")";
+                c.add(callLine);
+                return result;
+        } else {
+                assert(0, "Right-hand side of get expression must be an identifier or procedure call");
+        }
+}
+
 string compileExpr(Expr e, Context c) {
         switch (e.ty) {
         case ExprType.Bin: return compileExprBin(cast(ExprBin)e, c);
@@ -395,8 +534,8 @@ string compileExpr(Expr e, Context c) {
         case ExprType.Ident: return compileExprIdent(cast(ExprIdent)e, c);
         case ExprType.Mut: return compileExprMut(cast(ExprMut)e, c); break;
         case ExprType.ProcCall: return compileExprProcCall(cast(ExprProcCall)e, c);
-        case ExprType.StructInst: assert(0); break;
-        case ExprType.Get: assert(0); break;
+        case ExprType.StructInst: return compileExprStructInst(cast(ExprStructInst)e, c); break;
+        case ExprType.Get: return compileExprGet(cast(ExprGet)e, c); break;
         default: assert(0);
         }
         assert(0);
@@ -411,7 +550,13 @@ void compileStmtBlock(StmtBlock s, Context c) {
 }
 
 void compileStmtLet(StmtLet s, Context c) {
-        string buf = "%" ~ s.id.lx.idup ~ " =l" ~ " alloc8 " ~ getTypeSize(s.t).to!string;
+        string allocsz = getTypeSize(s.t).to!string;
+        if (s.t.b == RuntimeTypeBase.Struct) {
+                Sym strct = c.scpe.get(s.t.structName.dup);
+                assert(strct && strct.type == SymType.Struct);
+                allocsz = (cast(Struct)strct).stmt.size.to!string;
+        }
+        string buf = "%" ~ s.id.lx.idup ~ " =l" ~ " alloc8 " ~ allocsz;
         c.add(buf);
         buf = "";
         string res = compileExpr(s.e, c);
@@ -435,7 +580,11 @@ void compileStmtProc(StmtProc s, Context c) {
                 if (i != 0) {
                         procDef ~= ", ";
                 }
-                procDef ~= scrTypeToQbeType(s.pt[i]) ~ " %__" ~ s.pn[i].lx;
+                string scrTy = scrTypeToQbeType(s.pt[i]);
+                if (s.pt[i].b == RuntimeTypeBase.Struct) {
+                        scrTy = ":" ~ s.pt[i].structName.idup;
+                }
+                procDef ~= scrTy  ~ " %__" ~ s.pn[i].lx;
                 Var v = new Var(s.pn[i].lx, s.pt[i]);
                 c.scpe.add(v);
         }
@@ -445,7 +594,13 @@ void compileStmtProc(StmtProc s, Context c) {
 
         // Stack alloc parameters
         for (size_t i = 0; i < s.pn.length; ++i) {
-                c.add("%" ~ s.pn[i].lx.idup ~ " =l" ~ " alloc8 " ~ getTypeSize(s.pt[i]).to!string, true);
+                string sz = getTypeSize(s.pt[i]).to!string;
+                if (s.pt[i].b == RuntimeTypeBase.Struct) {
+                        Sym sym = c.scpe.get(s.pt[i].structName.dup);
+                        assert(sym && sym.type == SymType.Struct);
+                        sz = (cast(Struct)sym).stmt.size.to!string;
+                }
+                c.add("%" ~ s.pn[i].lx.idup ~ " =l" ~ " alloc8 " ~ sz, true);
         }
 
         for (size_t i = 0; i < s.pn.length; ++i) {
@@ -552,6 +707,20 @@ void compileStmtWhile(StmtWhile s, Context c) {
         c.add(endLabel, false);
 }
 
+void compileStmtStruct(StmtStruct s, Context c) {
+        Struct strct = new Struct(s);
+        c.scpe.add(strct);
+        string buf = format("type :%s = { ", s.id.lx);
+        for (size_t i = 0; i < s.memberTypes.length; ++i) {
+                if (i != 0) {
+                        buf ~= ", ";
+                }
+                buf ~= scrTypeToQbeType(s.memberTypes[i]);
+        }
+        buf ~= " }";
+        c.addStruct(buf);
+}
+
 void compileStmt(Stmt s, Context c) {
         switch (s.ty) {
         case StmtType.Let: compileStmtLet(cast(StmtLet)s, c); break;
@@ -562,7 +731,7 @@ void compileStmt(Stmt s, Context c) {
         case StmtType.Extern: compileStmtExtern(cast(StmtExtern)s, c); break;
         case StmtType.If: compileStmtIf(cast(StmtIf)s, c); break;
         case StmtType.While: compileStmtWhile(cast(StmtWhile)s, c); break;
-        case StmtType.Struct: assert(0); break;
+        case StmtType.Struct: compileStmtStruct(cast(StmtStruct)s, c); break;
         case StmtType.Mod: assert(0); break;
         case StmtType.Import: assert(0); break;
         default: assert(0);
