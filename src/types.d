@@ -10,25 +10,25 @@ enum TypeKind {
 class Type {
         TypeKind kind;
         size_t size;
-        this(TypeKind kind, size_t size) {
+        string name;
+        this(TypeKind kind, size_t size, string name) {
                 this.kind = kind;
                 this.size = size;
+                this.name = name;
         }
 }
 
 class Ptr : Type {
         Type to;
         this(Type to) {
-                super(TypeKind.Ptr, 8);
+                super(TypeKind.Ptr, 8, "Ptr");
                 this.to = to;
         }
 }
 
 class PrimitiveType : Type {
-        string name;
         this(string name, size_t size) {
-                super(TypeKind.Primitive, size);
-                this.name = name;
+                super(TypeKind.Primitive, size, name);
         }
 }
 
@@ -44,12 +44,11 @@ class Field {
 }
 
 class StructType : Type {
-        string name;
         Field[] fields;
         this(string name, Field[] fields) {
                 this.name = name;
                 this.fields = fields;
-                super(TypeKind.Struct, this.computeSize());
+                super(TypeKind.Struct, this.computeSize(), name);
         }
 
         size_t computeSize() {
@@ -68,7 +67,7 @@ class ProcType : Type {
         Type returnType;
         Type[] paramTypes;
         this(Type returnType, Type[] paramTypes, size_t size) {
-                super(TypeKind.Proc, size);
+                super(TypeKind.Proc, size, "Proc");
                 this.returnType = returnType;
                 this.paramTypes = paramTypes;
         }

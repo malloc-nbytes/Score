@@ -65,6 +65,27 @@ Expr[] parseCommaSepExprs(Lexer* l, TokenType end) {
         return exprs;
 }
 
+ExprStructLit parseExprStructLit(Lexer* l, string structName) {
+        lexerDiscard(l); // {
+
+        FieldInit[] fields = [];
+
+        while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
+                string name = expect(l, TokenType.Ident).lx.idup;
+                cast(void)expect(l, TokenType.Equals);
+                Expr expr = parseExpr(l);
+                fields ~= new FieldInit(name, expr);
+                if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
+                        lexerDiscard(l); // ,
+                } else {
+                        cast(void)expectWoEat(l, TokenType.RCurlyBracket);
+                        break;
+                }
+        }
+        cast(void)expect(l, TokenType.RCurlyBracket);
+        return new ExprStructLit(structName, fields);
+}
+
 private Expr parsePrimaryExpr(Lexer* l) {
         Expr left = null;
 
@@ -76,12 +97,7 @@ private Expr parsePrimaryExpr(Lexer* l) {
                 case TokenType.Ident: {
                         Token* ident = lexerNext(l);
                         if (l.hd && lexerPeek(l).ty == TokenType.LCurlyBracket) {
-                                // expect(l, TokenType.LCurlyBracket); // {
-                                // Token*[] structMemIds = [];
-                                // Expr[] structMemExprs = [];
-                                // parseStructInstMembers(l, structMemIds, structMemExprs, p);
-                                // left = new ExprStructInst(ident, structMemIds, structMemExprs, p);
-                                assert(0);
+                                left = parseExprStructLit(l, ident.lx.idup);
                         } else {
                                 if (left) {
                                         err(tokerrToStr(cur) ~ "Invalid expression, maybe missing ','?");
@@ -372,7 +388,27 @@ private StmtWhile parseStmtWhile(Lexer* l) {
 }
 
 private StmtStruct parseStmtStruct(Lexer* l) {
-        assert(0);
+        lexerDiscard(l); // struct
+        string name = expect(l, TokenType.Ident).lx.idup;
+        FieldDecl[] fields = [];
+        cast(void)expect(l, TokenType.LCurlyBracket);
+        while (l.hd && lexerPeek(l).ty != TokenType.RCurlyBracket) {
+                string member = expect(l, TokenType.Ident).lx.idup;
+                cast(void)expect(l, TokenType.Colon);
+                Type memberType = parseType(l);
+                fields ~= new FieldDecl(member, memberType);
+                if (l.hd && lexerPeek(l).ty == TokenType.Comma) {
+                        lexerDiscard(l); // ,
+                } else {
+                        cast(void)expectWoEat(l, TokenType.RCurlyBracket);
+                        break;
+                }
+        }
+        cast(void)expect(l, TokenType.RCurlyBracket);
+
+        StmtStruct stmt = new StmtStruct(name, fields);
+
+        return stmt;
 }
 
 private StmtMod parseStmtMod(Lexer* l) {

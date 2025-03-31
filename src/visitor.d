@@ -166,45 +166,48 @@ void acceptStmtImport(Stmt s, Visitor* v) {
  * Expression visitors
  */
 
-// Example of visitor:
-        // void visitExprGet(Visitor* v, ExprGet e) {
-        //         e.l.accept(e.l, v);
-        //         e.r.accept(e.r, v);
-        // }
 void visitExprMember(Visitor* v, ExprMember e) {
-        assert(0);
+        e.left.accept(e.left, v);
+        e.right.accept(e.right, v);
 }
 
 void visitExprStructLit(Visitor* v, ExprStructLit e) {
-        assert(0);
+        for (size_t i = 0; i < e.fields.length; ++i) {
+                e.fields[i].expr.accept(e.fields[i].expr, v);
+        }
 }
 
 void visitExprBin(Visitor* v, ExprBin e) {
-        assert(0);
+        e.left.accept(e.left, v);
+        e.right.accept(e.right, v);
 }
 
 void visitExprUn(Visitor* v, ExprUn e) {
-        assert(0);
+        e.expr.accept(e.expr, v);
 }
 
 void visitExprStrLit(Visitor* v, ExprStrLit e) {
-        assert(0);
+        return;
 }
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
-        assert(0);
+        return;
 }
 
 void visitExprIdent(Visitor* v, ExprIdent e) {
-        assert(0);
+        return;
 }
 
 void visitExprMut(Visitor* v, ExprMut e) {
-        assert(0);
+        e.left.accept(e.left, v);
+        e.right.accept(e.right, v);
 }
 
 void visitExprProcCall(Visitor* v, ExprProcCall e) {
-        assert(0);
+        e.call.accept(e.call, v);
+        for (size_t i = 0; i < e.args.length; ++i) {
+                e.args[i].accept(e.args[i], v);
+        }
 }
 
 /*
@@ -212,41 +215,48 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
  */
 
 void visitStmtLet(Visitor* v, StmtLet s) {
-        assert(0);
+        s.expr.accept(s.expr, v);
 }
 
 void visitStmtExpr(Visitor* v, StmtExpr s) {
-        assert(0);
+        s.expr.accept(s.expr, v);
 }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
-        assert(0);
+        visitStmtBlock(v, s.block);
 }
 
 void visitStmtBlock(Visitor* v, StmtBlock s) {
-        assert(0);
+        for (size_t i = 0; i < s.stmts.length; ++i) {
+                s.stmts[i].accept(s.stmts[i], v);
+        }
 }
 
 void visitStmtReturn(Visitor* v, StmtReturn s) {
-        assert(0);
+        s.expr.accept(s.expr, v);
 }
 
 void visitStmtExtern(Visitor* v, StmtExtern s) {
-        assert(0);
+        return;
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {
-        assert(0);
+        s.expr.accept(s.expr, v);
+        s.then.accept(s.then, v);
+        if (s.else_) {
+                s.else_.accept(s.else_, v);
+        }
 }
 
 void visitStmtWhile(Visitor* v, StmtWhile s) {
-        assert(0);
+        s.expr.accept(s.expr, v);
+        s.stmt.accept(s.stmt, v);
 }
 
 void visitStmtMod(Visitor* v, StmtMod s) {
-        assert(0);
+        return;
 }
 
 void visitStmtImport(Stmt s, Visitor* v) {
-        assert(0);
+        return;
 }

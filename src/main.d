@@ -10,6 +10,7 @@ import grammar;
 import parser;
 import visitor;
 import flag;
+import semantic;
 
 void usage() {
         writeln("Usage: scr [paths...] [options...]");
@@ -32,6 +33,7 @@ int main(string[] args) {
         const string src = readText(fp);
         Lexer l = lexFile(src, fp);
         Program p = parseProgram(&l);
+        semanticAnalyze(p);
 
         return 0;
 }
