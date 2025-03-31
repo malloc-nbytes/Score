@@ -15,8 +15,8 @@ struct Visitor {
         void function(Visitor* v, ExprIdent e)      visitExprIdent;
         void function(Visitor* v, ExprMut e)        visitExprMut;
         void function(Visitor* v, ExprProcCall e)   visitExprProcCall;
-        void function(Visitor* v, ExprStructInst e) visitExprStructInst;
-        void function(Visitor* v, ExprGet e)        visitExprGet;
+        void function(Visitor* v, ExprStructLit e)  visitExprStructLit;
+        void function(Visitor* v, ExprMember e)     visitExprMember;
 
         /*
          * Statement Visitors
@@ -38,15 +38,15 @@ struct Visitor {
  * Expression acceptors
  */
 
-void acceptExprGet(Expr e, Visitor* v) {
-        if (v.visitExprGet) {
-                v.visitExprGet(v, cast(ExprGet)e);
+void acceptExprMember(Expr e, Visitor* v) {
+        if (v.visitExprMember) {
+                v.visitExprMember(v, cast(ExprMember)e);
         }
 }
 
-void acceptExprStructInst(Expr e, Visitor* v) {
-        if (v.visitExprStructInst) {
-                v.visitExprStructInst(v, cast(ExprStructInst)e);
+void acceptExprStructLit(Expr e, Visitor* v) {
+        if (v.visitExprStructLit) {
+                v.visitExprStructLit(v, cast(ExprStructLit)e);
         }
 }
 
@@ -166,48 +166,45 @@ void acceptStmtImport(Stmt s, Visitor* v) {
  * Expression visitors
  */
 
-void visitExprGet(Visitor* v, ExprGet e) {
-        e.l.accept(e.l, v);
-        e.r.accept(e.r, v);
+// Example of visitor:
+        // void visitExprGet(Visitor* v, ExprGet e) {
+        //         e.l.accept(e.l, v);
+        //         e.r.accept(e.r, v);
+        // }
+void visitExprMember(Visitor* v, ExprMember e) {
+        assert(0);
 }
 
-void visitExprStructInst(Visitor* v, ExprStructInst e) {
-        for (size_t i = 0; i < e.structMemExprs.length; ++i) {
-                e.structMemExprs[i].accept(e.structMemExprs[i], v);
-        }
+void visitExprStructLit(Visitor* v, ExprStructLit e) {
+        assert(0);
 }
 
 void visitExprBin(Visitor* v, ExprBin e) {
-        e.l.accept(e.l, v);
-        e.r.accept(e.r, v);
+        assert(0);
 }
 
 void visitExprUn(Visitor* v, ExprUn e) {
-        e.e.accept(e.e, v);
+        assert(0);
 }
 
 void visitExprStrLit(Visitor* v, ExprStrLit e) {
-        return;
+        assert(0);
 }
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
-        return;
+        assert(0);
 }
 
 void visitExprIdent(Visitor* v, ExprIdent e) {
-        return;
+        assert(0);
 }
 
 void visitExprMut(Visitor* v, ExprMut e) {
-        e.l.accept(e.l, v);
-        e.r.accept(e.r, v);
+        assert(0);
 }
 
 void visitExprProcCall(Visitor* v, ExprProcCall e) {
-        e.l.accept(e.l, v);
-        for (size_t i = 0; i < e.exprs.length; ++i) {
-                e.exprs[i].accept(e.exprs[i], v);
-        }
+        assert(0);
 }
 
 /*
@@ -215,48 +212,41 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
  */
 
 void visitStmtLet(Visitor* v, StmtLet s) {
-        s.e.accept(s.e, v);
+        assert(0);
 }
 
 void visitStmtExpr(Visitor* v, StmtExpr s) {
-        s.e.accept(s.e, v);
+        assert(0);
 }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
-        visitStmtBlock(v, s.b);
+        assert(0);
 }
 
 void visitStmtBlock(Visitor* v, StmtBlock s) {
-        for (size_t i = 0; i < s.stmts.length; ++i) {
-                s.stmts[i].accept(s.stmts[i], v);
-        }
+        assert(0);
 }
 
 void visitStmtReturn(Visitor* v, StmtReturn s) {
-        s.e.accept(s.e, v);
+        assert(0);
 }
 
 void visitStmtExtern(Visitor* v, StmtExtern s) {
-        visitStmtProc(v, s.proto);
+        assert(0);
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {
-        s.e.accept(s.e, v);
-        s.then.accept(s.then, v);
-        if (s.else_) {
-                s.else_.accept(s.else_, v);
-        }
+        assert(0);
 }
 
 void visitStmtWhile(Visitor* v, StmtWhile s) {
-        s.e.accept(s.e, v);
-        s.s.accept(s.s, v);
+        assert(0);
 }
 
 void visitStmtMod(Visitor* v, StmtMod s) {
-        return;
+        assert(0);
 }
 
 void visitStmtImport(Stmt s, Visitor* v) {
-        return;
+        assert(0);
 }

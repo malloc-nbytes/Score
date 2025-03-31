@@ -7,8 +7,8 @@ import std.format;
 import std.stdio;
 
 import token;
-import runtimeTypes;
 import visitor;
+import types;
 
 enum ExprType {
         Bin,
@@ -18,8 +18,8 @@ enum ExprType {
         Ident,
         Mut,
         ProcCall,
-        StructInst,
-        Get,
+        StructLit,
+        Member,
 }
 
 //////////////////
@@ -27,11 +27,13 @@ enum ExprType {
 //////////////////
 
 class Expr {
-        ExprType ty;
+        ExprType kind;
+        Type type;
         void function(Expr e, Visitor* v) accept;
-        this(ExprType ty) {
-                this.ty = ty;
-                switch (this.ty) {
+        this(ExprType kind) {
+                this.kind = kind;
+                this.type = null;
+                switch (this.kind) {
                 case ExprType.Bin:        this.accept = &acceptExprBin;        break;
                 case ExprType.Un:         this.accept = &acceptExprUn;         break;
                 case ExprType.StrLit:     this.accept = &acceptExprStrLit;     break;
@@ -39,101 +41,107 @@ class Expr {
                 case ExprType.Ident:      this.accept = &acceptExprIdent;      break;
                 case ExprType.Mut:        this.accept = &acceptExprMut;        break;
                 case ExprType.ProcCall:   this.accept = &acceptExprProcCall;   break;
-                case ExprType.StructInst: this.accept = &acceptExprStructInst; break;
-                case ExprType.Get:        this.accept = &acceptExprGet;        break;
+                case ExprType.StructLit:  this.accept = &acceptExprStructLit;  break;
+                case ExprType.Member:     this.accept = &acceptExprMember;     break;
                 default: assert(0);
                 }
         }
 }
 
-class ExprGet : Expr {
-        Expr l, r;
-        this(Expr l, Expr r) {
-                super(ExprType.Get);
-                this.l = l;
-                this.r = r;
+class ExprMember: Expr {
+        Expr left;
+        Expr right;
+        this(Expr left, Expr right) {
+                super(ExprType.Member);
+                this.left = left;
+                this.right = right;
         }
 }
 
 class ExprBin : Expr {
-        Expr l, r;
-        Token* op;
-        this(Expr l, Token* op, Expr r) {
+        Expr left;
+        string op;
+        Expr right;
+        this(Expr left, string op, Expr right) {
                 super(ExprType.Bin);
-                this.l = l;
+                this.left = left;
                 this.op = op;
-                this.r = r;
+                this.right = right;
         }
 }
 
 class ExprUn : Expr {
-        Token* op;
-        Expr e;
-        this(Token* op, Expr e) {
+        Expr expr;
+        string op;
+        this(Expr expr, string op) {
                 super(ExprType.Un);
+                this.expr = expr;
                 this.op = op;
-                this.e = e;
         }
 }
 
 class ExprStrLit : Expr {
-        Token* s;
-        this(Token* s) {
+        string str;
+        this(string str) {
                 super(ExprType.StrLit);
-                this.s = s;
+                this.str = str;
         }
 }
 
 class ExprIntLit : Expr {
-        Token* i;
-        this(Token* i) {
+        int num;
+        this(int num) {
                 super(ExprType.IntLit);
-                this.i = i;
+                this.num = num;
         }
 }
 
 class ExprIdent : Expr {
-        Token* id;
-        this(Token* id) {
+        string name;
+        this(string name) {
                 super(ExprType.Ident);
-                this.id = id;
+                this.name = name;
         }
 }
 
 class ExprMut : Expr {
-        Expr l;
-        Token* eqty;
-        Expr r;
-        this(Expr l, Token* eqty, Expr r) {
+        Expr left;
+        string op;
+        Expr right;
+        this(Expr left, string op, Expr right) {
                 super(ExprType.Mut);
-                this.l = l;
-                this.eqty = eqty;
-                this.r = r;
+                this.left = left;
+                this.op = op;
+                this.right = right;
         }
 }
 
 class ExprProcCall : Expr {
-        Expr l;
-        Expr[] exprs;
-        this(Expr l, Expr[] exprs) {
+        Expr call;
+        Expr[] args;
+        this(Expr call, Expr[] args) {
                 super(ExprType.ProcCall);
-                this.l = l;
-                this.exprs = exprs;
+                this.call = call;
+                this.args = args;
         }
 }
 
-class ExprStructInst : Expr {
-        Token* structId;
-        Token*[] structMemIds;
-        Expr[] structMemExprs;
-        Program* program;
+class ExprStructLit : Expr {
+        string structName;
+        FieldInit[] fields;
+        this(string structName, FieldInit[] fields) {
+                super(ExprType.StructLit);
+                this.structName = structName;
+                this.fields = fields;
+        }
+}
 
-        this(Token* structId, Token*[] structMemIds, Expr[] structMemExprs, Program* program) {
-                super(ExprType.StructInst);
-                this.structId = structId;
-                this.structMemIds = structMemIds;
-                this.structMemExprs = structMemExprs;
-                this.program = program;
+class FieldInit {
+        string name;
+        Expr expr;
+        this(string name, Expr expr) {
+                this.name = name;
+                this.expr = expr;
         }
 }
 
@@ -156,11 +164,11 @@ enum StmtType {
 }
 
 class Stmt {
-        StmtType ty;
+        StmtType kind;
         void function(Stmt e, Visitor* v) accept;
-        this(StmtType ty) {
-                this.ty = ty;
-                switch (this.ty) {
+        this(StmtType kind) {
+                this.kind = kind;
+                switch (this.kind) {
                 case StmtType.Let:    this.accept = &acceptStmtLet;    break;
                 case StmtType.Expr:   this.accept = &acceptStmtExpr;   break;
                 case StmtType.Proc:   this.accept = &acceptStmtProc;   break;
@@ -178,67 +186,41 @@ class Stmt {
 }
 
 class StmtStruct : Stmt {
-        Token* id;
-        Token*[] members;
-        RuntimeType*[] memberTypes;
-        size_t[] memberOffsets;
-        size_t size;
-
-        this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
+        string name;
+        FieldDecl[] fields;
+        this(string name, FieldDecl[] fields) {
                 super(StmtType.Struct);
-                this.id = id;
-                this.members = members;
-                this.memberTypes = memberTypes;
-                this.memberOffsets = [];
-                size_t off = 0;
-                for (size_t i = 0; i < memberTypes.length; ++i) {
-                        this.memberOffsets ~= off;
-                        off += getTypeSize(memberTypes[i]);
-                }
-                this.size = off;
+                this.name = name;
+                this.fields = fields;
         }
 }
 
-// class StmtStruct : Stmt {
-//         Token* id;
-//         Token*[] members;
-//         RuntimeType*[] memberTypes;
-//         size_t[] memberOffsets;
-//         size_t size;
-
-//         this(Token* id, Token*[] members, RuntimeType*[] memberTypes) {
-//                 super(StmtType.Struct);
-//                 this.id = id;
-//                 this.members = members;
-//                 this.memberTypes = memberTypes;
-//                 for (size_t i = 0; i < memberTypes.length; ++i) {
-//                         size_t off = 0;
-//                         if (i != 0) {
-//                                 off = this.memberOffsets[i-1];
-//                         }
-//                         this.memberOffsets ~= getTypeSize(memberTypes[i]) + off;
-//                         this.size += this.memberOffsets[i] - off;
-//                 }
-//         }
-// }
+class FieldDecl {
+        string name;
+        Type type;
+        this(string name, Type type) {
+                this.name = name;
+                this.type = type;
+        }
+}
 
 class StmtLet : Stmt {
-        Token* id;
-        RuntimeType* t;
-        Expr e;
-        this(Token* id, RuntimeType* t, Expr e) {
+        string name;
+        Type type;
+        Expr expr;
+        this(string name, Type type, Expr expr) {
                 super(StmtType.Let);
-                this.id = id;
-                this.t = t;
-                this.e = e;
+                this.name = name;
+                this.type = type;
+                this.expr = expr;
         }
 }
 
 class StmtExpr : Stmt {
-        Expr e;
-        this(Expr e) {
+        Expr expr;
+        this(Expr expr) {
                 super(StmtType.Expr);
-                this.e = e;
+                this.expr = expr;
         }
 }
 
@@ -250,83 +232,96 @@ class StmtBlock : Stmt {
         }
 }
 
-class StmtProc : Stmt {
-        Token* id;
-        RuntimeType* rtype;
-        Token*[] pn;
-        RuntimeType*[] pt;
-        bool variadic = false;
-        StmtBlock b;
-        bool isExport;
+class Param {
+        string name;
+        Type type;
+        this(string name, Type type) {
+                this.name = name;
+                this.type = type;
+        }
+}
 
-        this(Token* id, RuntimeType* rtype, Token*[] pn, RuntimeType*[] pt, bool variadic, StmtBlock b, bool isExport) {
+class StmtProc : Stmt {
+        string name;
+        Param[] params;
+        bool variadic;
+        Type returnType;
+        StmtBlock block;
+        bool isExport;
+        this(string name, Param[] params, bool variadic, Type returnType, StmtBlock block, bool isExport) {
                 super(StmtType.Proc);
-                this.id = id;
-                this.rtype = rtype;
-                this.pn = pn;
-                this.pt = pt;
+                this.name = name;
+                this.params = params;
                 this.variadic = variadic;
-                this.b = b;
+                this.returnType = returnType;
+                this.block = block;
                 this.isExport = isExport;
         }
 }
 
 class StmtReturn : Stmt {
-        Expr e;
-        this(Expr e) {
+        Expr expr;
+        this(Expr expr) {
                 super(StmtType.Return);
-                this.e = e;
+                this.expr = expr;
         }
 }
 
 class StmtExtern : Stmt {
-        StmtProc proto;
-        this(StmtProc proto) {
+        string name;
+        Param[] params;
+        bool variadic;
+        Type returnType;
+        this(string name, Param[] params, bool variadic, Type returnType) {
                 super(StmtType.Extern);
-                this.proto = proto;
+                this.name = name;
+                this.params = params;
+                this.variadic = variadic;
+                this.returnType = returnType;
         }
 }
 
 class StmtIf : Stmt {
-        Expr e;
+        Expr expr;
         Stmt then;
-        Stmt else_; // optional
-
-        this(Expr e, Stmt then, Stmt else_) {
+        Stmt else_; // can be null
+        this(Expr expr, Stmt then, Stmt else_) {
                 super(StmtType.If);
-                this.e = e;
+                this.expr = expr;
                 this.then = then;
                 this.else_ = else_;
         }
 }
 
 class StmtWhile : Stmt {
-        Expr e;
-        Stmt s;
-        this(Expr e, Stmt s) {
+        Expr expr;
+        Stmt stmt;
+        this(Expr expr, Stmt stmt) {
                 super(StmtType.While);
-                this.e = e;
-                this.s = s;
+                this.expr = expr;
+                this.stmt = stmt;
         }
 }
 
 class StmtMod : Stmt {
-        Token* id;
-        this(Token* id) {
+        string name;
+        this(string name) {
                 super(StmtType.Mod);
-                this.id = id;
+                this.name = name;
         }
 }
 
 class StmtImport : Stmt {
-        Token* id;
-        this(Token* id) {
+        string name;
+        this(string name) {
                 super(StmtType.Import);
-                this.id = id;
+                this.name = name;
         }
 }
 
 struct Program {
         Stmt[] stmts;
-        StmtMod mod;
+        this(Stmt[] stmts) {
+                this.stmts = stmts;
+        }
 }
