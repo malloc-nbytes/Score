@@ -168,7 +168,6 @@ void acceptStmtImport(Stmt s, Visitor* v) {
 
 void visitExprMember(Visitor* v, ExprMember e) {
         e.left.accept(e.left, v);
-        e.right.accept(e.right, v);
 }
 
 void visitExprStructLit(Visitor* v, ExprStructLit e) {

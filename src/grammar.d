@@ -52,8 +52,10 @@ class Expr {
 
 class ExprMember: Expr {
         Expr left;
-        Expr right;
-        this(Expr left, Expr right) {
+        // Expr right;
+        string right;
+        // this(Expr left, Expr right) {
+        this(Expr left, string right) {
                 super(ExprType.Member);
                 this.left = left;
                 this.right = right;

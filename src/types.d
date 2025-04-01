@@ -66,9 +66,11 @@ class StructType : Type {
 class ProcType : Type {
         Type returnType;
         Type[] paramTypes;
-        this(Type returnType, Type[] paramTypes, size_t size) {
+        bool variadic;
+        this(Type returnType, Type[] paramTypes, bool variadic, size_t size) {
                 super(TypeKind.Proc, size, "Proc");
                 this.returnType = returnType;
                 this.paramTypes = paramTypes;
+                this.variadic = variadic;
         }
 }

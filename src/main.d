@@ -22,6 +22,20 @@ void usage() {
         writeln("    ", FLAG_2HYPH_NO_CLEANUP, ", ", FLAG_1HYPH_NO_CLEANUP, "   do not clean up files generated");
         exit(0);
 }
+        // for (size_t i = 0; i < p.stmts.length; ++i) {
+        //         if (p.stmts[i].kind == StmtType.Proc) {
+        //                 auto proc = cast(StmtProc)p.stmts[i];
+        //                 for (size_t j = 0; j < proc.block.stmts.length; ++j) {
+        //                         if (proc.block.stmts[j].kind == StmtType.Expr) {
+        //                                 auto e = (cast(StmtExpr)proc.block.stmts[j]).expr;
+        //                                 auto mem = cast(ExprMember)e;
+        //                                 auto left = mem.left;
+        //                                 auto right = mem.right;
+        //                                 writeln((cast(ExprIdent)left).name, ' ', (cast(ExprIdent)right).name);
+        //                         }
+        //                 }
+        //         }
+        // }
 
 int main(string[] args) {
         if (args.length < 2) {
@@ -34,16 +48,8 @@ int main(string[] args) {
         const string src = readText(fp);
         Lexer l = lexFile(src, fp);
         Program p = parseProgram(&l);
-        semanticAnalyze(p);
 
-        for (size_t i = 0; i < p.stmts.length; ++i) {
-                if (p.stmts[i].kind == StmtType.Let) {
-                        // StructType t = (cast(StructType)(cast(StmtLet)p.stmts[i]).expr.type);
-                        // foreach (f; t.fields) {
-                        //         writeln(f.type.name);
-                        // }
-                }
-        }
+        semanticAnalyze(p);
 
         return 0;
 }

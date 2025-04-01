@@ -111,7 +111,9 @@ bool isTypeCompatible(Type t1, Type t2) {
 
                 final switch (t1.kind) {
                 case TypeKind.Primitive:
-                        return (cast(PrimitiveType)t1).name == (cast(PrimitiveType)t2).name;
+                        string t1n = (cast(PrimitiveType)t1).name;
+                        string t2n = (cast(PrimitiveType)t2).name;
+                        return t1n == t2n;
                 case TypeKind.Ptr:
                         return isTypeCompatible((cast(Ptr)t1).to, (cast(Ptr)t2).to);
                 case TypeKind.Struct:
@@ -141,19 +143,42 @@ void visitStmtStruct(Visitor* v, StmtStruct s) {
 void visitStmtLet(Visitor* v, StmtLet s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
 
-        // Type check the initializer
-        s.expr.accept(s.expr, v);
+        s.expr.accept(s.expr, v);  // Populates s.expr.type
+
+        // If s.type is provided (e.g., from parser), verify it against the scope
+        if (s.type) {
+                Symbol sym = ana.currentScope.lookup(s.type.name);
+                if (sym && sym.type.kind == TypeKind.Struct) {
+                        s.type = sym.type;  // Use the StructType from the scope (with fields)
+                }
+        } else if (s.expr.type) {
+                s.type = s.expr.type;  // Infer from expression if no explicit type
+        }
+
         if (s.type && s.expr.type && !isTypeCompatible(s.type, s.expr.type)) {
                 err(format("type mismatch in let: expected %s, got %s", s.type.name, s.expr.type.name));
         }
-        // If no explicit type, infer from expr
-        if (!s.type && s.expr.type) {
-                s.type = s.expr.type;
-        }
-        ana.currentScope.addSymbol(new Symbol(s.name, s.type, ana.currentScope));
 
+        ana.currentScope.addSymbol(new Symbol(s.name, s.type, ana.currentScope));
         ana.programIR.add(Instruction(OpCode.Store, "@" ~ s.name, [s.expr.temp]));
 }
+
+// void visitStmtLet(Visitor* v, StmtLet s) {
+//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
+//         // Type check the initializer
+//         s.expr.accept(s.expr, v);
+//         if (s.type && s.expr.type && !isTypeCompatible(s.type, s.expr.type)) {
+//                 err(format("type mismatch in let: expected %s, got %s", s.type.name, s.expr.type.name));
+//         }
+//         // If no explicit type, infer from expr
+//         if (!s.type && s.expr.type) {
+//                 s.type = s.expr.type;
+//         }
+//         ana.currentScope.addSymbol(new Symbol(s.name, s.type, ana.currentScope));
+
+//         ana.programIR.add(Instruction(OpCode.Store, "@" ~ s.name, [s.expr.temp]));
+// }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
@@ -163,7 +188,7 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         foreach (param; s.params) {
                 paramTypes ~= param.type;
         }
-        Type procType = new ProcType(s.returnType, paramTypes, 8);  // 8 for function pointer
+        Type procType = new ProcType(s.returnType, paramTypes, s.variadic, 8);  // 8 for function pointer
         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
 
         ana.programIR.add(Instruction(OpCode.Label, s.name, []));
@@ -186,7 +211,7 @@ void visitStmtExtern(Visitor* v, StmtExtern s) {
         foreach (param; s.params) {
                 paramTypes ~= param.type;
         }
-        Type procType = new ProcType(s.returnType, paramTypes, 8);
+        Type procType = new ProcType(s.returnType, paramTypes, s.variadic, 8);
         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
 }
 
@@ -271,23 +296,22 @@ void visitStmtImport(Visitor* v, StmtImport s) {
 }
 
 // Expression Visitors
+
 void visitExprMember(Visitor* v, ExprMember e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-        e.left.accept(e.left, v);
-        e.right.accept(e.right, v);
+
+        e.left.accept(e.left, v);  // Resolve 'p' to its type and temp
         if (!e.left.type || e.left.type.kind != TypeKind.Struct) {
                 err("member access requires a struct type");
         }
         StructType structType = cast(StructType)e.left.type;
-        if (e.right.kind != ExprType.Ident) {
-                err("member name must be an identifier");
-        }
-        string fieldName = (cast(ExprIdent)e.right).name;
+        string fieldName = e.right;
         foreach (field; structType.fields) {
                 if (field.name == fieldName) {
                         e.type = field.type;
                         e.temp = ana.newTmp();
-                        ana.programIR.add(Instruction(OpCode.Load, e.temp, [format("%s + %d", e.left.temp, field.offset)]));
+                        ana.programIR.add(Instruction(OpCode.Load, e.temp,
+                                                      [format("%s + %d", e.left.temp, field.offset)]));
                         return;
                 }
         }
@@ -342,7 +366,7 @@ void visitExprBin(Visitor* v, ExprBin e) {
         case "/": ana.programIR.add(Instruction(OpCode.Div, e.temp, [e.left.temp, e.right.temp])); break;
         case "==":
                 e.type = new PrimitiveType("bool", 1);
-                ana.programIR.add(Instruction(OpCode.Eq, e.temp, [e.left.temp, e.right.temp])); 
+                ana.programIR.add(Instruction(OpCode.Eq, e.temp, [e.left.temp, e.right.temp]));
                 break;
         default: err(format("unsupported binary operator '%s'", e.op));
         }
@@ -448,7 +472,7 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
                 err("call target must be a procedure");
         }
         ProcType procType = cast(ProcType)e.call.type;
-        if (procType.paramTypes.length != e.args.length) {
+        if (procType.paramTypes.length != e.args.length && !procType.variadic) {
                 err(format("argument count mismatch: expected %d, got %d",
                            procType.paramTypes.length, e.args.length));
         }

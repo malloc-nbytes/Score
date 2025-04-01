@@ -143,11 +143,12 @@ private Expr parseMemberExpr(Lexer* l) {
         Token* cur = lexerPeek(l);
         while (cur && cur.ty == TokenType.Period) {
                 lexerDiscard(l); // .
-                Expr rhs = parsePrimaryExpr(l); // Right side should be an identifier or struct instantiation
-                if (rhs is null) {
-                        err(tokerrToStr(cur) ~ "Expected identifier or struct instantiation after '.'");
-                }
-                lhs = new ExprMember(lhs, rhs);
+                // Expr rhs = parsePrimaryExpr(l); // Right side should be an identifier or struct instantiation
+                // if (rhs is null) {
+                //         err(tokerrToStr(cur) ~ "Expected identifier or struct instantiation after '.'");
+                // }
+                // lhs = new ExprMember(lhs, rhs);
+                lhs = new ExprMember(lhs, expect(l, TokenType.Ident).lx.idup);
 
                 // Check for procedure call after member access (e.g., p.f())
                 cur = lexerPeek(l);
@@ -376,11 +377,39 @@ private StmtReturn parseStmtReturn(Lexer* l) {
 }
 
 private StmtExtern parseStmtExtern(Lexer* l) {
-        assert(0);
+        lexerDiscard(l); // proc
+        string name = expect(l, TokenType.Ident).lx.idup;
+        bool variadic = false;
+        Param[] params = parseProcParams(l, &variadic);
+        cast(void)expect(l, TokenType.Colon);
+        Type returnType = parseType(l);
+        cast(void)expect(l, TokenType.SemiColon);
+        return new StmtExtern(name, params, variadic, returnType);
 }
 
 private StmtIf parseStmtIf(Lexer* l) {
-        assert(0);
+        lexerDiscard(l); // if
+
+        Expr e = parseExpr(l);
+        Stmt then = parseStmt(l);
+        Stmt else_ = null;
+
+        Token *t1 = lexerPeek(l);
+        Token *t2 = lexerPeek(l);
+
+        bool t1_else = t1 && t1.ty == TokenType.Keyword && t1.lx == Keyword.Else;
+        bool t2_if = t2 && t2.ty == TokenType.Keyword && t2.lx == Keyword.If;
+
+        if (t1_else && t2_if) {
+                lexerDiscard(l); // else
+                else_ = parseStmtIf(l);
+        }
+        else if (t1_else) {
+                lexerDiscard(l); // else
+                else_ = parseStmt(l);
+        }
+
+        return new StmtIf(e, then, else_);
 }
 
 private StmtWhile parseStmtWhile(Lexer* l) {
