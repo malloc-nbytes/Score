@@ -2,8 +2,12 @@ module semantic;
 
 import std.format;
 import std.stdio;
+import std.conv;
+import std.algorithm;
+import std.array;
 
 import types;
+import ir;
 import grammar;
 import visitor;
 import utils;
@@ -45,12 +49,19 @@ class Scope {
 class SemanticAnalyzer {
         Scope globalScope;
         Scope currentScope;
+        ProgramIR programIR;
+        int tmpCount;
 
         this() {
                 globalScope = new Scope(null);
                 currentScope = globalScope;
+                programIR = ProgramIR();
+                tmpCount = 0;
         }
 
+        string newTmp() {
+                return format("t%d", tmpCount++);
+        }
 }
 
 void semanticAnalyze(Program p) {
@@ -58,6 +69,11 @@ void semanticAnalyze(Program p) {
         Visitor v = createVisitor(s);
         foreach (stmt; p.stmts) {
                 stmt.accept(stmt, &v);
+        }
+
+        // Debugging
+        foreach (instr; s.programIR.instructions) {
+                stderr.writefln("%s %s, %s", instr.op, instr.result, instr.operands);
         }
 }
 
@@ -114,8 +130,6 @@ bool isTypeCompatible(Type t1, Type t2) {
 
 void visitStmtStruct(Visitor* v, StmtStruct s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-
-        // Define the struct type with its fields
         Field[] fields;
         foreach (fieldDecl; s.fields) {
                 fields ~= new Field(fieldDecl.name, fieldDecl.type);
@@ -137,6 +151,8 @@ void visitStmtLet(Visitor* v, StmtLet s) {
                 s.type = s.expr.type;
         }
         ana.currentScope.addSymbol(new Symbol(s.name, s.type, ana.currentScope));
+
+        ana.programIR.add(Instruction(OpCode.Store, "@" ~ s.name, [s.expr.temp]));
 }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
@@ -150,11 +166,14 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         Type procType = new ProcType(s.returnType, paramTypes, 8);  // 8 for function pointer
         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
 
+        ana.programIR.add(Instruction(OpCode.Label, s.name, []));
+
         // Analyze body in a new scope
         Scope oldScope = ana.currentScope;
         ana.currentScope = new Scope(ana.currentScope);
-        foreach (param; s.params) {
+        foreach (i, param; s.params) {
                 ana.currentScope.addSymbol(new Symbol(param.name, param.type, ana.currentScope));
+                ana.programIR.add(Instruction(OpCode.Param, param.name, [format("param%d", i)]));
         }
         s.block.accept(s.block, v);
         ana.currentScope = oldScope;
@@ -183,19 +202,59 @@ void visitStmtBlock(Visitor* v, StmtBlock s) {
 }
 
 void visitStmtReturn(Visitor* v, StmtReturn s) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         s.expr.accept(s.expr, v);
         // Return type checked in StmtProc context (not here)
+        ana.programIR.add(Instruction(OpCode.Return, "", [s.expr.temp]));
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
         s.expr.accept(s.expr, v);
+        string thenLbl = ana.newTmp() ~ "_then";
+        string endLbl = ana.newTmp() ~ "_end";
+
+        // IR: Check condition and jump
+        ana.programIR.add(Instruction(OpCode.Eq, ana.newTmp(), [s.expr.temp, "1"]));
+        string condTemp = ana.programIR.instructions[$-1].result;
+        ana.programIR.add(Instruction(OpCode.JumpIf, thenLbl, [condTemp]));
+        ana.programIR.add(Instruction(OpCode.Jump, endLbl, []));
+
+        // Then branch
+        ana.programIR.add(Instruction(OpCode.Label, thenLbl, []));
         s.then.accept(s.then, v);
-        if (s.else_) s.else_.accept(s.else_, v);
+
+        if (s.else_) {
+                string elseLbl = ana.newTmp() ~ "_else";
+                // Update the previous jump to go to else instead of end
+                ana.programIR.instructions[$-2] = Instruction(OpCode.Jump, elseLbl, []); // Replace Jump to endLabel
+                ana.programIR.add(Instruction(OpCode.Label, elseLbl, []));
+                s.else_.accept(s.else_, v);
+        }
+
+        ana.programIR.add(Instruction(OpCode.Label, endLbl, []));
 }
 
 void visitStmtWhile(Visitor* v, StmtWhile s) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
+        string loopLbl = ana.newTmp() ~ "_loop";
+        string endLbl = ana.newTmp() ~ "_end";
+
+        // IR: Loop start
+        ana.programIR.add(Instruction(OpCode.Label, loopLbl, []));
         s.expr.accept(s.expr, v);
+        ana.programIR.add(Instruction(OpCode.Eq, ana.newTmp(), [s.expr.temp, "1"]));  // Check condition
+        string condTemp = ana.programIR.instructions[$-1].result;
+        ana.programIR.add(Instruction(OpCode.JumpIfNot, endLbl, [condTemp]));
+
+        // Loop body
         s.stmt.accept(s.stmt, v);
+        ana.programIR.add(Instruction(OpCode.Jump, loopLbl, []));
+
+        // Loop end
+        ana.programIR.add(Instruction(OpCode.Label, endLbl, []));
 }
 
 void visitStmtExpr(Visitor* v, StmtExpr s) {
@@ -203,15 +262,17 @@ void visitStmtExpr(Visitor* v, StmtExpr s) {
 }
 
 void visitStmtMod(Visitor* v, StmtMod s) {
-        // Module name doesn’t need type checking yet
+        return;
 }
 
 void visitStmtImport(Visitor* v, StmtImport s) {
         // Imports handled later (e.g., linking phase)
+        return;
 }
 
 // Expression Visitors
 void visitExprMember(Visitor* v, ExprMember e) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         e.left.accept(e.left, v);
         e.right.accept(e.right, v);
         if (!e.left.type || e.left.type.kind != TypeKind.Struct) {
@@ -225,6 +286,8 @@ void visitExprMember(Visitor* v, ExprMember e) {
         foreach (field; structType.fields) {
                 if (field.name == fieldName) {
                         e.type = field.type;
+                        e.temp = ana.newTmp();
+                        ana.programIR.add(Instruction(OpCode.Load, e.temp, [format("%s + %d", e.left.temp, field.offset)]));
                         return;
                 }
         }
@@ -241,6 +304,9 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
         StructType structType = cast(StructType)sym.type;
         e.type = structType;
 
+        string structTemp = ana.newTmp();
+        ana.programIR.add(Instruction(OpCode.Alloc, structTemp, [structType.size.to!string]));
+
         // Check field initializers
         foreach (init; e.fields) {
                 init.expr.accept(init.expr, v);
@@ -250,23 +316,41 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
                                         err(format("type mismatch for field '%s': expected %s, got %s",
                                                    init.name, field.type.name, init.expr.type.name));
                                 }
+                                ana.programIR.add(Instruction(OpCode.Store,
+                                                              format("%s + %d", structTemp, field.offset), [init.expr.temp]));
                                 break;
                         }
                 }
         }
+        e.temp = structTemp;
 }
 
 void visitExprBin(Visitor* v, ExprBin e) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
         e.left.accept(e.left, v);
         e.right.accept(e.right, v);
-        // TODO: Basic type checking (expand for operators)
         if (!isTypeCompatible(e.left.type, e.right.type)) {
                 err("binary op type mismatch");
         }
-        e.type = e.left.type;  // Simple assumption; refine per op
+        e.type = e.left.type;
+        e.temp = ana.newTmp();
+        switch (e.op) {
+        case "+": ana.programIR.add(Instruction(OpCode.Add, e.temp, [e.left.temp, e.right.temp])); break;
+        case "-": ana.programIR.add(Instruction(OpCode.Sub, e.temp, [e.left.temp, e.right.temp])); break;
+        case "*": ana.programIR.add(Instruction(OpCode.Mul, e.temp, [e.left.temp, e.right.temp])); break;
+        case "/": ana.programIR.add(Instruction(OpCode.Div, e.temp, [e.left.temp, e.right.temp])); break;
+        case "==":
+                e.type = new PrimitiveType("bool", 1);
+                ana.programIR.add(Instruction(OpCode.Eq, e.temp, [e.left.temp, e.right.temp])); 
+                break;
+        default: err(format("unsupported binary operator '%s'", e.op));
+        }
 }
 
 void visitExprUn(Visitor* v, ExprUn e) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
         e.expr.accept(e.expr, v);
         if (!e.expr.type) {
                 err("unary operand must have a type");
@@ -277,15 +361,20 @@ void visitExprUn(Visitor* v, ExprUn e) {
                         err("unary minus requires a primitive type");
                 }
                 e.type = e.expr.type;  // Same type as operand
+                e.temp = ana.newTmp();
+                ana.programIR.add(Instruction(OpCode.Sub, e.temp, ["0", e.expr.temp]));
                 break;
         case "*":  // Dereference
                 if (e.expr.type.kind != TypeKind.Ptr) {
                         err("dereference requires a pointer type");
                 }
                 e.type = (cast(Ptr)e.expr.type).to;
+                e.temp = ana.newTmp();
+                ana.programIR.add(Instruction(OpCode.Load, e.temp, [e.expr.temp]));
                 break;
         case "&":  // Address-of
                 e.type = new Ptr(e.expr.type);
+                e.temp = e.expr.temp;
                 break;
         default:
                 err(format("unsupported unary operator '%s'", e.op));
@@ -293,12 +382,18 @@ void visitExprUn(Visitor* v, ExprUn e) {
 }
 
 void visitExprStrLit(Visitor* v, ExprStrLit e) {
-        // String literal as a pointer to char (or similar)
-        e.type = new Ptr(new PrimitiveType("char", 1));  // Assuming char is 1 byte
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+        // String literal as a pointer to char
+        e.type = new Ptr(new PrimitiveType("u8", 1));
+        e.temp = ana.newTmp();
+        ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.str]));
 }
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         e.type = new PrimitiveType("i32", 4);  // Default to 32-bit integer
+        e.temp = ana.newTmp();
+        ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.num.to!string]));
 }
 
 void visitExprIdent(Visitor* v, ExprIdent e) {
@@ -308,14 +403,20 @@ void visitExprIdent(Visitor* v, ExprIdent e) {
                 err(format("undefined identifier '%s'", e.name));
         }
         e.type = sym.type;
+        e.temp = ana.newTmp();
+        ana.programIR.add(Instruction(OpCode.Load, e.temp, ["@" ~ e.name]));
 }
 
 void visitExprMut(Visitor* v, ExprMut e) {
+        SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+
         e.left.accept(e.left, v);
         e.right.accept(e.right, v);
+
         if (!e.left.type || !e.right.type) {
                 err("mutation operands must have types");
         }
+
         switch (e.op) {
         case "=":
                 if (!isTypeCompatible(e.left.type, e.right.type)) {
@@ -325,7 +426,11 @@ void visitExprMut(Visitor* v, ExprMut e) {
                 if (e.left.kind != ExprType.Ident && e.left.kind != ExprType.Member) {
                         err("left side of assignment must be an l-value");
                 }
+                string target = (e.left.kind == ExprType.Ident) ?
+                        "@" ~ (cast(ExprIdent)e.left).name : e.left.temp;
+                ana.programIR.add(Instruction(OpCode.Store, target, [e.right.temp]));
                 e.type = e.left.type;  // Type of the assignment expression is the left type
+                e.temp = e.right.temp;
                 break;
         default:
                 err(format("unsupported mutation operator '%s'", e.op));
@@ -354,4 +459,7 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
                 }
         }
         e.type = procType.returnType;
+        e.temp = ana.newTmp();
+        string[] operands = [(cast(ExprIdent)e.call).name] ~ e.args.map!(a => a.temp).array;
+        ana.programIR.add(Instruction(OpCode.Call, e.temp, operands));
 }

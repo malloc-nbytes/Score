@@ -29,10 +29,12 @@ enum ExprType {
 class Expr {
         ExprType kind;
         Type type;
+        string temp;
         void function(Expr e, Visitor* v) accept;
         this(ExprType kind) {
                 this.kind = kind;
                 this.type = null;
+                this.temp = null;
                 switch (this.kind) {
                 case ExprType.Bin:        this.accept = &acceptExprBin;        break;
                 case ExprType.Un:         this.accept = &acceptExprUn;         break;

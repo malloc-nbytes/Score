@@ -11,6 +11,7 @@ import parser;
 import visitor;
 import flag;
 import semantic;
+import types;
 
 void usage() {
         writeln("Usage: scr [paths...] [options...]");
@@ -34,6 +35,15 @@ int main(string[] args) {
         Lexer l = lexFile(src, fp);
         Program p = parseProgram(&l);
         semanticAnalyze(p);
+
+        for (size_t i = 0; i < p.stmts.length; ++i) {
+                if (p.stmts[i].kind == StmtType.Let) {
+                        // StructType t = (cast(StructType)(cast(StmtLet)p.stmts[i]).expr.type);
+                        // foreach (f; t.fields) {
+                        //         writeln(f.type.name);
+                        // }
+                }
+        }
 
         return 0;
 }
