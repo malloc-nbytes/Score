@@ -17,6 +17,10 @@ enum OpCode {
         Jump,
         JumpIf,
         JumpIfNot,
+        Push,
+        Pop,
+        Mov,
+        Lea,
 }
 
 struct Instruction {

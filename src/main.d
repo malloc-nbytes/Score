@@ -12,6 +12,8 @@ import visitor;
 import flag;
 import semantic;
 import types;
+import codegen;
+import ir;
 
 void usage() {
         writeln("Usage: scr [paths...] [options...]");
@@ -22,20 +24,6 @@ void usage() {
         writeln("    ", FLAG_2HYPH_NO_CLEANUP, ", ", FLAG_1HYPH_NO_CLEANUP, "   do not clean up files generated");
         exit(0);
 }
-        // for (size_t i = 0; i < p.stmts.length; ++i) {
-        //         if (p.stmts[i].kind == StmtType.Proc) {
-        //                 auto proc = cast(StmtProc)p.stmts[i];
-        //                 for (size_t j = 0; j < proc.block.stmts.length; ++j) {
-        //                         if (proc.block.stmts[j].kind == StmtType.Expr) {
-        //                                 auto e = (cast(StmtExpr)proc.block.stmts[j]).expr;
-        //                                 auto mem = cast(ExprMember)e;
-        //                                 auto left = mem.left;
-        //                                 auto right = mem.right;
-        //                                 writeln((cast(ExprIdent)left).name, ' ', (cast(ExprIdent)right).name);
-        //                         }
-        //                 }
-        //         }
-        // }
 
 int main(string[] args) {
         if (args.length < 2) {
@@ -49,7 +37,8 @@ int main(string[] args) {
         Lexer l = lexFile(src, fp);
         Program p = parseProgram(&l);
 
-        semanticAnalyze(p);
+        ProgramIR ir = semanticAnalyze(p);
+        generateAssembly(ir, "input.out");
 
         return 0;
 }
