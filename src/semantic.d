@@ -502,11 +502,22 @@ void visitExprUn(Visitor* v, ExprUn e) {
 
 void visitExprStrLit(Visitor* v, ExprStrLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-        // String literal as a pointer to char
-        e.type = new Ptr(new PrimitiveType("u8", 1));
+        e.type = new Ptr(new PrimitiveType("u8", 1));  // Pointer to u8
         e.temp = ana.newTmp();
-        ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.str]));
+
+        // Generate a unique label for the string
+        string strLabel = format("str%d", ana.tmpCount);  // Use tmpCount for uniqueness
+        ana.programIR.add(Instruction(OpCode.StrLit, strLabel, [e.str]));  // New opcode for string literals
+        ana.programIR.add(Instruction(OpCode.Lea, e.temp, [strLabel]));    // Load address of string
 }
+
+// void visitExprStrLit(Visitor* v, ExprStrLit e) {
+//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+//         // String literal as a pointer to char
+//         e.type = new Ptr(new PrimitiveType("u8", 1));
+//         e.temp = ana.newTmp();
+//         ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.str]));
+// }
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
@@ -523,9 +534,26 @@ void visitExprIdent(Visitor* v, ExprIdent e) {
         }
         e.type = sym.type;
         e.temp = ana.newTmp();
-        // Load from stack address
-        ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
+        // Load the value, not the address, for scalar types
+        if (sym.type.kind == TypeKind.Primitive) {
+                ana.programIR.add(Instruction(OpCode.Load, e.temp, [format("[rbp - %d]", sym.address)]));
+        } else {
+                // For structs or pointers, load the address
+                ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
+        }
 }
+
+// void visitExprIdent(Visitor* v, ExprIdent e) {
+//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+//         Symbol sym = ana.currentScope.lookup(e.name);
+//         if (!sym) {
+//                 err(format("undefined identifier '%s'", e.name));
+//         }
+//         e.type = sym.type;
+//         e.temp = ana.newTmp();
+//         // Load from stack address
+//         ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
+// }
 
 // void visitExprIdent(Visitor* v, ExprIdent e) {
 //         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;

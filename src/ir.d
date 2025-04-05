@@ -21,6 +21,7 @@ enum OpCode {
         Pop,
         Mov,
         Lea,
+        StrLit,
 }
 
 struct Instruction {
