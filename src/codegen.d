@@ -9,6 +9,7 @@ import ir;
 void generateAssembly(ProgramIR programIR, string outputFile) {
         File f = File(outputFile, "w");
 
+        f.writeln("section .note.GNU-stack");
         f.writeln("section .text");
         f.writeln("global main");
         f.writeln("extern printf");

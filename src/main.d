@@ -38,7 +38,7 @@ int main(string[] args) {
         Program p = parseProgram(&l);
 
         ProgramIR ir = semanticAnalyze(p);
-        generateAssembly(ir, "input.out");
+        generateAssembly(ir, "input.asm");
 
         return 0;
 }

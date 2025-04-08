@@ -158,7 +158,7 @@ void visitStmtStruct(Visitor* v, StmtStruct s) {
 void visitStmtLet(Visitor* v, StmtLet s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
 
-        s.expr.accept(s.expr, v);
+        s.expr.accept(s.expr, v);  // Populates s.expr.type and s.expr.temp
 
         if (s.type) {
                 Symbol sym = ana.currentScope.lookup(s.type.name);
@@ -173,38 +173,32 @@ void visitStmtLet(Visitor* v, StmtLet s) {
                 err(format("type mismatch in let: expected %s, got %s", s.type.name, s.expr.type.name));
         }
 
-        // Allocate stack space
         size_t offset = ana.allocStack(s.type.size);
         Symbol sym = new Symbol(s.name, s.type, ana.currentScope);
-        sym.address = offset;  // Store stack offset
+        sym.address = offset;
         ana.currentScope.addSymbol(sym);
 
-        // Store the expression result at the stack location
-        ana.programIR.add(Instruction(OpCode.Store, format("[rbp - %d]", offset), [s.expr.temp]));
+        if (s.expr.kind == ExprType.StructLit) {
+                // For struct literals, allocate and initialize directly
+                string structTemp = ana.newTmp();
+                ana.programIR.add(Instruction(OpCode.Lea, structTemp, [format("[rbp - %d]", offset)]));
+                ExprStructLit structLit = cast(ExprStructLit)s.expr;
+                foreach (init; structLit.fields) {
+                        init.expr.accept(init.expr, v);  // Revisit to get field values
+                        foreach (field; (cast(StructType)s.type).fields) {
+                                if (field.name == init.name) {
+                                        ana.programIR.add(Instruction(OpCode.Store,
+                                                                      format("%s + %d", structTemp, field.offset), [init.expr.temp]));
+                                        break;
+                                }
+                        }
+                }
+                s.expr.temp = structTemp;  // Update temp to point to the actual location
+        } else {
+                // For non-struct expressions (e.g., p.x)
+                ana.programIR.add(Instruction(OpCode.Store, format("[rbp - %d]", offset), [s.expr.temp]));
+        }
 }
-
-// void visitStmtLet(Visitor* v, StmtLet s) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-
-//         s.expr.accept(s.expr, v);  // Populates s.expr.type
-
-//         // If s.type is provided (e.g., from parser), verify it against the scope
-//         if (s.type) {
-//                 Symbol sym = ana.currentScope.lookup(s.type.name);
-//                 if (sym && sym.type.kind == TypeKind.Struct) {
-//                         s.type = sym.type;  // Use the StructType from the scope (with fields)
-//                 }
-//         } else if (s.expr.type) {
-//                 s.type = s.expr.type;  // Infer from expression if no explicit type
-//         }
-
-//         if (s.type && s.expr.type && !isTypeCompatible(s.type, s.expr.type)) {
-//                 err(format("type mismatch in let: expected %s, got %s", s.type.name, s.expr.type.name));
-//         }
-
-//         ana.currentScope.addSymbol(new Symbol(s.name, s.type, ana.currentScope));
-//         ana.programIR.add(Instruction(OpCode.Store, "@" ~ s.name, [s.expr.temp]));
-// }
 
 void visitStmtProc(Visitor* v, StmtProc s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
@@ -242,30 +236,6 @@ void visitStmtProc(Visitor* v, StmtProc s) {
 
         ana.currentScope = oldScope;
 }
-
-// void visitStmtProc(Visitor* v, StmtProc s) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-
-//         // Create procedure type
-//         Type[] paramTypes;
-//         foreach (param; s.params) {
-//                 paramTypes ~= param.type;
-//         }
-//         Type procType = new ProcType(s.returnType, paramTypes, s.variadic, 8);  // 8 for function pointer
-//         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
-
-//         ana.programIR.add(Instruction(OpCode.Label, s.name, []));
-
-//         // Analyze body in a new scope
-//         Scope oldScope = ana.currentScope;
-//         ana.currentScope = new Scope(ana.currentScope);
-//         foreach (i, param; s.params) {
-//                 ana.currentScope.addSymbol(new Symbol(param.name, param.type, ana.currentScope));
-//                 ana.programIR.add(Instruction(OpCode.Param, param.name, [format("param%d", i)]));
-//         }
-//         s.block.accept(s.block, v);
-//         ana.currentScope = oldScope;
-// }
 
 void visitStmtExtern(Visitor* v, StmtExtern s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
@@ -392,10 +362,8 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
         e.type = structType;
 
         string structTemp = ana.newTmp();
-        size_t offset = ana.allocStack(structType.size);
-        // Use stack address directly as temp
-        ana.programIR.add(Instruction(OpCode.Lea, structTemp, [format("[rbp - %d]", offset)]));
-
+        // Don’t allocate stack here; `visitStmtLet` will handle it
+        // Just prepare the field initializations
         foreach (init; e.fields) {
                 init.expr.accept(init.expr, v);
                 foreach (field; structType.fields) {
@@ -404,45 +372,13 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
                                         err(format("type mismatch for field '%s': expected %s, got %s",
                                                    init.name, field.type.name, init.expr.type.name));
                                 }
-                                ana.programIR.add(Instruction(OpCode.Store,
-                                                              format("%s + %d", structTemp, field.offset), [init.expr.temp]));
+                                // Store operations will be finalized in visitStmtLet
                                 break;
                         }
                 }
         }
-        e.temp = structTemp;
+        e.temp = structTemp;  // Temp placeholder; actual address set later
 }
-
-// void visitExprStructLit(Visitor* v, ExprStructLit e) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-
-//         Symbol sym = ana.currentScope.lookup(e.structName);
-//         if (!sym || sym.type.kind != TypeKind.Struct) {
-//                 err(format("unknown struct '%s'", e.structName));
-//         }
-//         StructType structType = cast(StructType)sym.type;
-//         e.type = structType;
-
-//         string structTemp = ana.newTmp();
-//         ana.programIR.add(Instruction(OpCode.Alloc, structTemp, [structType.size.to!string]));
-
-//         // Check field initializers
-//         foreach (init; e.fields) {
-//                 init.expr.accept(init.expr, v);
-//                 foreach (field; structType.fields) {
-//                         if (field.name == init.name) {
-//                                 if (!isTypeCompatible(field.type, init.expr.type)) {
-//                                         err(format("type mismatch for field '%s': expected %s, got %s",
-//                                                    init.name, field.type.name, init.expr.type.name));
-//                                 }
-//                                 ana.programIR.add(Instruction(OpCode.Store,
-//                                                               format("%s + %d", structTemp, field.offset), [init.expr.temp]));
-//                                 break;
-//                         }
-//                 }
-//         }
-//         e.temp = structTemp;
-// }
 
 void visitExprBin(Visitor* v, ExprBin e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
@@ -511,14 +447,6 @@ void visitExprStrLit(Visitor* v, ExprStrLit e) {
         ana.programIR.add(Instruction(OpCode.Lea, e.temp, [strLabel]));    // Load address of string
 }
 
-// void visitExprStrLit(Visitor* v, ExprStrLit e) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-//         // String literal as a pointer to char
-//         e.type = new Ptr(new PrimitiveType("u8", 1));
-//         e.temp = ana.newTmp();
-//         ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.str]));
-// }
-
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         e.type = new PrimitiveType("i32", 4);  // Default to 32-bit integer
@@ -542,29 +470,6 @@ void visitExprIdent(Visitor* v, ExprIdent e) {
                 ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
         }
 }
-
-// void visitExprIdent(Visitor* v, ExprIdent e) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-//         Symbol sym = ana.currentScope.lookup(e.name);
-//         if (!sym) {
-//                 err(format("undefined identifier '%s'", e.name));
-//         }
-//         e.type = sym.type;
-//         e.temp = ana.newTmp();
-//         // Load from stack address
-//         ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
-// }
-
-// void visitExprIdent(Visitor* v, ExprIdent e) {
-//         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-//         Symbol sym = ana.currentScope.lookup(e.name);
-//         if (!sym) {
-//                 err(format("undefined identifier '%s'", e.name));
-//         }
-//         e.type = sym.type;
-//         e.temp = ana.newTmp();
-//         ana.programIR.add(Instruction(OpCode.Load, e.temp, ["@" ~ e.name]));
-// }
 
 void visitExprMut(Visitor* v, ExprMut e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
