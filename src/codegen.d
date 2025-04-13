@@ -10,6 +10,8 @@ import visitor;
 import types;
 
 //=====================================================================================REGISTERS
+// calling order: rdi, rsi, rdx, rcx, r8, r9.
+
 // https://math.hws.edu/eck/cs220/f22/registers.html
 
 // 64 bit
@@ -122,12 +124,14 @@ class Context {
         int allocReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 4 || sz == 8);
-                const (Reg[]) regs = (sz == 4) ? gGenRegs32 : gGenRegs64;
+                const(Reg[]) regs = (sz == 4) ? gGenRegs32 : gGenRegs64;
                 for (int i = 0; i < cast(int)regs.length; ++i) {
-                        if (!(genRegs & (1 << i))) {
-                                genRegs |= (1 << i);
+                        int tmp = sz == 8 ? i+cast(int)gGenRegs32.length : i;
+                        if (!(genRegs & (1 << tmp))) {
+                                genRegs |= (1 << tmp);
                                 if (sz == 8) {
-                                        i += gGenRegs32.length;
+                                        // i += gGenRegs32.length;
+                                        i = tmp;
                                 }
                                 lastReg = i;
                                 return i;
@@ -136,16 +140,21 @@ class Context {
                 assert(0 && "out of registers");
         }
         int allocParamReg(size_t sz) {
+                // IMPORTANT: we do not want to set lastReg here
+                //            as it will conflict and mess up
+                //            the general purpose last used register.
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 4 || sz == 8);
-                const (Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
+                const(Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
                 for (int i = 0; i < cast(int)regs.length; ++i) {
-                        if (!(paramRegs & (1 << i))) {
-                                paramRegs |= (1 << i);
+                        int tmp = sz == 8 ? i+cast(int)gParamRegs32.length : i;
+                        if (!(paramRegs & (1 << tmp))) {
+                                paramRegs |= (1 << tmp);
                                 if (sz == 8) {
-                                        i += gParamRegs32.length;
+                                        // i += gParamRegs32.length;
+                                        i = tmp;
                                 }
-                                // lastReg = i;
+                                //lastReg = i;
                                 return i;
                         }
                 }
