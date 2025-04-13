@@ -135,7 +135,6 @@ class Context {
                 wrtln("mov rbp, rsp");
         }
         void epilogue() {
-                // wrtln(format("add rsp, %d", getStack()));
                 wrtln("mov rsp, rbp");
                 wrtln("pop rbp");
         }
@@ -163,7 +162,6 @@ private void visitStmtLet(Visitor* v, StmtLet s) {
         Context c = cast(Context)v.context;
         c.incrStack(s.type.size);
         s.expr.accept(s.expr, v);
-        //c.wrtln(format("sub rsp, %d", s.type.size));
         c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lastReg)));
         c.freeReg(c.lastReg);
 }

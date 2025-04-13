@@ -150,6 +150,10 @@ void visitStmtStruct(Visitor* v, StmtStruct s) {
 void visitStmtLet(Visitor* v, StmtLet s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
 
+        if (s.type.kind == TypeKind.Never) {
+                err(format("Type error in let: cannot be marked as `Never` (!)"));
+        }
+
         s.expr.accept(s.expr, v);  // Populates s.expr.type and s.expr.temp
 
         if (s.type) {
