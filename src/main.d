@@ -1,5 +1,6 @@
 import std.stdio;
-import std.file : readText, write, exists, remove;
+//import std.file : readText, write, exists, remove;
+import std.file : readText;
 import std.process : execute;
 import core.stdc.stdlib : exit;
 
@@ -33,11 +34,19 @@ int main(string[] args) {
 
         const string fp = "./input.scr";
         const string src = readText(fp);
+
+        write("lexing...\r"); stdout.flush();
         Lexer l = lexFile(src, fp);
+
+        write("parsing...\r"); stdout.flush();
         Program p = parseProgram(&l);
 
+        write("semantic...\r"); stdout.flush();
         SemanticAnalyzer ana = semanticAnalyze(p);
+
+        write("generating code...\r"); stdout.flush();
         gen(p, ana);
+        writeln("                    \r", fp, " ok");
 
         return 0;
 }

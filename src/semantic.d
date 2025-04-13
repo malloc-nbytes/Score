@@ -213,7 +213,7 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         foreach (param; s.params) {
                 paramTypes ~= param.type;
         }
-        Type procType = new ProcType(s.returnType, paramTypes, s.variadic, 8);
+        Type procType = new ProcType(s.returnType, paramTypes, s.variadic, s.returnType.size);
         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
 
         Scope oldScope = ana.currentScope;

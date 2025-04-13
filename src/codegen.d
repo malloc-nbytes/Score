@@ -7,6 +7,7 @@ import std.format;
 import grammar;
 import semantic;
 import visitor;
+import types;
 
 //=====================================================================================REGISTERS
 // https://math.hws.edu/eck/cs220/f22/registers.html
@@ -109,7 +110,14 @@ class Context {
         string getRetReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 8 || sz == 4);
-                return sz == 8 ? "rax" : "eax";
+                if (sz == 8) {
+                        // lastReg = 0 + cast(int)gGenRegs32.length;
+                        return "rax";
+                } else {
+                        // lastReg = 0;
+                        return "eax";
+                }
+                // string res = sz == 8 ? "rax" : "eax";
         }
         int allocReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
@@ -236,7 +244,7 @@ private void visitStmtWhile(Visitor* v, StmtWhile s) {
 
 private void visitStmtExpr(Visitor* v, StmtExpr s) {
         Context c = cast(Context)v.context;
-        assert(0);
+        s.expr.accept(s.expr, v);
 }
 
 private void visitStmtMod(Visitor* v, StmtMod s) {
@@ -284,8 +292,13 @@ private void visitExprIntLit(Visitor* v, ExprIntLit e) {
 
 private void visitExprIdent(Visitor* v, ExprIdent e) {
         Context c = cast(Context)v.context;
-        int reg = c.allocReg(e.type.size);
-        c.wrtln(format("mov %s, [rbp-%d]", c.regToStr(reg), e.address));
+        if (e.type.kind == TypeKind.Proc) {
+                int reg = c.allocReg(8);
+                c.wrtln(format("mov %s, %s", c.regToStr(reg), e.name));
+        } else {
+                int reg = c.allocReg(e.type.size);
+                c.wrtln(format("mov %s, [rbp-%d]", c.regToStr(reg), e.address));
+        }
 }
 
 private void visitExprMut(Visitor* v, ExprMut e) {
@@ -295,7 +308,11 @@ private void visitExprMut(Visitor* v, ExprMut e) {
 
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         Context c = cast(Context)v.context;
-        assert(0);
+        e.call.accept(e.call, v);
+        c.wrtln(format("call %s", c.regToStr(c.lastReg)));
+        c.freeReg(c.lastReg);
+        int reg = c.allocReg(e.type.size);
+        c.wrtln(format("mov %s, %s", c.regToStr(reg), c.getRetReg(e.type.size)));
 }
 
 private Visitor createVisitor(Context c) {
