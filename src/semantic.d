@@ -94,6 +94,7 @@ private Visitor createVisitor(SemanticAnalyzer s) {
         v.visitStmtExpr = &visitStmtExpr;
         v.visitStmtMod = &visitStmtMod;
         v.visitStmtImport = &visitStmtImport;
+        v.visitStmtExit = &visitStmtExit;
 
         v.visitExprMember = &visitExprMember;
         v.visitExprStructLit = &visitExprStructLit;
@@ -274,6 +275,10 @@ void visitStmtImport(Visitor* v, StmtImport s) {
         return;
 }
 
+void visitStmtExit(Visitor* v, StmtExit s) {
+        s.expr.accept(s.expr, v);
+}
+
 // Expression Visitors
 
 void visitExprMember(Visitor* v, ExprMember e) {
@@ -392,7 +397,6 @@ void visitExprIdent(Visitor* v, ExprIdent e) {
         }
         e.address = sym.address;
         e.type = sym.type;
-        writeln("ADDR: ", sym.name, ' ', sym.address);
 }
 
 void visitExprMut(Visitor* v, ExprMut e) {

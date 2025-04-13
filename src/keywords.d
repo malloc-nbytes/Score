@@ -26,6 +26,7 @@ static const string[] keywords = [
         "module",
         "where",
         "import",
+        "exit",
 ];
 
 enum Keyword {
@@ -41,6 +42,7 @@ enum Keyword {
         Module = keywords[9],
         Where = keywords[10],
         Import = keywords[11],
+        Exit = keywords[12],
 }
 
 enum TypeKeyword {

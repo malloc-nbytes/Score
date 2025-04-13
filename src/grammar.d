@@ -167,6 +167,7 @@ enum StmtType {
         Struct,
         Mod,
         Import,
+        Exit,
 }
 
 class Stmt {
@@ -186,8 +187,17 @@ class Stmt {
                 case StmtType.Struct: this.accept = &acceptStmtStruct; break;
                 case StmtType.Mod:    this.accept = &acceptStmtMod;    break;
                 case StmtType.Import: this.accept = &acceptStmtImport; break;
+                case StmtType.Exit:   this.accept = &acceptStmtExit;   break;
                 default: assert(0);
                 }
+        }
+}
+
+class StmtExit : Stmt {
+        Expr expr; // (optional) can be null
+        this(Expr expr) {
+                super(StmtType.Exit);
+                this.expr = expr;
         }
 }
 

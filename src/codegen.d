@@ -60,17 +60,18 @@ static const(Reg[]) gParamRegs64 = [Reg.RDI, Reg.RSI, Reg.RDX, Reg.RCX, Reg.R8, 
 
 static const(Reg[]) gGenRegs32 = [Reg.EBX, Reg.R10D, Reg.R11D, Reg.R12D, Reg.R13D, Reg.R14D, Reg.R15D];
 static const(Reg[]) gParamRegs32 = [Reg.EDI, Reg.ESI, Reg.EDX, Reg.ECX, Reg.R8D, Reg.R9D];
+static const(Reg[]) gGenRegs = gGenRegs32 ~ gGenRegs64;
 
 class Context {
         File file;
         size_t[] stack;
-        int genRegs64;
+        int genRegs;
         int lastReg;
         string[] globls;
         this() {
                 this.file = File("output.asm", "w");
                 this.stack = [0];
-                genRegs64 = 0x000000;
+                genRegs = 0x000000;
                 lastReg = 0;
                 globls = [];
         }
@@ -78,7 +79,6 @@ class Context {
                 if (file.isOpen) { file.close(); }
         }
         void addGlobl(string name) {
-                // globls ~= name;
                 wrtln(format("global %s", name));
         }
         void wrtln(string s) {
@@ -103,10 +103,18 @@ class Context {
                 assert(this.stack.length > 0);
                 stack.length--;
         }
-        int allocReg() {
-                for (int i = 0; i < cast(int)gGenRegs64.length; ++i) {
-                        if (!(genRegs64 & (1 << i))) {
-                                genRegs64 |= (1 << i);
+        string getRetReg(size_t sz) {
+                // TODO: support 16bit and 8bit registers
+                assert(sz == 8 || sz == 4);
+                return sz == 8 ? "rax" : "eax";
+        }
+        int allocReg(size_t sz) {
+                // TODO: support 16bit and 8bit registers
+                assert(sz == 4 || sz == 8);
+                const (Reg[]) regs = (sz == 4) ? gGenRegs32 : gGenRegs64;
+                for (int i = 0; i < cast(int)regs.length; ++i) {
+                        if (!(genRegs & (1 << i))) {
+                                genRegs |= (1 << i);
                                 lastReg = i;
                                 return i;
                         }
@@ -114,19 +122,30 @@ class Context {
                 assert(0 && "out of registers");
         }
         void freeReg(int r) {
-                genRegs64 &= ~(1 << r);
+                genRegs &= ~(1 << r);
         }
         string regToStr(int r) {
-                return gGenRegs64[r];
+                return gGenRegs[r];
         }
         void prologue() {
                 wrtln("push rbp");
                 wrtln("mov rbp, rsp");
         }
         void epilogue() {
-                wrtln(format("add rsp, %d", getStack()));
+                // wrtln(format("add rsp, %d", getStack()));
+                wrtln("mov rsp, rbp");
                 wrtln("pop rbp");
         }
+}
+
+private void visitStmtExit(Visitor* v, StmtExit s) {
+        Context c = cast(Context)v.context;
+        if (s.expr) {
+                s.expr.accept(s.expr, v);
+        }
+        c.wrtln(format("mov rax, 60"));
+        c.wrtln(format("mov edi, %s", c.regToStr(c.lastReg)));
+        c.wrtln("syscall");
 }
 
 private void visitStmtStruct(Visitor* v, StmtStruct s) {
@@ -139,6 +158,7 @@ private void visitStmtLet(Visitor* v, StmtLet s) {
         s.expr.accept(s.expr, v);
         //c.wrtln(format("sub rsp, %d", s.type.size));
         c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lastReg)));
+        c.freeReg(c.lastReg);
 }
 
 private void visitStmtProc(Visitor* v, StmtProc s) {
@@ -168,7 +188,9 @@ private void visitStmtBlock(Visitor* v, StmtBlock s) {
 private void visitStmtReturn(Visitor* v, StmtReturn s) {
         Context c = cast(Context)v.context;
         s.expr.accept(s.expr, v);
-        c.wrtln(format("mov rax, %s", c.regToStr(c.lastReg)));
+        string retReg = c.getRetReg(s.expr.type.size);
+        c.wrtln(format("mov %s, %s", retReg, c.regToStr(c.lastReg)));
+        c.freeReg(c.lastReg);
         c.epilogue();
         c.wrtln("ret");
 }
@@ -225,13 +247,14 @@ private void visitExprStrLit(Visitor* v, ExprStrLit e) {
 
 private void visitExprIntLit(Visitor* v, ExprIntLit e) {
         Context c = cast(Context)v.context;
-        int reg = c.allocReg();
+        int reg = c.allocReg(4);
         c.wrtln(format("mov DWORD %s, %d", c.regToStr(reg), e.num));
 }
 
 private void visitExprIdent(Visitor* v, ExprIdent e) {
         Context c = cast(Context)v.context;
-        assert(0);
+        int reg = c.allocReg(e.type.size);
+        c.wrtln(format("mov %s, [rbp-%d]", c.regToStr(reg), e.address));
 }
 
 private void visitExprMut(Visitor* v, ExprMut e) {
@@ -259,6 +282,7 @@ private Visitor createVisitor(Context c) {
         v.visitStmtExpr = &visitStmtExpr;
         v.visitStmtMod = &visitStmtMod;
         v.visitStmtImport = &visitStmtImport;
+        v.visitStmtExit = &visitStmtExit;
 
         v.visitExprMember = &visitExprMember;
         v.visitExprStructLit = &visitExprStructLit;

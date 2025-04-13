@@ -454,6 +454,13 @@ private StmtImport parseStmtImport(Lexer* l) {
         return new StmtImport(t.lx.dup);
 }
 
+private StmtExit parseStmtExit(Lexer* l) {
+        lexerDiscard(l); // exit
+        Expr e = parseExpr(l);
+        cast(void)expect(l, TokenType.SemiColon);
+        return new StmtExit(e);
+}
+
 private Stmt parseStmtKW(Lexer* l) {
         switch (lexerPeek(l).lx) {
         case Keyword.Export: {
@@ -486,6 +493,9 @@ private Stmt parseStmtKW(Lexer* l) {
         } break;
         case Keyword.Import: {
                 return parseStmtImport(l);
+        } break;
+        case Keyword.Exit: {
+                return parseStmtExit(l);
         } break;
         default: {
                 err(tokerrToStr(l.hd) ~ format("invalid keyword '%s' for statement", lexerPeek(l).lx));

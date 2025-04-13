@@ -32,6 +32,7 @@ struct Visitor {
         void function(Visitor* v, StmtStruct s) visitStmtStruct;
         void function(Visitor* v, StmtMod s)    visitStmtMod;
         void function(Visitor* v, StmtImport s) visitStmtImport;
+        void function(Visitor* v, StmtExit s)   visitStmtExit;
 }
 
 /*
@@ -162,6 +163,12 @@ void acceptStmtImport(Stmt s, Visitor* v) {
         }
 }
 
+void acceptStmtExit(Stmt s, Visitor* v) {
+        if (v.visitStmtExit) {
+                v.visitStmtExit(v, cast(StmtExit)s);
+        }
+}
+
 /*
  * Expression visitors
  */
@@ -258,4 +265,8 @@ void visitStmtMod(Visitor* v, StmtMod s) {
 
 void visitStmtImport(Stmt s, Visitor* v) {
         return;
+}
+
+void visitStmtExit(Visitor* v, StmtExit s) {
+        s.expr.accept(s.expr, v);
 }
