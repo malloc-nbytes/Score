@@ -4,6 +4,8 @@ import std.file : readText;
 import std.process : execute;
 import core.stdc.stdlib : exit;
 
+import core.thread;
+
 import utils;
 import lexer;
 import token;
@@ -14,6 +16,7 @@ import flag;
 import semantic;
 import types;
 import codegen;
+import assemble;
 
 void usage() {
         writeln("Usage: scr [paths...] [options...]");
@@ -32,22 +35,36 @@ int main(string[] args) {
 
         args = args[1..$];
 
-        const string fp = "./input.scr";
+        FlagParser flagParser = handleArgs(args);
+        assert(flagParser.paths.length == 1);
+
+        string outputName = flagParser.outputName;
+        if (outputName.length == 0) {
+                outputName = "output";
+        }
+
+        const string fp = flagParser.paths[0];
         const string src = readText(fp);
 
-        write("lexing...\r"); stdout.flush();
+        write("[xxxxxx] Lexing...\r"); stdout.flush();
         Lexer l = lexFile(src, fp);
 
-        write("parsing...\r"); stdout.flush();
+        write("[*xxxxx] Parsing...\r"); stdout.flush();
         Program p = parseProgram(&l);
 
-        write("semantic...\r"); stdout.flush();
+        write("[**xxxx] Semantic...\r"); stdout.flush();
         SemanticAnalyzer ana = semanticAnalyze(p);
 
-        write("generating code...\r"); stdout.flush();
-        gen(p, ana);
-        writeln("                    \r", fp, " ok");
+        write("[***xxx] Codegen...\r"); stdout.flush();
+        gen(p, outputName);
 
+        write("[****xx] Assembling...\r"); stdout.flush();
+        nasm_assemble(outputName);
+
+        write("[*****x] Linking Executable...\r"); stdout.flush();
+        ld(outputName);
+
+        writeln("                             \r[******] ", fp, " ok");
         return 0;
 }
 

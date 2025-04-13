@@ -73,13 +73,15 @@ class Context {
         int paramRegs;
         int lastReg;
         string[] globls;
-        this() {
-                this.file = File("output.asm", "w");
+        string outputName;
+        this(string outputName) {
+                this.file = File(outputName~".asm", "w");
                 this.stack = [0];
                 genRegs = 0x000000;
                 paramRegs = 0x000000;
                 lastReg = 0;
                 globls = [];
+                outputName = outputName;
         }
         ~this() {
                 if (file.isOpen) { file.close(); }
@@ -130,7 +132,6 @@ class Context {
                         if (!(genRegs & (1 << tmp))) {
                                 genRegs |= (1 << tmp);
                                 if (sz == 8) {
-                                        // i += gGenRegs32.length;
                                         i = tmp;
                                 }
                                 lastReg = i;
@@ -142,7 +143,7 @@ class Context {
         int allocParamReg(size_t sz) {
                 // IMPORTANT: we do not want to set lastReg here
                 //            as it will conflict and mess up
-                //            the general purpose last used register.
+                //            the general purpose last used register.e
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 4 || sz == 8);
                 const(Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
@@ -151,10 +152,8 @@ class Context {
                         if (!(paramRegs & (1 << tmp))) {
                                 paramRegs |= (1 << tmp);
                                 if (sz == 8) {
-                                        // i += gParamRegs32.length;
                                         i = tmp;
                                 }
-                                //lastReg = i;
                                 return i;
                         }
                 }
@@ -354,8 +353,8 @@ private Visitor createVisitor(Context c) {
         return v;
 }
 
-void gen(Program p, SemanticAnalyzer ana) {
-        Context c = new Context;
+void gen(Program p, string outputName) {
+        Context c = new Context(outputName);
         c.wrtln("section .text");
         Visitor v = createVisitor(c);
         foreach (stmt; p.stmts) {
