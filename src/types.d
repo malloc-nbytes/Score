@@ -1,7 +1,10 @@
 module types;
 
+import std.stdio;
+
 enum TypeKind {
         Primitive,
+        Number,
         Never,
         Ptr,
         Struct,
@@ -16,6 +19,13 @@ class Type {
                 this.kind = kind;
                 this.size = size;
                 this.name = name;
+        }
+}
+
+class NumberType : Type {
+        int num;
+        this() {
+                super(TypeKind.Number, 4, "Number");
         }
 }
 

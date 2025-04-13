@@ -118,7 +118,26 @@ class Context {
                 for (int i = 0; i < cast(int)regs.length; ++i) {
                         if (!(genRegs & (1 << i))) {
                                 genRegs |= (1 << i);
+                                if (sz == 8) {
+                                        i += gGenRegs32.length;
+                                }
                                 lastReg = i;
+                                return i;
+                        }
+                }
+                assert(0 && "out of registers");
+        }
+        int allocParamReg(size_t sz) {
+                // TODO: support 16bit and 8bit registers
+                assert(sz == 4 || sz == 8);
+                const (Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
+                for (int i = 0; i < cast(int)regs.length; ++i) {
+                        if (!(genRegs & (1 << i))) {
+                                genRegs |= (1 << i);
+                                if (sz == 8) {
+                                        i += gParamRegs32.length;
+                                }
+                                // lastReg = i;
                                 return i;
                         }
                 }
@@ -129,6 +148,9 @@ class Context {
         }
         string regToStr(int r) {
                 return gGenRegs[r];
+        }
+        string paramRegToStr(int r) {
+                return gParamRegs[r];
         }
         void prologue() {
                 wrtln("push rbp");
@@ -147,7 +169,9 @@ private void visitStmtExit(Visitor* v, StmtExit s) {
         }
         c.wrtln(format("mov rax, 60"));
         if (s.expr) {
-                c.wrtln(format("mov edi, %s", c.regToStr(c.lastReg)));
+                int reg = c.allocParamReg(s.expr.type.size);
+                c.wrtln(format("mov %s, %s", c.paramRegToStr(reg), c.regToStr(c.lastReg)));
+                c.freeReg(reg);
         } else {
                 c.wrtln("mov edi, 0");
         }
@@ -252,8 +276,10 @@ private void visitExprStrLit(Visitor* v, ExprStrLit e) {
 
 private void visitExprIntLit(Visitor* v, ExprIntLit e) {
         Context c = cast(Context)v.context;
-        int reg = c.allocReg(4);
-        c.wrtln(format("mov DWORD %s, %d", c.regToStr(reg), e.num));
+        int reg = c.allocReg(e.type.size);
+        // TODO: support for 16bit and 8bit types
+        string instr = e.type.size == 8 ? "QWORD" : "DWORD";
+        c.wrtln(format("mov %s %s, %d", instr, c.regToStr(reg), e.num));
 }
 
 private void visitExprIdent(Visitor* v, ExprIdent e) {

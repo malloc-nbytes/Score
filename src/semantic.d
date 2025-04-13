@@ -111,30 +111,42 @@ private Visitor createVisitor(SemanticAnalyzer s) {
 }
 
 bool isTypeCompatible(Type t1, Type t2) {
-                if (t1 is null || t2 is null) return false;
-                if (t1 is t2) return true;  // Same object
-                if (t1.kind != t2.kind) return false;
+        bool isNumberAndPrim = (t1.kind == TypeKind.Primitive && t2.kind == TypeKind.Number)
+                || (t1.kind == TypeKind.Number && t2.kind == TypeKind.Primitive);
+        if (t1 is null || t2 is null) return false;
+        if (t1 is t2) return true;  // Same object
+        if (!isNumberAndPrim && t1.kind != t2.kind) return false;
 
-                final switch (t1.kind) {
-                case TypeKind.Primitive:
-                        string t1n = (cast(PrimitiveType)t1).name;
-                        string t2n = (cast(PrimitiveType)t2).name;
-                        return t1n == t2n;
-                case TypeKind.Never: return false;
-                case TypeKind.Ptr:
-                        return isTypeCompatible((cast(Ptr)t1).to, (cast(Ptr)t2).to);
-                case TypeKind.Struct:
-                        return (cast(StructType)t1).name == (cast(StructType)t2).name;
-                case TypeKind.Proc:
-                        ProcType p1 = cast(ProcType)t1;
-                        ProcType p2 = cast(ProcType)t2;
-                        if (!isTypeCompatible(p1.returnType, p2.returnType)) return false;
-                        if (p1.paramTypes.length != p2.paramTypes.length) return false;
-                        foreach (i; 0 .. p1.paramTypes.length) {
-                                if (!isTypeCompatible(p1.paramTypes[i], p2.paramTypes[i])) return false;
-                        }
-                        return true;
+        if (isNumberAndPrim && t1.kind == TypeKind.Number) {
+                t1 = t2;
+                return true;
+        } else if (isNumberAndPrim && t2.kind == TypeKind.Number) {
+                // t2 = t1;
+                t2.size = t1.size;
+                return true;
+        }
+
+        switch (t1.kind) {
+        case TypeKind.Primitive:
+                string t1n = (cast(PrimitiveType)t1).name;
+                string t2n = (cast(PrimitiveType)t2).name;
+                return t1n == t2n;
+        case TypeKind.Never: return false;
+        case TypeKind.Ptr:
+                return isTypeCompatible((cast(Ptr)t1).to, (cast(Ptr)t2).to);
+        case TypeKind.Struct:
+                return (cast(StructType)t1).name == (cast(StructType)t2).name;
+        case TypeKind.Proc:
+                ProcType p1 = cast(ProcType)t1;
+                ProcType p2 = cast(ProcType)t2;
+                if (!isTypeCompatible(p1.returnType, p2.returnType)) return false;
+                if (p1.paramTypes.length != p2.paramTypes.length) return false;
+                foreach (i; 0 .. p1.paramTypes.length) {
+                        if (!isTypeCompatible(p1.paramTypes[i], p2.paramTypes[i])) return false;
                 }
+                return true;
+        default: assert(0);
+        }
 }
 
 void visitStmtStruct(Visitor* v, StmtStruct s) {
@@ -399,7 +411,7 @@ void visitExprStrLit(Visitor* v, ExprStrLit e) {
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
-        e.type = new PrimitiveType("i32", 4);  // Default to 32-bit integer
+        e.type = new NumberType();  // Default to 32-bit integer
 }
 
 void visitExprIdent(Visitor* v, ExprIdent e) {

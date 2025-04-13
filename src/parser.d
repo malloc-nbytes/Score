@@ -276,7 +276,7 @@ private size_t typeToStr(Token* tykw) {
         case TypeKeyword.I32:
         case TypeKeyword.U32: return 4;
         case TypeKeyword.I64:
-        case TypeKeyword.U64: return 4;
+        case TypeKeyword.U64: return 8;
         case TypeKeyword.Void: return 0;
         default: assert(0);
         }
