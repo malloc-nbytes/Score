@@ -13,7 +13,6 @@ import flag;
 import semantic;
 import types;
 import codegen;
-import ir;
 
 void usage() {
         writeln("Usage: scr [paths...] [options...]");
@@ -37,8 +36,8 @@ int main(string[] args) {
         Lexer l = lexFile(src, fp);
         Program p = parseProgram(&l);
 
-        ProgramIR ir = semanticAnalyze(p);
-        generateAssembly(ir, "input.asm");
+        SemanticAnalyzer ana = semanticAnalyze(p);
+        gen(p, ana);
 
         return 0;
 }

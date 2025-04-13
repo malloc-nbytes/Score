@@ -102,9 +102,11 @@ class ExprIntLit : Expr {
 
 class ExprIdent : Expr {
         string name;
+        size_t address;
         this(string name) {
                 super(ExprType.Ident);
                 this.name = name;
+                this.address = 0;
         }
 }
 
@@ -212,11 +214,13 @@ class StmtLet : Stmt {
         string name;
         Type type;
         Expr expr;
+        size_t offset;
         this(string name, Type type, Expr expr) {
                 super(StmtType.Let);
                 this.name = name;
                 this.type = type;
                 this.expr = expr;
+                this.offset = 0;
         }
 }
 

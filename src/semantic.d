@@ -7,7 +7,6 @@ import std.algorithm;
 import std.array;
 
 import types;
-import ir;
 import grammar;
 import visitor;
 import utils;
@@ -49,20 +48,14 @@ class Scope {
 class SemanticAnalyzer {
         Scope globalScope;
         Scope currentScope;
-        ProgramIR programIR;
         int tmpCount;
         size_t stackOffset;
 
         this() {
                 globalScope = new Scope(null);
                 currentScope = globalScope;
-                programIR = ProgramIR();
                 tmpCount = 0;
                 stackOffset = 0;
-        }
-
-        string newTmp() {
-                return format("t%d", tmpCount++);
         }
 
         // Allocate stack space, return offset
@@ -77,19 +70,14 @@ class SemanticAnalyzer {
         }
 }
 
-ProgramIR semanticAnalyze(Program p) {
+SemanticAnalyzer semanticAnalyze(Program p) {
         SemanticAnalyzer s = new SemanticAnalyzer;
         Visitor v = createVisitor(s);
         foreach (stmt; p.stmts) {
                 stmt.accept(stmt, &v);
         }
 
-        // Debugging
-        foreach (instr; s.programIR.instructions) {
-                stderr.writefln("%s %s, %s", instr.op, instr.result, instr.operands);
-        }
-
-        return s.programIR;
+        return s;
 }
 
 private Visitor createVisitor(SemanticAnalyzer s) {
@@ -174,29 +162,22 @@ void visitStmtLet(Visitor* v, StmtLet s) {
         }
 
         size_t offset = ana.allocStack(s.type.size);
+        s.offset = offset;
         Symbol sym = new Symbol(s.name, s.type, ana.currentScope);
         sym.address = offset;
         ana.currentScope.addSymbol(sym);
 
         if (s.expr.kind == ExprType.StructLit) {
                 // For struct literals, allocate and initialize directly
-                string structTemp = ana.newTmp();
-                ana.programIR.add(Instruction(OpCode.Lea, structTemp, [format("[rbp - %d]", offset)]));
                 ExprStructLit structLit = cast(ExprStructLit)s.expr;
                 foreach (init; structLit.fields) {
                         init.expr.accept(init.expr, v);  // Revisit to get field values
                         foreach (field; (cast(StructType)s.type).fields) {
                                 if (field.name == init.name) {
-                                        ana.programIR.add(Instruction(OpCode.Store,
-                                                                      format("%s + %d", structTemp, field.offset), [init.expr.temp]));
                                         break;
                                 }
                         }
                 }
-                s.expr.temp = structTemp;  // Update temp to point to the actual location
-        } else {
-                // For non-struct expressions (e.g., p.x)
-                ana.programIR.add(Instruction(OpCode.Store, format("[rbp - %d]", offset), [s.expr.temp]));
         }
 }
 
@@ -210,28 +191,19 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         Type procType = new ProcType(s.returnType, paramTypes, s.variadic, 8);
         ana.currentScope.addSymbol(new Symbol(s.name, procType, ana.currentScope));
 
-        ana.programIR.add(Instruction(OpCode.Label, s.name, []));
-        // Prologue: Save rbp, set up stack frame
-        ana.programIR.add(Instruction(OpCode.Push, "rbp", []));
-        ana.programIR.add(Instruction(OpCode.Mov, "rbp", ["rsp"]));
-
         Scope oldScope = ana.currentScope;
         ana.currentScope = new Scope(ana.currentScope);
         ana.resetStack();  // Reset stack offset for this function
 
+        // TODO: rspAlloc needs to account for proc parameters.
         foreach (i, param; s.params) {
                 ana.currentScope.addSymbol(new Symbol(param.name, param.type, ana.currentScope));
-                ana.programIR.add(Instruction(OpCode.Param, param.name, [format("param%d", i)]));
         }
         s.block.accept(s.block, v);
 
         // Epilogue: Restore stack (done in Return if present, or add default return)
         if (s.returnType.name != "void") {
                 // Ensure return exists; add default if needed later
-        } else {
-                ana.programIR.add(Instruction(OpCode.Mov, "rsp", ["rbp"]));
-                ana.programIR.add(Instruction(OpCode.Pop, "rbp", []));
-                ana.programIR.add(Instruction(OpCode.Return, "", []));
         }
 
         ana.currentScope = oldScope;
@@ -263,56 +235,30 @@ void visitStmtReturn(Visitor* v, StmtReturn s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         s.expr.accept(s.expr, v);
         // Return type checked in StmtProc context (not here)
-        ana.programIR.add(Instruction(OpCode.Return, "", [s.expr.temp]));
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
 
         s.expr.accept(s.expr, v);
-        string thenLbl = ana.newTmp() ~ "_then";
-        string endLbl = ana.newTmp() ~ "_end";
-
-        // IR: Check condition and jump
-        ana.programIR.add(Instruction(OpCode.Eq, ana.newTmp(), [s.expr.temp, "1"]));
-        string condTemp = ana.programIR.instructions[$-1].result;
-        ana.programIR.add(Instruction(OpCode.JumpIf, thenLbl, [condTemp]));
-        ana.programIR.add(Instruction(OpCode.Jump, endLbl, []));
 
         // Then branch
-        ana.programIR.add(Instruction(OpCode.Label, thenLbl, []));
         s.then.accept(s.then, v);
 
         if (s.else_) {
-                string elseLbl = ana.newTmp() ~ "_else";
-                // Update the previous jump to go to else instead of end
-                ana.programIR.instructions[$-2] = Instruction(OpCode.Jump, elseLbl, []); // Replace Jump to endLabel
-                ana.programIR.add(Instruction(OpCode.Label, elseLbl, []));
                 s.else_.accept(s.else_, v);
         }
-
-        ana.programIR.add(Instruction(OpCode.Label, endLbl, []));
 }
 
 void visitStmtWhile(Visitor* v, StmtWhile s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
 
-        string loopLbl = ana.newTmp() ~ "_loop";
-        string endLbl = ana.newTmp() ~ "_end";
-
         // IR: Loop start
-        ana.programIR.add(Instruction(OpCode.Label, loopLbl, []));
         s.expr.accept(s.expr, v);
-        ana.programIR.add(Instruction(OpCode.Eq, ana.newTmp(), [s.expr.temp, "1"]));  // Check condition
-        string condTemp = ana.programIR.instructions[$-1].result;
-        ana.programIR.add(Instruction(OpCode.JumpIfNot, endLbl, [condTemp]));
 
         // Loop body
         s.stmt.accept(s.stmt, v);
-        ana.programIR.add(Instruction(OpCode.Jump, loopLbl, []));
 
-        // Loop end
-        ana.programIR.add(Instruction(OpCode.Label, endLbl, []));
 }
 
 void visitStmtExpr(Visitor* v, StmtExpr s) {
@@ -342,9 +288,6 @@ void visitExprMember(Visitor* v, ExprMember e) {
         foreach (field; structType.fields) {
                 if (field.name == fieldName) {
                         e.type = field.type;
-                        e.temp = ana.newTmp();
-                        ana.programIR.add(Instruction(OpCode.Load, e.temp,
-                                                      [format("%s + %d", e.left.temp, field.offset)]));
                         return;
                 }
         }
@@ -361,7 +304,6 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
         StructType structType = cast(StructType)sym.type;
         e.type = structType;
 
-        string structTemp = ana.newTmp();
         // Don’t allocate stack here; `visitStmtLet` will handle it
         // Just prepare the field initializations
         foreach (init; e.fields) {
@@ -377,7 +319,6 @@ void visitExprStructLit(Visitor* v, ExprStructLit e) {
                         }
                 }
         }
-        e.temp = structTemp;  // Temp placeholder; actual address set later
 }
 
 void visitExprBin(Visitor* v, ExprBin e) {
@@ -389,15 +330,13 @@ void visitExprBin(Visitor* v, ExprBin e) {
                 err("binary op type mismatch");
         }
         e.type = e.left.type;
-        e.temp = ana.newTmp();
         switch (e.op) {
-        case "+": ana.programIR.add(Instruction(OpCode.Add, e.temp, [e.left.temp, e.right.temp])); break;
-        case "-": ana.programIR.add(Instruction(OpCode.Sub, e.temp, [e.left.temp, e.right.temp])); break;
-        case "*": ana.programIR.add(Instruction(OpCode.Mul, e.temp, [e.left.temp, e.right.temp])); break;
-        case "/": ana.programIR.add(Instruction(OpCode.Div, e.temp, [e.left.temp, e.right.temp])); break;
+        case "+":
+        case "-":
+        case "*":
+        case "/":
         case "==":
                 e.type = new PrimitiveType("bool", 1);
-                ana.programIR.add(Instruction(OpCode.Eq, e.temp, [e.left.temp, e.right.temp]));
                 break;
         default: err(format("unsupported binary operator '%s'", e.op));
         }
@@ -416,16 +355,12 @@ void visitExprUn(Visitor* v, ExprUn e) {
                         err("unary minus requires a primitive type");
                 }
                 e.type = e.expr.type;  // Same type as operand
-                e.temp = ana.newTmp();
-                ana.programIR.add(Instruction(OpCode.Sub, e.temp, ["0", e.expr.temp]));
                 break;
         case "*":  // Dereference
                 if (e.expr.type.kind != TypeKind.Ptr) {
                         err("dereference requires a pointer type");
                 }
                 e.type = (cast(Ptr)e.expr.type).to;
-                e.temp = ana.newTmp();
-                ana.programIR.add(Instruction(OpCode.Load, e.temp, [e.expr.temp]));
                 break;
         case "&":  // Address-of
                 e.type = new Ptr(e.expr.type);
@@ -439,19 +374,14 @@ void visitExprUn(Visitor* v, ExprUn e) {
 void visitExprStrLit(Visitor* v, ExprStrLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         e.type = new Ptr(new PrimitiveType("u8", 1));  // Pointer to u8
-        e.temp = ana.newTmp();
 
         // Generate a unique label for the string
         string strLabel = format("str%d", ana.tmpCount);  // Use tmpCount for uniqueness
-        ana.programIR.add(Instruction(OpCode.StrLit, strLabel, [e.str]));  // New opcode for string literals
-        ana.programIR.add(Instruction(OpCode.Lea, e.temp, [strLabel]));    // Load address of string
 }
 
 void visitExprIntLit(Visitor* v, ExprIntLit e) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         e.type = new PrimitiveType("i32", 4);  // Default to 32-bit integer
-        e.temp = ana.newTmp();
-        ana.programIR.add(Instruction(OpCode.LoadIm, e.temp, [e.num.to!string]));
 }
 
 void visitExprIdent(Visitor* v, ExprIdent e) {
@@ -460,15 +390,9 @@ void visitExprIdent(Visitor* v, ExprIdent e) {
         if (!sym) {
                 err(format("undefined identifier '%s'", e.name));
         }
+        e.address = sym.address;
         e.type = sym.type;
-        e.temp = ana.newTmp();
-        // Load the value, not the address, for scalar types
-        if (sym.type.kind == TypeKind.Primitive) {
-                ana.programIR.add(Instruction(OpCode.Load, e.temp, [format("[rbp - %d]", sym.address)]));
-        } else {
-                // For structs or pointers, load the address
-                ana.programIR.add(Instruction(OpCode.Lea, e.temp, [format("[rbp - %d]", sym.address)]));
-        }
+        writeln("ADDR: ", sym.name, ' ', sym.address);
 }
 
 void visitExprMut(Visitor* v, ExprMut e) {
@@ -492,7 +416,6 @@ void visitExprMut(Visitor* v, ExprMut e) {
                 }
                 string target = (e.left.kind == ExprType.Ident) ?
                         "@" ~ (cast(ExprIdent)e.left).name : e.left.temp;
-                ana.programIR.add(Instruction(OpCode.Store, target, [e.right.temp]));
                 e.type = e.left.type;  // Type of the assignment expression is the left type
                 e.temp = e.right.temp;
                 break;
@@ -523,7 +446,4 @@ void visitExprProcCall(Visitor* v, ExprProcCall e) {
                 }
         }
         e.type = procType.returnType;
-        e.temp = ana.newTmp();
-        string[] operands = [(cast(ExprIdent)e.call).name] ~ e.args.map!(a => a.temp).array;
-        ana.programIR.add(Instruction(OpCode.Call, e.temp, operands));
 }
