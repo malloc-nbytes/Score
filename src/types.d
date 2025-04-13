@@ -2,6 +2,7 @@ module types;
 
 enum TypeKind {
         Primitive,
+        Never,
         Ptr,
         Struct,
         Proc,
@@ -15,6 +16,12 @@ class Type {
                 this.kind = kind;
                 this.size = size;
                 this.name = name;
+        }
+}
+
+class NeverType : Type {
+        this() {
+                super(TypeKind.Never, 0, "Never");
         }
 }
 

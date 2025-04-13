@@ -56,22 +56,25 @@ enum Reg {
 }
 
 static const(Reg[]) gGenRegs64 = [Reg.RBX, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15];
-static const(Reg[]) gParamRegs64 = [Reg.RDI, Reg.RSI, Reg.RDX, Reg.RCX, Reg.R8, Reg.R9];
-
 static const(Reg[]) gGenRegs32 = [Reg.EBX, Reg.R10D, Reg.R11D, Reg.R12D, Reg.R13D, Reg.R14D, Reg.R15D];
+
+static const(Reg[]) gParamRegs64 = [Reg.RDI, Reg.RSI, Reg.RDX, Reg.RCX, Reg.R8, Reg.R9];
 static const(Reg[]) gParamRegs32 = [Reg.EDI, Reg.ESI, Reg.EDX, Reg.ECX, Reg.R8D, Reg.R9D];
 static const(Reg[]) gGenRegs = gGenRegs32 ~ gGenRegs64;
+static const(Reg[]) gParamRegs = gParamRegs32 ~ gParamRegs64;
 
 class Context {
         File file;
         size_t[] stack;
         int genRegs;
+        int paramRegs;
         int lastReg;
         string[] globls;
         this() {
                 this.file = File("output.asm", "w");
                 this.stack = [0];
                 genRegs = 0x000000;
+                paramRegs = 0x000000;
                 lastReg = 0;
                 globls = [];
         }
@@ -144,7 +147,11 @@ private void visitStmtExit(Visitor* v, StmtExit s) {
                 s.expr.accept(s.expr, v);
         }
         c.wrtln(format("mov rax, 60"));
-        c.wrtln(format("mov edi, %s", c.regToStr(c.lastReg)));
+        if (s.expr) {
+                c.wrtln(format("mov edi, %s", c.regToStr(c.lastReg)));
+        } else {
+                c.wrtln("mov edi, 0");
+        }
         c.wrtln("syscall");
 }
 

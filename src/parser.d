@@ -288,8 +288,12 @@ private Type parseType(Lexer* l) {
 
         if (t.ty == TokenType.TypeKeyword) {
                 type = new types.PrimitiveType(t.lx.idup, typeToStr(t));
-        } else {
+        } else if (t.ty == TokenType.Ident) {
                 type = new types.StructType(t.lx.idup, []);
+        } else if (t.ty == TokenType.Bang) {
+                type = new types.NeverType();
+        } else {
+                assert(0);
         }
 
         while (l.hd && lexerPeek(l).ty == TokenType.Asterisk) {

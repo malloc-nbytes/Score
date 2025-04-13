@@ -50,12 +50,14 @@ class SemanticAnalyzer {
         Scope currentScope;
         int tmpCount;
         size_t stackOffset;
+        StmtProc curProc;
 
         this() {
                 globalScope = new Scope(null);
                 currentScope = globalScope;
                 tmpCount = 0;
                 stackOffset = 0;
+                curProc = null;
         }
 
         // Allocate stack space, return offset
@@ -118,6 +120,7 @@ bool isTypeCompatible(Type t1, Type t2) {
                         string t1n = (cast(PrimitiveType)t1).name;
                         string t2n = (cast(PrimitiveType)t2).name;
                         return t1n == t2n;
+                case TypeKind.Never: return false;
                 case TypeKind.Ptr:
                         return isTypeCompatible((cast(Ptr)t1).to, (cast(Ptr)t2).to);
                 case TypeKind.Struct:
@@ -184,6 +187,11 @@ void visitStmtLet(Visitor* v, StmtLet s) {
 
 void visitStmtProc(Visitor* v, StmtProc s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
+        ana.curProc = s;
+
+        if (s.name == "_start" && s.returnType.kind != TypeKind.Never) {
+                err(format("Entry procedure _start must be marked as `Never` (!)"));
+        }
 
         Type[] paramTypes;
         foreach (param; s.params) {
@@ -201,11 +209,6 @@ void visitStmtProc(Visitor* v, StmtProc s) {
                 ana.currentScope.addSymbol(new Symbol(param.name, param.type, ana.currentScope));
         }
         s.block.accept(s.block, v);
-
-        // Epilogue: Restore stack (done in Return if present, or add default return)
-        if (s.returnType.name != "void") {
-                // Ensure return exists; add default if needed later
-        }
 
         ana.currentScope = oldScope;
 }
@@ -235,7 +238,11 @@ void visitStmtBlock(Visitor* v, StmtBlock s) {
 void visitStmtReturn(Visitor* v, StmtReturn s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         s.expr.accept(s.expr, v);
-        // Return type checked in StmtProc context (not here)
+        if (!isTypeCompatible(ana.curProc.returnType, s.expr.type)) {
+                if (ana.curProc.returnType.kind == TypeKind.Never) {
+                        err(format("Procedures marked as `never` (!) cannot have returns. Use `exit <expr>;` instead."));
+                }
+        }
 }
 
 void visitStmtIf(Visitor* v, StmtIf s) {
@@ -276,7 +283,9 @@ void visitStmtImport(Visitor* v, StmtImport s) {
 }
 
 void visitStmtExit(Visitor* v, StmtExit s) {
-        s.expr.accept(s.expr, v);
+        if (s.expr) {
+                s.expr.accept(s.expr, v);
+        }
 }
 
 // Expression Visitors
