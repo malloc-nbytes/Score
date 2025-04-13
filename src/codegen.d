@@ -132,8 +132,8 @@ class Context {
                 assert(sz == 4 || sz == 8);
                 const (Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
                 for (int i = 0; i < cast(int)regs.length; ++i) {
-                        if (!(genRegs & (1 << i))) {
-                                genRegs |= (1 << i);
+                        if (!(paramRegs & (1 << i))) {
+                                paramRegs |= (1 << i);
                                 if (sz == 8) {
                                         i += gParamRegs32.length;
                                 }
