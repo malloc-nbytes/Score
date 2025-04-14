@@ -25,16 +25,17 @@ fn get_test_files() {
 }
 
 fn cleanup() {
+    set_flag("-x");
     let files = sys::ls(".").filter(|k| {
         with parts = sys::name_and_ext(k) in
         return !parts[0]
             || (parts[1].unwrap() == "asm"
                 || parts[1].unwrap() == "o");
     });
-    log(f"Removing: {files}", Colors::Tfc.Yellow);
     foreach f in files {
         $f"rm {f}";
     }
+    unset_flag("-x");
 }
 
 fn run(exes) {
@@ -42,11 +43,11 @@ fn run(exes) {
     foreach e in exes {
         $f"./{e} || echo $?" |> let _out;
         if (len(_out) == 0) {
-            println(f"FAILED: {e}");
+            println(f"FAILED: {e} (no output)");
         } else {
             let out = int(_out);
             if (out != success) {
-                log(f"FAILED: {e}", Colors::Tfc.Red);
+                log(f"FAILED: {e} [exit code {out}]", Colors::Tfc.Red);
             } else {
                 log(f"PASSED: {e}", Colors::Tfc.Green);
             }
@@ -57,8 +58,6 @@ fn run(exes) {
 fn compile() {
     let files = get_test_files();
     let exes = [];
-
-    log(f"Compiling: {files}", Colors::Tfc.Yellow);
 
     foreach f in files {
         let stripped = sys::name_and_ext(f);
