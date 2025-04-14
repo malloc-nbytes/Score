@@ -2,11 +2,11 @@ build
 scr
 output
 input
-*.asm
-*.o
 
-# Ignore everything in src/tests
-/src/tests/*
+src/test/*
+src/test/!*.rl
+src/test/!*.scr
+src/test/!*/
 
 # Except .scr files
 !/src/tests/*.scr

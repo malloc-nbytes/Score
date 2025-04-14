@@ -5,6 +5,8 @@ import "std/io.rl"; as io
 import "std/colors.rl";
 
 ### This file is the test runner for the Score tests.
+### It is required that EARL is installed: https://github.com/malloc-nbytes/EARL/
+### No third-party modules need to be installed, just the StdLib.
 
 fn log(msg, c) {
     println(c, msg, Colors::Te.Reset);
@@ -43,7 +45,7 @@ fn run(exes) {
             println(f"FAILED: {e}");
         } else {
             let out = int(_out);
-            if (out != 69) {
+            if (out != success) {
                 log(f"FAILED: {e}", Colors::Tfc.Red);
             } else {
                 log(f"PASSED: {e}", Colors::Tfc.Green);
