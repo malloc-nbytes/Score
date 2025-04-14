@@ -101,7 +101,7 @@ class Context {
                 return stack[$-1];
         }
         void incrStack(size_t bytes) {
-                wrtln(format("add rsp, %d", bytes));
+                wrtln(format("sub rsp, %d", bytes));
                 stack[$-1] += bytes;
         }
         void pushStack() {
@@ -110,6 +110,16 @@ class Context {
         void popStack() {
                 assert(this.stack.length > 0);
                 stack.length--;
+        }
+        void pushHotRegisters() {
+                // for (size_t i = 0; i < gParamRegs64.length + gParamRegs32.length; ++i) {
+                //         if ((genRegs & (1 << i)) != 0) {
+                //                 wrtln(format("push %s", regToStr(cast(int)i)));
+                //         }
+                // }
+        }
+        void popHotRegisters() {
+                //assert(0);
         }
         string getRetReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
@@ -277,7 +287,23 @@ private void visitExprStructLit(Visitor* v, ExprStructLit e) {
 
 private void visitExprBin(Visitor* v, ExprBin e) {
         Context c = cast(Context)v.context;
-        assert(0);
+
+        e.left.accept(e.left, v);
+        int lreg = c.lastReg;
+        e.right.accept(e.right, v);
+        int rreg = c.lastReg;
+
+        switch (e.op) {
+        case "+": {
+                c.wrtln(format("add %s, %s", c.regToStr(lreg), c.regToStr(rreg)));
+        } break;
+        default: assert(0);
+        }
+
+        //c.freeReg(lreg);
+        c.freeReg(rreg);
+
+        c.lastReg = lreg;
 }
 
 private void visitExprUn(Visitor* v, ExprUn e) {
@@ -316,8 +342,11 @@ private void visitExprMut(Visitor* v, ExprMut e) {
 
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         Context c = cast(Context)v.context;
+
+        c.pushHotRegisters();
         e.call.accept(e.call, v);
         c.wrtln(format("call %s", c.regToStr(c.lastReg)));
+        c.popHotRegisters();
         c.freeReg(c.lastReg);
         int reg = c.allocReg(e.type.size);
         c.wrtln(format("mov %s, %s", c.regToStr(reg), c.getRetReg(e.type.size)));

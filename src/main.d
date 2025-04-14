@@ -1,10 +1,8 @@
 import std.stdio;
 //import std.file : readText, write, exists, remove;
-import std.file : readText;
+import std.file : readText, getSize;
 import std.process : execute;
 import core.stdc.stdlib : exit;
-
-import core.thread;
 
 import utils;
 import lexer;
@@ -46,25 +44,26 @@ int main(string[] args) {
         const string fp = flagParser.paths[0];
         const string src = readText(fp);
 
-        write("[xxxxxx] Lexing...\r"); stdout.flush();
+        write("[      ] Lexing...\r"); stdout.flush();
         Lexer l = lexFile(src, fp);
 
-        write("[*xxxxx] Parsing...\r"); stdout.flush();
+        write("[*     ] Parsing...\r"); stdout.flush();
         Program p = parseProgram(&l);
 
-        write("[**xxxx] Semantic...\r"); stdout.flush();
+        write("[**    ] Semantic...\r"); stdout.flush();
         SemanticAnalyzer ana = semanticAnalyze(p);
 
-        write("[***xxx] Codegen...\r"); stdout.flush();
+        write("[***   ] Codegen...\r"); stdout.flush();
         gen(p, outputName);
 
-        write("[****xx] Assembling...\r"); stdout.flush();
+        write("[****  ] Assembling...\r"); stdout.flush();
         nasm_assemble(outputName);
 
-        write("[*****x] Linking Executable...\r"); stdout.flush();
+        write("[***** ] Linking Executable...\r"); stdout.flush();
         ld(outputName);
 
-        writeln("                             \r[******] ", fp, " ok");
+        ulong size = getSize(outputName);
+        writeln("                             \r[******] ", fp, " ok (", size, " bytes)");
         return 0;
 }
 

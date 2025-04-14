@@ -113,16 +113,25 @@ private Visitor createVisitor(SemanticAnalyzer s) {
 bool isTypeCompatible(Type t1, Type t2) {
         bool isNumberAndPrim = (t1.kind == TypeKind.Primitive && t2.kind == TypeKind.Number)
                 || (t1.kind == TypeKind.Number && t2.kind == TypeKind.Primitive);
-        if (t1 is null || t2 is null) return false;
-        if (t1 is t2) return true;  // Same object
-        if (!isNumberAndPrim && t1.kind != t2.kind) return false;
+
+        if (t1.kind == TypeKind.Number && t2.kind == TypeKind.Number) {
+                return true;
+        }
+        if (t1 is null || t2 is null) {
+                return false;
+        }
+        if (t1 is t2) { // Same object
+                return true;
+        }
+        if (!isNumberAndPrim && t1.kind != t2.kind) {
+                return false;
+        }
 
         if (isNumberAndPrim && t1.kind == TypeKind.Number) {
-                t1 = t2;
+                //t1.size = t2.size;
                 return true;
         } else if (isNumberAndPrim && t2.kind == TypeKind.Number) {
-                // t2 = t1;
-                t2.size = t1.size;
+                //t2.size = t1.size;
                 return true;
         }
 
@@ -361,10 +370,10 @@ void visitExprBin(Visitor* v, ExprBin e) {
         }
         e.type = e.left.type;
         switch (e.op) {
-        case "+":
-        case "-":
-        case "*":
-        case "/":
+        case "+": break;
+        case "-": break;
+        case "*": break;
+        case "/": break;
         case "==":
                 e.type = new PrimitiveType("bool", 1);
                 break;

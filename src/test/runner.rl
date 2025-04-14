@@ -4,6 +4,8 @@ import "std/system.rl"; as sys
 import "std/io.rl"; as io
 import "std/colors.rl";
 
+set_flag("-e");
+
 ### This file is the test runner for the Score tests.
 ### It is required that EARL is installed: https://github.com/malloc-nbytes/EARL/
 ### No third-party modules need to be installed, just the StdLib.
@@ -25,7 +27,7 @@ fn get_test_files() {
 }
 
 fn cleanup() {
-    set_flag("-x");
+    # set_flag("-x");
     let files = sys::ls(".").filter(|k| {
         with parts = sys::name_and_ext(k) in
         return !parts[0]
@@ -35,7 +37,7 @@ fn cleanup() {
     foreach f in files {
         $f"rm {f}";
     }
-    unset_flag("-x");
+    # unset_flag("-x");
 }
 
 fn run(exes) {
