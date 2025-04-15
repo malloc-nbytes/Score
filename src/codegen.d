@@ -74,6 +74,7 @@ class Context {
         int lastReg;
         string[] globls;
         string outputName;
+        int[] pushedRegs;
         this(string outputName) {
                 this.file = File(outputName~".asm", "w");
                 this.stack = [0];
@@ -82,6 +83,7 @@ class Context {
                 lastReg = 0;
                 globls = [];
                 outputName = outputName;
+                pushedRegs = [];
         }
         ~this() {
                 if (file.isOpen) { file.close(); }
@@ -111,15 +113,25 @@ class Context {
                 assert(this.stack.length > 0);
                 stack.length--;
         }
-        void pushHotRegisters() {
-                // for (size_t i = 0; i < gParamRegs64.length + gParamRegs32.length; ++i) {
-                //         if ((genRegs & (1 << i)) != 0) {
-                //                 wrtln(format("push %s", regToStr(cast(int)i)));
-                //         }
-                // }
+        void pushHot64Registers() {
+                for (size_t i = 0; i < gParamRegs32.length; ++i) {
+                        if ((genRegs & (1 << i)) != 0) {
+                                wrtln(format("push %s", regToStr(cast(int)(i + gGenRegs32.length))));
+                                pushedRegs ~= cast(int)(i + gGenRegs32.length);
+                        }
+                }
+                for (size_t i = 0; i < gParamRegs64.length; ++i) {
+                        if ((genRegs & (1 << (i + gGenRegs32.length))) != 0) {
+                                wrtln(format("push %s", regToStr(cast(int)(i + gGenRegs32.length))));
+                                pushedRegs ~= cast(int)(i + gGenRegs32.length);
+                        }
+                }
         }
-        void popHotRegisters() {
-                //assert(0);
+        void popHot64Registers() {
+                for (size_t i = 0; i < pushedRegs.length; ++i) {
+                        wrtln(format("pop %s", regToStr(pushedRegs[i])));
+                }
+                pushedRegs = [];
         }
         string getRetReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
@@ -343,11 +355,25 @@ private void visitExprMut(Visitor* v, ExprMut e) {
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         Context c = cast(Context)v.context;
 
-        c.pushHotRegisters();
+        c.pushHot64Registers();
         e.call.accept(e.call, v);
-        c.wrtln(format("call %s", c.regToStr(c.lastReg)));
-        c.popHotRegisters();
-        c.freeReg(c.lastReg);
+        int callReg = c.lastReg;
+        // TODO: allow for more than 6 args
+        assert(e.args.length <= 6);
+        int[] paramRegs = [];
+        for (size_t i = 0; i < e.args.length; ++i) {
+                e.args[i].accept(e.args[i], v);
+                int lr = c.lastReg;
+                paramRegs ~= c.allocParamReg(e.args[i].type.size);
+                c.wrtln(format("mov %s, %s", c.regToStr(paramRegs[i]), c.regToStr(lr)));
+                c.freeReg(c.lastReg);
+        }
+        c.wrtln(format("call %s", c.regToStr(callReg)));
+        c.popHot64Registers();
+        c.freeReg(callReg);
+        for (size_t i = 0; i < paramRegs.length; ++i) {
+                c.freeReg(paramRegs[i]);
+        }
         int reg = c.allocReg(e.type.size);
         c.wrtln(format("mov %s, %s", c.regToStr(reg), c.getRetReg(e.type.size)));
 }
