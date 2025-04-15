@@ -91,7 +91,7 @@ class Context {
         bool[] paramRegs;
         int[] pushedRegs;
 
-        int lr; // last register used
+        int lru; // last register used
         string[] globls;
         string outputName;
 
@@ -166,7 +166,7 @@ class Context {
                 for (int i = cast(int)offset; i < cast(int)len + offset; ++i) {
                         if (!genRegs[i]) {
                                 genRegs[i] = true;
-                                lr = i;
+                                lru = i;
                                 return i;
                         }
                 }
@@ -188,6 +188,13 @@ class Context {
                 }
                 assert(0 && "out of registers");
         }
+        // Get a paremeter register. This function
+        // should be used at the entry of a function to alloc parameters.
+        // int getParamReg(size_t sz) {
+        //         // TODO: support 16bit a 8bit registers
+        //         assert(sz == 4 || sz == 8);
+        //         allocParamReg(sz);
+        // }
         void freeGenReg(int r) {
                 genRegs[r] = false;
         }
@@ -218,7 +225,7 @@ private void visitStmtExit(Visitor* v, StmtExit s) {
         c.wrtln(format("mov rax, 60"));
         if (s.expr) {
                 int reg = c.allocParamReg(s.expr.type.size);
-                c.wrtln(format("mov %s, %s", c.paramRegToStr(reg), c.regToStr(c.lr)));
+                c.wrtln(format("mov %s, %s", c.paramRegToStr(reg), c.regToStr(c.lru)));
                 c.freeParamReg(reg);
         } else {
                 c.wrtln("mov edi, 0");
@@ -234,8 +241,8 @@ private void visitStmtLet(Visitor* v, StmtLet s) {
         Context c = cast(Context)v.context;
         c.incrStack(s.type.size);
         s.expr.accept(s.expr, v);
-        c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lr)));
-        c.freeGenReg(c.lr);
+        c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lru)));
+        c.freeGenReg(c.lru);
 }
 
 private void visitStmtProc(Visitor* v, StmtProc s) {
@@ -245,6 +252,21 @@ private void visitStmtProc(Visitor* v, StmtProc s) {
         }
         c.wrtln(s.name ~ ":");
         c.prologue();
+
+        // TODO: support for more parameters
+        assert(s.params.length <= 6);
+
+        int[] pregs = [];
+
+        for (size_t i = 0; i < s.params.length; ++i) {
+                pregs ~= c.allocParamReg(s.params[i].type.size);
+                c.wrtln(format("mov [rbp-%d], %s; store param", s.params[i].type.size, c.paramRegToStr(pregs[i])));
+        }
+
+        for (size_t i = 0; i < pregs.length; ++i) {
+                c.freeParamReg(pregs[i]);
+        }
+
         s.block.accept(s.block, v);
 }
 
@@ -266,8 +288,8 @@ private void visitStmtReturn(Visitor* v, StmtReturn s) {
         Context c = cast(Context)v.context;
         s.expr.accept(s.expr, v);
         string retReg = c.getRetReg(s.expr.type.size);
-        c.wrtln(format("mov %s, %s", retReg, c.regToStr(c.lr)));
-        c.freeGenReg(c.lr);
+        c.wrtln(format("mov %s, %s", retReg, c.regToStr(c.lru)));
+        c.freeGenReg(c.lru);
         c.epilogue();
         c.wrtln("ret");
 }
@@ -311,9 +333,9 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         Context c = cast(Context)v.context;
 
         e.left.accept(e.left, v);
-        int lreg = c.lr;
+        int lreg = c.lru;
         e.right.accept(e.right, v);
-        int rreg = c.lr;
+        int rreg = c.lru;
 
         switch (e.op) {
         case "+": {
@@ -325,7 +347,7 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         //c.freeReg(lreg);
         c.freeGenReg(rreg);
 
-        c.lr = lreg;
+        c.lru = lreg;
 }
 
 private void visitExprUn(Visitor* v, ExprUn e) {
@@ -367,16 +389,16 @@ private void visitExprProcCall(Visitor* v, ExprProcCall e) {
 
         c.pushHot64Registers();
         e.call.accept(e.call, v);
-        int callReg = c.lr;
+        int callReg = c.lru;
         // TODO: allow for more than 6 args
         assert(e.args.length <= 6);
         int[] paramRegs = [];
         for (size_t i = 0; i < e.args.length; ++i) {
                 e.args[i].accept(e.args[i], v);
-                int lr = c.lr;
+                int lr = c.lru;
                 paramRegs ~= c.allocParamReg(e.args[i].type.size);
-                c.wrtln(format("mov %s, %s", c.regToStr(paramRegs[i]), c.regToStr(lr)));
-                c.freeGenReg(c.lr);
+                c.wrtln(format("mov %s, %s; parameter", c.paramRegToStr(paramRegs[i]), c.regToStr(lr)));
+                c.freeGenReg(c.lru);
         }
         c.wrtln(format("call %s", c.regToStr(callReg)));
         c.popHot64Registers();

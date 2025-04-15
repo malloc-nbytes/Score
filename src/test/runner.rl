@@ -1,3 +1,5 @@
+#!/usr/local/bin/earl
+
 module Runner
 
 import "std/system.rl"; as sys

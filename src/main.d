@@ -44,26 +44,26 @@ int main(string[] args) {
         const string fp = flagParser.paths[0];
         const string src = readText(fp);
 
-        write("[      ] Lexing...\r"); stdout.flush();
+        write("[      ] ", fp, " Lexing...\r"); stdout.flush();
         Lexer l = lexFile(src, fp);
 
-        write("[*     ] Parsing...\r"); stdout.flush();
+        write("\033[K[*     ] ", fp, " Parsing...\r"); stdout.flush();
         Program p = parseProgram(&l);
 
-        write("[**    ] Semantic...\r"); stdout.flush();
+        write("\033[K[**    ] ", fp, " Semantic...\r"); stdout.flush();
         SemanticAnalyzer ana = semanticAnalyze(p);
 
-        write("[***   ] Codegen...\r"); stdout.flush();
+        write("\033[K[***   ] ", fp, " Codegen...\r"); stdout.flush();
         gen(p, outputName);
 
-        write("[****  ] Assembling...\r"); stdout.flush();
+        write("\033[K[****  ] ", fp, " Assembling...\r"); stdout.flush();
         nasm_assemble(outputName);
 
-        write("[***** ] Linking Executable...\r"); stdout.flush();
+        write("\033[K[***** ] ", fp, " Linking Executable...\r"); stdout.flush();
         ld(outputName);
 
         ulong size = getSize(outputName);
-        writeln("                             \r[******] ", fp, " ok (", size, " bytes)");
+        writeln("\033[K[******] ", fp, " ok (", size, " bytes)");
         return 0;
 }
 
