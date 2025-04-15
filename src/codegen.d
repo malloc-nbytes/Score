@@ -58,32 +58,50 @@ enum Reg {
         R15B = "r15b",
 }
 
+//==================Registers====================================
+static const(Reg[]) gRegs64 = [Reg.RAX, Reg.RBX, Reg.RCX, Reg.RDX, Reg.RSI, Reg.RDI, Reg.R8, Reg.R9, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15];
+static const(Reg[]) gRegs32 = [Reg.EAX, Reg.EBX, Reg.ECX, Reg.EDX, Reg.ESI, Reg.EDI, Reg.R8D, Reg.R9D, Reg.R10D, Reg.R11D, Reg.R12D, Reg.R13D, Reg.R14D, Reg.R15D];
+static const(Reg[]) gRegs16 = [Reg.AX, Reg.BX, Reg.CX, Reg.DX, Reg.SI, Reg.DI, Reg.R8W, Reg.R9W, Reg.R10W, Reg.R11W, Reg.R12W, Reg.R13W, Reg.R14W, Reg.R15W];
+static const(Reg[]) gRegs8  = [Reg.AH, Reg.AL, Reg.BH, Reg.BL, Reg.CH, Reg.CL, Reg.DH, Reg.DL, Reg.R8B, Reg.R9B, Reg.R10B, Reg.R11B, Reg.R12B, Reg.R13B, Reg.R14B, Reg.R15B];
+//===============================================================
+
+//==================General Register====================================
 static const(Reg[]) gGenRegs64 = [Reg.RBX, Reg.R10, Reg.R11, Reg.R12, Reg.R13, Reg.R14, Reg.R15];
 static const(Reg[]) gGenRegs32 = [Reg.EBX, Reg.R10D, Reg.R11D, Reg.R12D, Reg.R13D, Reg.R14D, Reg.R15D];
+//=======================================================================
 
+//==================Parameter Registers====================================
 static const(Reg[]) gParamRegs64 = [Reg.RDI, Reg.RSI, Reg.RDX, Reg.RCX, Reg.R8, Reg.R9];
 static const(Reg[]) gParamRegs32 = [Reg.EDI, Reg.ESI, Reg.EDX, Reg.ECX, Reg.R8D, Reg.R9D];
-static const(Reg[]) gGenRegs = gGenRegs32 ~ gGenRegs64;
-static const(Reg[]) gParamRegs = gParamRegs32 ~ gParamRegs64;
+//=========================================================================
+
+static const(Reg[]) gAllGenRegs  = gGenRegs64 ~ gGenRegs32;
+static const size_t g64GenOffset = 0;
+static const size_t g32GenOffset = gGenRegs64.length;
+
+static const(Reg[]) gAllParamRegs = gParamRegs64 ~ gParamRegs32;
+static const size_t g64ParamOffset = 0;
+static const size_t g32ParamOffset = gParamRegs64.length;
 
 class Context {
         File file;
         size_t[] stack;
-        int genRegs;
-        int paramRegs;
-        int lastReg;
+
+        bool[] genRegs;
+        bool[] paramRegs;
+        int[] pushedRegs;
+
+        int lr; // last register used
         string[] globls;
         string outputName;
-        int[] pushedRegs;
+
         this(string outputName) {
                 this.file = File(outputName~".asm", "w");
                 this.stack = [0];
-                genRegs = 0x000000;
-                paramRegs = 0x000000;
-                lastReg = 0;
-                globls = [];
-                outputName = outputName;
+                for (size_t i = 0; i < gAllGenRegs.length; ++i) { genRegs ~= false; }
+                for (size_t i = 0; i < gAllParamRegs.length; ++i) { paramRegs ~= false; }
                 pushedRegs = [];
+                outputName = outputName;
         }
         ~this() {
                 if (file.isOpen) { file.close(); }
@@ -114,16 +132,18 @@ class Context {
                 stack.length--;
         }
         void pushHot64Registers() {
-                for (size_t i = 0; i < gParamRegs32.length; ++i) {
-                        if ((genRegs & (1 << i)) != 0) {
-                                wrtln(format("push %s", regToStr(cast(int)(i + gGenRegs32.length))));
-                                pushedRegs ~= cast(int)(i + gGenRegs32.length);
+                int offset = g32GenOffset;
+                for (size_t i = offset; i < gGenRegs32.length + offset; ++i) {
+                        if (genRegs[i]) {
+                                wrtln(format("push %s", regToStr(cast(int)i-offset)));
+                                pushedRegs ~= cast(int)i-offset;
                         }
                 }
-                for (size_t i = 0; i < gParamRegs64.length; ++i) {
-                        if ((genRegs & (1 << (i + gGenRegs32.length))) != 0) {
-                                wrtln(format("push %s", regToStr(cast(int)(i + gGenRegs32.length))));
-                                pushedRegs ~= cast(int)(i + gGenRegs32.length);
+                offset = 0;
+                for (size_t i = offset; i < gParamRegs64.length + offset; ++i) {
+                        if (genRegs[i]) {
+                                wrtln(format("push %s", regToStr(cast(int)i-offset)));
+                                pushedRegs ~= cast(int)i-offset;
                         }
                 }
         }
@@ -135,60 +155,50 @@ class Context {
         }
         string getRetReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
-                assert(sz == 8 || sz == 4);
-                if (sz == 8) {
-                        // lastReg = 0 + cast(int)gGenRegs32.length;
-                        return "rax";
-                } else {
-                        // lastReg = 0;
-                        return "eax";
-                }
-                // string res = sz == 8 ? "rax" : "eax";
+                string res = sz == 8 ? "rax" : "eax";
+                return res;
         }
         int allocReg(size_t sz) {
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 4 || sz == 8);
-                const(Reg[]) regs = (sz == 4) ? gGenRegs32 : gGenRegs64;
-                for (int i = 0; i < cast(int)regs.length; ++i) {
-                        int tmp = sz == 8 ? i+cast(int)gGenRegs32.length : i;
-                        if (!(genRegs & (1 << tmp))) {
-                                genRegs |= (1 << tmp);
-                                if (sz == 8) {
-                                        i = tmp;
-                                }
-                                lastReg = i;
+                size_t offset = sz == 8 ? g64GenOffset : g32GenOffset;
+                size_t len = sz == 8 ? gGenRegs64.length : gGenRegs32.length;
+                for (int i = cast(int)offset; i < cast(int)len + offset; ++i) {
+                        if (!genRegs[i]) {
+                                genRegs[i] = true;
+                                lr = i;
                                 return i;
                         }
                 }
                 assert(0 && "out of registers");
         }
         int allocParamReg(size_t sz) {
-                // IMPORTANT: we do not want to set lastReg here
+                // IMPORTANT: we do not want to set lr here
                 //            as it will conflict and mess up
                 //            the general purpose last used register.e
                 // TODO: support 16bit and 8bit registers
                 assert(sz == 4 || sz == 8);
-                const(Reg[]) regs = (sz == 4) ? gParamRegs32 : gParamRegs64;
-                for (int i = 0; i < cast(int)regs.length; ++i) {
-                        int tmp = sz == 8 ? i+cast(int)gParamRegs32.length : i;
-                        if (!(paramRegs & (1 << tmp))) {
-                                paramRegs |= (1 << tmp);
-                                if (sz == 8) {
-                                        i = tmp;
-                                }
+                size_t offset = sz == 8 ? g64ParamOffset : g32ParamOffset;
+                size_t len = sz == 8 ? gParamRegs64.length : gParamRegs32.length;
+                for (int i = cast(int)offset; i < cast(int)len + offset; ++i) {
+                        if (!paramRegs[i]) {
+                                paramRegs[i] = true;
                                 return i;
                         }
                 }
                 assert(0 && "out of registers");
         }
-        void freeReg(int r) {
-                genRegs &= ~(1 << r);
+        void freeGenReg(int r) {
+                genRegs[r] = false;
+        }
+        void freeParamReg(int r) {
+                paramRegs[r] = false;
         }
         string regToStr(int r) {
-                return gGenRegs[r];
+                return gAllGenRegs[r];
         }
         string paramRegToStr(int r) {
-                return gParamRegs[r];
+                return gAllParamRegs[r];
         }
         void prologue() {
                 wrtln("push rbp");
@@ -208,8 +218,8 @@ private void visitStmtExit(Visitor* v, StmtExit s) {
         c.wrtln(format("mov rax, 60"));
         if (s.expr) {
                 int reg = c.allocParamReg(s.expr.type.size);
-                c.wrtln(format("mov %s, %s", c.paramRegToStr(reg), c.regToStr(c.lastReg)));
-                c.freeReg(reg);
+                c.wrtln(format("mov %s, %s", c.paramRegToStr(reg), c.regToStr(c.lr)));
+                c.freeParamReg(reg);
         } else {
                 c.wrtln("mov edi, 0");
         }
@@ -224,8 +234,8 @@ private void visitStmtLet(Visitor* v, StmtLet s) {
         Context c = cast(Context)v.context;
         c.incrStack(s.type.size);
         s.expr.accept(s.expr, v);
-        c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lastReg)));
-        c.freeReg(c.lastReg);
+        c.wrtln(format("mov [rbp-%d], %s", s.offset, c.regToStr(c.lr)));
+        c.freeGenReg(c.lr);
 }
 
 private void visitStmtProc(Visitor* v, StmtProc s) {
@@ -256,8 +266,8 @@ private void visitStmtReturn(Visitor* v, StmtReturn s) {
         Context c = cast(Context)v.context;
         s.expr.accept(s.expr, v);
         string retReg = c.getRetReg(s.expr.type.size);
-        c.wrtln(format("mov %s, %s", retReg, c.regToStr(c.lastReg)));
-        c.freeReg(c.lastReg);
+        c.wrtln(format("mov %s, %s", retReg, c.regToStr(c.lr)));
+        c.freeGenReg(c.lr);
         c.epilogue();
         c.wrtln("ret");
 }
@@ -301,9 +311,9 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         Context c = cast(Context)v.context;
 
         e.left.accept(e.left, v);
-        int lreg = c.lastReg;
+        int lreg = c.lr;
         e.right.accept(e.right, v);
-        int rreg = c.lastReg;
+        int rreg = c.lr;
 
         switch (e.op) {
         case "+": {
@@ -313,9 +323,9 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         }
 
         //c.freeReg(lreg);
-        c.freeReg(rreg);
+        c.freeGenReg(rreg);
 
-        c.lastReg = lreg;
+        c.lr = lreg;
 }
 
 private void visitExprUn(Visitor* v, ExprUn e) {
@@ -357,22 +367,22 @@ private void visitExprProcCall(Visitor* v, ExprProcCall e) {
 
         c.pushHot64Registers();
         e.call.accept(e.call, v);
-        int callReg = c.lastReg;
+        int callReg = c.lr;
         // TODO: allow for more than 6 args
         assert(e.args.length <= 6);
         int[] paramRegs = [];
         for (size_t i = 0; i < e.args.length; ++i) {
                 e.args[i].accept(e.args[i], v);
-                int lr = c.lastReg;
+                int lr = c.lr;
                 paramRegs ~= c.allocParamReg(e.args[i].type.size);
                 c.wrtln(format("mov %s, %s", c.regToStr(paramRegs[i]), c.regToStr(lr)));
-                c.freeReg(c.lastReg);
+                c.freeGenReg(c.lr);
         }
         c.wrtln(format("call %s", c.regToStr(callReg)));
         c.popHot64Registers();
-        c.freeReg(callReg);
+        c.freeGenReg(callReg);
         for (size_t i = 0; i < paramRegs.length; ++i) {
-                c.freeReg(paramRegs[i]);
+                c.freeParamReg(paramRegs[i]);
         }
         int reg = c.allocReg(e.type.size);
         c.wrtln(format("mov %s, %s", c.regToStr(reg), c.getRetReg(e.type.size)));
