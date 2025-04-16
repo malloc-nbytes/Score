@@ -1,0 +1,16 @@
+proc b(n: i32): i32 {
+        return n;
+}
+
+proc a(n: i32): i32 {
+        if (n == 3) {
+                return 9;
+        } else if (n == 68) {
+                return b(n);
+        }
+        return 5;
+}
+
+export proc _start(void): ! {
+        exit a(68) + 1;
+}

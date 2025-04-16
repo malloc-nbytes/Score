@@ -37,7 +37,7 @@ fn cleanup() {
                 || parts[1].unwrap() == "o");
     });
     foreach f in files {
-        $f"rm {f}";
+        println(f"[RM] {f}"); $f"rm {f}";
     }
 }
 
