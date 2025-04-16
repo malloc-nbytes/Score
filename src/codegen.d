@@ -289,8 +289,11 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         } break;
         case "==": {
                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
-                c.wrtln("sete al");     // Set al to 1 if equal, 0 otherwise
-                c.wrtln("movzx rax, al"); // Zero-extend to 64-bit
+                // c.wrtln("sete al");     // Set al to 1 if equal, 0 otherwise
+                // c.wrtln("movzx rax, al"); // Zero-extend to 64-bit
+                Register* reg8bit = lreg.getSmallestReg();
+                c.wrtln(format("sete %s", reg8bit.name));
+                c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name));
         } break;
         default: assert(0);
         }

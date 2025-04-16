@@ -30,7 +30,6 @@ fn get_test_files() {
 }
 
 fn cleanup() {
-    # set_flag("-x");
     let files = sys::ls(".").filter(|k| {
         with parts = sys::name_and_ext(k) in
         return !parts[0]
@@ -40,7 +39,6 @@ fn cleanup() {
     foreach f in files {
         $f"rm {f}";
     }
-    # unset_flag("-x");
 }
 
 fn display_code_for_failed_file(fp) {
@@ -67,35 +65,46 @@ fn display_code_for_failed_file(fp) {
 }
 
 fn run(exes, show_asm) {
+    let passes, fails = (0, 0);
     @const let success = 69;
+    log("=== Running Tests ===", Colors::Te.Bold);
     foreach e in exes {
         $f"./{e} || echo $?" |> let _out;
         if (len(_out) == 0) {
-            println(f"FAILED: {e} (no output)");
+            println(f"└──FAILED: {e} (no output)");
+            fails += 1;
         } else {
             let out = int(_out);
             if (out != success) {
-                log(f"FAILED: {e} [exit code {out}]", Colors::Tfc.Red);
+                log(f"└──FAILED: {e} [exit code {out}]", Colors::Tfc.Red);
                 if (show_asm) {
                     display_code_for_failed_file(e);
                 }
+                fails += 1;
             } else {
-                log(f"PASSED: {e}", Colors::Tfc.Green);
+                log(f"└──PASSED: {e}", Colors::Tfc.Green);
+                passes += 1;
             }
         }
     }
+    log("=== End Running Tests ===", Colors::Te.Bold);
+    log("=== Results ===", Colors::Te.Bold);
+    log(f"Passed: {passes}", Colors::Te.Invert + Colors::Tfc.Green);
+    log(f"Failed: {fails}", Colors::Te.Invert + Colors::Tfc.Red);
 }
 
 fn compile() {
     let files = get_test_files();
     let exes = [];
 
+    log("=== Compiling ===", Colors::Te.Bold);
     foreach f in files {
         let stripped = sys::name_and_ext(f);
         let name = stripped[0].unwrap();
         $f"../scr -o {name} {f}";
         exes.append(name);
     }
+    log("=== End Compiling ===", Colors::Te.Bold);
 
     return exes;
 }

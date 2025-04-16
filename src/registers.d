@@ -34,6 +34,16 @@ struct Register {
                 this.name = name;
         }
 
+        // Get the smallest subset register associated
+        // to what this register is i.e., rax -> al.
+        Register* getSmallestReg() {
+                Register* it = &this;
+                while (it.down) { it = it.down; }
+                return it;
+        }
+
+        // Determine if this register or any subset
+        // of this register is currently in use.
         bool regInUse() {
                 if (inUse) { return true; }
                 Register* it = this.up;
@@ -49,6 +59,9 @@ struct Register {
                 return false;
         }
 
+        // Append a register to the right (the next register
+        // should have no association with this register
+        // except for the size).
         void append(Register** r) {
                 Register* it = this.next;
                 Register* p = &this;
@@ -60,6 +73,7 @@ struct Register {
                 p.next = it;
         }
 
+        // Append a subset to this register of size/2 size.
         void appendDown(Register** r) {
                 Register* it = this.down;
                 Register* p = &this;

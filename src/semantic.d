@@ -51,6 +51,8 @@ class SemanticAnalyzer {
         int tmpCount;
         size_t stackOffset;
         StmtProc curProc;
+        string[] errs;
+        bool ok;
 
         this() {
                 globalScope = new Scope(null);
@@ -58,6 +60,13 @@ class SemanticAnalyzer {
                 tmpCount = 0;
                 stackOffset = 0;
                 curProc = null;
+                errs = [];
+                ok = true;
+        }
+
+        void writeErr(string msg) {
+                errs ~= msg;
+                ok = false;
         }
 
         // Allocate stack space, return offset
@@ -239,6 +248,11 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         s.block.accept(s.block, v);
 
         ana.currentScope = oldScope;
+
+        bool procIsVoid = s.returnType.size == 0;
+        if ((!procIsVoid && s.block.stmts.length == 0) || (!procIsVoid && s.block.stmts[$-1].kind != StmtType.Return)) {
+                err(format("Procedure missing return final statement."));
+        }
 }
 
 void visitStmtExtern(Visitor* v, StmtExtern s) {
