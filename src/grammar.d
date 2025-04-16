@@ -253,9 +253,11 @@ class StmtBlock : Stmt {
 class Param {
         string name;
         Type type;
+        int address; // set during semantic
         this(string name, Type type) {
                 this.name = name;
                 this.type = type;
+                this.address = 0;
         }
 }
 

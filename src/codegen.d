@@ -62,6 +62,8 @@ class Context {
                 stack.length--;
         }
         void pushHot64Registers() {
+                // TODO: Make the registers in use temporarily
+                //       not in use.
                 Register* it = genRegs;
                 while (it) {
                         if (it.regInUse()) {
@@ -72,6 +74,7 @@ class Context {
                 }
         }
         void popHot64Registers() {
+                // TODO: Make the registers in be back in use.
                 Register* it = genRegs;
                 for (size_t i = 0; i < pushedRegs.length; ++i) {
                         wrtln(format("pop %s", pushedRegs[i].name));
@@ -153,7 +156,7 @@ private void visitStmtLet(Visitor* v, StmtLet s) {
         Context c = cast(Context)v.context;
         c.incrStack(s.type.size);
         s.expr.accept(s.expr, v);
-        c.wrtln(format("mov [rbp-%d], %s", s.offset, c.lru.name));
+        c.wrtln(format("mov [rbp-%d], %s; storing variable: %s", s.offset, c.lru.name, s.name));
         c.freeGenReg(c.lru);
 }
 
@@ -168,11 +171,19 @@ private void visitStmtProc(Visitor* v, StmtProc s) {
         // TODO: support for more parameters
         assert(s.params.length <= 6);
 
-        Register*[] pregs = [];
+        int rspAmnt = 0;
+        for (size_t i = 0; i < s.params.length; ++i) {
+                rspAmnt += s.params[i].address;
+        }
 
+        if (rspAmnt > 0) {
+                c.wrtln(format("sub rsp, %d", rspAmnt));
+        }
+
+        Register*[] pregs = [];
         for (size_t i = 0; i < s.params.length; ++i) {
                 pregs ~= c.allocParamReg(s.params[i].type.size);
-                c.wrtln(format("mov [rbp-%d], %s; store param", s.params[i].type.size, pregs[i].name));
+                c.wrtln(format("mov [rbp-%d], %s; store param", s.params[i].address, pregs[i].name));
         }
 
         for (size_t i = 0; i < pregs.length; ++i) {
@@ -259,6 +270,8 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         //c.freeReg(lreg);
         c.freeGenReg(rreg);
 
+        // TODO: Maybe we need to free c.lru since
+        //       we are reassigning it?
         c.lru = lreg;
 }
 

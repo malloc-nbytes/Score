@@ -229,9 +229,12 @@ void visitStmtProc(Visitor* v, StmtProc s) {
         ana.currentScope = new Scope(ana.currentScope);
         ana.resetStack();  // Reset stack offset for this function
 
-        // TODO: rspAlloc needs to account for proc parameters.
         foreach (i, param; s.params) {
-                ana.currentScope.addSymbol(new Symbol(param.name, param.type, ana.currentScope));
+                size_t offset = ana.allocStack(param.type.size);
+                Symbol sym = new Symbol(param.name, param.type, ana.currentScope);
+                sym.address = offset;
+                s.params[i].address = cast(int)offset;
+                ana.currentScope.addSymbol(sym);
         }
         s.block.accept(s.block, v);
 
@@ -365,6 +368,13 @@ void visitExprBin(Visitor* v, ExprBin e) {
 
         e.left.accept(e.left, v);
         e.right.accept(e.right, v);
+
+        if (e.left.type.kind == TypeKind.Primitive && e.right.type.kind == TypeKind.Number) {
+                e.right.type = e.left.type;
+        } else if (e.right.type.kind == TypeKind.Number && e.left.type.kind == TypeKind.Primitive) {
+                e.left.type = e.right.type;
+        }
+
         if (!isTypeCompatible(e.left.type, e.right.type)) {
                 err("binary op type mismatch");
         }
