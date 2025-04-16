@@ -25,6 +25,7 @@ struct Register {
         Register* down, up;
         bool inUse;
         string name;
+        bool pushed;
 
         this(string name, Register* next = null, Register* up = null, Register* down = null) {
                 this.next = next;
@@ -32,6 +33,17 @@ struct Register {
                 this.down = down;
                 this.inUse = false;
                 this.name = name;
+                this.pushed = false;
+        }
+
+        void push() {
+                pushed = true;
+                inUse = false;
+        }
+
+        void pop() {
+                pushed = false;
+                inUse = true;
         }
 
         // Get the smallest subset register associated

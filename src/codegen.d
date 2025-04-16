@@ -102,7 +102,7 @@ class Context {
         void popHot64Registers() {
                 // TODO: Make the registers in be back in use.
                 Register* it = genRegs;
-                for (size_t i = 0; i < pushedRegs.length; ++i) {
+                for (int i = cast(int)pushedRegs.length-1; i >= 0; --i) {
                         wrtln(format("pop %s", pushedRegs[i].name));
                 }
                 pushedRegs = [];
@@ -274,6 +274,7 @@ private void visitStmtWhile(Visitor* v, StmtWhile s) {
 private void visitStmtExpr(Visitor* v, StmtExpr s) {
         Context c = cast(Context)v.context;
         s.expr.accept(s.expr, v);
+        c.freeGenReg(c.lru);
 }
 
 private void visitStmtMod(Visitor* v, StmtMod s) {
@@ -391,29 +392,78 @@ private void visitExprMut(Visitor* v, ExprMut e) {
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         Context c = cast(Context)v.context;
 
+        // Save hot registers to preserve their state
         c.pushHot64Registers();
-        e.call.accept(e.call, v);
-        Register* callReg = c.lru;
-        // TODO: allow for more than 6 args
-        assert(e.args.length <= 6);
-        Register*[] paramRegs = [];
+
+        // Step 1: Evaluate all arguments first and store results in temporary registers
+        Register*[] argRegs;
         for (size_t i = 0; i < e.args.length; ++i) {
-                e.args[i].accept(e.args[i], v);
-                Register* lr = c.lru;
-                paramRegs ~= c.allocParamReg(e.args[i].type.size);
-                c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, lr.name));
-                c.freeGenReg(c.lru);
+                e.args[i].accept(e.args[i], v); // Evaluate argument
+                Register* lr = c.lru;           // Get the register holding the argument result
+                argRegs ~= lr;                  // Store the register for later use
+                // Note: Don't free lr yet, as we need its value
         }
-        c.wrtln("xor rax, rax");
+
+        // Step 2: Evaluate the function expression (e.g., function name or pointer)
+        e.call.accept(e.call, v);
+        Register* callReg = c.lru; // Register holding the function address
+
+        // Step 3: Move arguments to parameter registers
+        Register*[] paramRegs;
+        assert(e.args.length <= 6, "More than 6 arguments not supported");
+        for (size_t i = 0; i < e.args.length; ++i) {
+                paramRegs ~= c.allocParamReg(e.args[i].type.size);
+                c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, argRegs[i].name));
+                c.freeGenReg(argRegs[i]); // Free the temporary register after moving
+        }
+
+        // Step 4: Prepare and perform the function call
+        c.wrtln("xor rax, rax"); // Clear rax (no floating-point args)
         c.wrtln(format("call %s", callReg.name));
+
+        // Step 5: Restore hot registers and clean up
         c.popHot64Registers();
-        c.freeGenReg(callReg);
+        c.freeGenReg(callReg); // Free the function address register
         for (size_t i = 0; i < paramRegs.length; ++i) {
                 c.freeParamReg(paramRegs[i]);
         }
+
+        // Step 6: Store the return value
         Register* reg = c.allocGenReg(e.type.size);
         c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
+        c.lru = reg; // Update lru to the return value register
 }
+
+// private void visitExprProcCall(Visitor* v, ExprProcCall e) {
+//         Context c = cast(Context)v.context;
+
+//         c.pushHot64Registers();
+//         e.call.accept(e.call, v);
+//         Register* callReg = c.lru;
+
+//         // TODO: allow for more than 6 args
+//         assert(e.args.length <= 6);
+
+//         Register*[] paramRegs = [];
+
+//         for (size_t i = 0; i < e.args.length; ++i) {
+//                 e.args[i].accept(e.args[i], v);
+//                 Register* lr = c.lru;
+//                 paramRegs ~= c.allocParamReg(e.args[i].type.size);
+//                 c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, lr.name));
+//                 c.freeGenReg(c.lru);
+//         }
+
+//         c.wrtln("xor rax, rax");
+//         c.wrtln(format("call %s", callReg.name));
+//         c.popHot64Registers();
+//         c.freeGenReg(callReg);
+//         for (size_t i = 0; i < paramRegs.length; ++i) {
+//                 c.freeParamReg(paramRegs[i]);
+//         }
+//         Register* reg = c.allocGenReg(e.type.size);
+//         c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
+// }
 
 private Visitor createVisitor(Context c) {
         Visitor v;
