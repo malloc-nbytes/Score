@@ -3,6 +3,7 @@ module codegen;
 import std.stdio;
 import std.stdint;
 import std.format;
+import std.conv;
 
 import grammar;
 import semantic;
@@ -22,6 +23,7 @@ class Context {
         Register* lru; // Last register used
         string[] globls;
         string outputName;
+        int labelCounter;
 
         this(string outputName, Register* genStart, Register* paramStart, Register* resStart) {
                 this.file = File(outputName~".asm", "w");
@@ -32,9 +34,13 @@ class Context {
                 lru = null;
                 pushedRegs = [];
                 outputName = outputName;
+                labelCounter = 0;
         }
         ~this() {
                 if (file.isOpen) { file.close(); }
+        }
+        string genLabel() {
+                return ".L"~(labelCounter++).to!string;
         }
         void addGlobl(string name) {
                 wrtln(format("global %s", name));
@@ -219,7 +225,24 @@ private void visitStmtReturn(Visitor* v, StmtReturn s) {
 
 private void visitStmtIf(Visitor* v, StmtIf s) {
         Context c = cast(Context)v.context;
-        assert(0);
+        string elseLabel = c.genLabel();
+        string endLabel = c.genLabel();
+        s.expr.accept(s.expr, v);
+
+        c.wrtln(format("cmp %s, 0", c.lru.name));
+        c.wrtln(format("je %s", s.else_ !is null ? elseLabel : endLabel));
+
+        c.freeGenReg(c.lru);
+
+        s.then.accept(s.then, v);
+
+        if (s.else_ !is null) {
+                c.wrtln(format("jmp %s", endLabel));
+                c.wrtln(format("%s:", elseLabel));
+                s.else_.accept(s.else_, v);
+        }
+
+        c.wrtln(format("%s:", endLabel));
 }
 
 private void visitStmtWhile(Visitor* v, StmtWhile s) {
@@ -263,6 +286,11 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         switch (e.op) {
         case "+": {
                 c.wrtln(format("add %s, %s", lreg.name, rreg.name));
+        } break;
+        case "==": {
+                c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+                c.wrtln("sete al");     // Set al to 1 if equal, 0 otherwise
+                c.wrtln("movzx rax, al"); // Zero-extend to 64-bit
         } break;
         default: assert(0);
         }
