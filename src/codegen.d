@@ -274,6 +274,9 @@ private void visitStmtWhile(Visitor* v, StmtWhile s) {
 private void visitStmtExpr(Visitor* v, StmtExpr s) {
         Context c = cast(Context)v.context;
         s.expr.accept(s.expr, v);
+
+        // We are not using the result since
+        // since this is a statement expression.
         c.freeGenReg(c.lru);
 }
 
@@ -308,6 +311,9 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         switch (e.op) {
         case "+": {
                 c.wrtln(format("add %s, %s", lreg.name, rreg.name));
+        } break;
+        case "-": {
+                c.wrtln(format("sub %s, %s", lreg.name, rreg.name));
         } break;
         case "==": {
                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
@@ -433,37 +439,6 @@ private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
         c.lru = reg; // Update lru to the return value register
 }
-
-// private void visitExprProcCall(Visitor* v, ExprProcCall e) {
-//         Context c = cast(Context)v.context;
-
-//         c.pushHot64Registers();
-//         e.call.accept(e.call, v);
-//         Register* callReg = c.lru;
-
-//         // TODO: allow for more than 6 args
-//         assert(e.args.length <= 6);
-
-//         Register*[] paramRegs = [];
-
-//         for (size_t i = 0; i < e.args.length; ++i) {
-//                 e.args[i].accept(e.args[i], v);
-//                 Register* lr = c.lru;
-//                 paramRegs ~= c.allocParamReg(e.args[i].type.size);
-//                 c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, lr.name));
-//                 c.freeGenReg(c.lru);
-//         }
-
-//         c.wrtln("xor rax, rax");
-//         c.wrtln(format("call %s", callReg.name));
-//         c.popHot64Registers();
-//         c.freeGenReg(callReg);
-//         for (size_t i = 0; i < paramRegs.length; ++i) {
-//                 c.freeParamReg(paramRegs[i]);
-//         }
-//         Register* reg = c.allocGenReg(e.type.size);
-//         c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
-// }
 
 private Visitor createVisitor(Context c) {
         Visitor v;

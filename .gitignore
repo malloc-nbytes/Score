@@ -8,9 +8,17 @@ input
 # src/test/!*.scr
 # src/test/!*/
 
-src/test/*
-!src/test/*.rl
-!src/test/*.scr
+# src/test/*
+# !src/test/*.rl
+# !src/test/*.scr
+
+# Ignore all files in src/test and subdirectories
+src/test/**/*
+# Un-ignore directories under src/test
+!src/test/**/
+# Un-ignore .rl and .scr files in src/test and subdirectories
+!src/test/**/*.rl
+!src/test/**/*.scr
 
 # Except .scr files
 !/src/tests/*.scr

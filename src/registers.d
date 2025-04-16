@@ -2,23 +2,61 @@ module registers;
 
 import std.stdio;
 
-//=====================================================================================REGISTERS
-// calling order: rdi, rsi, rdx, rcx, r8, r9.
+// Information
+//   calling order: rdi, rsi, rdx, rcx, r8, r9.
+//   Links:
+//     https://math.hws.edu/eck/cs220/f22/registers.html
 
-// https://math.hws.edu/eck/cs220/f22/registers.html
-
-// 64 bit
-// rax, rbx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
-
-// 32 bit
-// eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-
-// 16 bit
-// ax, bx, cx, dx, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
-
-// 8 bit
-// (ah,al), (bh,bl), (ch,cl), (dh,dl), r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b
-//=====================================================================================END REGISTERS
+/*
+ * Register Setup of the Register Datastructure:
+ *
+ *              === General Purpose Registers ===
+ *
+ *                       `Register* next`
+ *   ------------------------------------------------------------>
+ *   r10  ->  r11  ->  rbx  ->  r12  ->  r13  ->  r14  ->  r15  |
+ *    |        |        |        |        |        |        |   |
+ *    v        v        v        v        v        v        v   |
+ *   r10d ->  r11d ->  ebx  ->  r12d ->  r13d ->  r14d ->  r15d |
+ *    |        |        |        |        |        |        |   |
+ *    v        v        v        v        v        v        v   | `Register* down'
+ *   r10w ->  r11w ->  bx   ->  r12w ->  r13w ->  r14w ->  r15w |
+ *    |        |        |        |        |        |        |   |
+ *    v        v        v        v        v        v        v   |
+ *   r10b ->  r11b ->  bl   ->  r12b ->  r13b ->  r14b ->  r15b |
+ *                                                              v
+ *             === Parameter Registers ===
+ *
+ *                  `Register* next`
+ *   ------------------------------------------------->
+ *   rdi  ->  rsi  ->  rdx  ->  rcx  ->  r8  ->  r9  |
+ *    |        |        |        |        |       |  |
+ *    v        v        v        v        v       v  |
+ *   edi  ->  esi  ->  edx  ->  ecx  ->  r8d ->  r9d |
+ *    |        |        |        |        |       |  | `Register* down'
+ *    v        v        v        v        v       v  |
+ *   di   ->  si   ->  dx   ->  cx   ->  r8w ->  r9w |
+ *    |        |        |        |        |       |  |
+ *    v        v        v        v        v       v  |
+ *   dil  ->  sil  ->  dl   ->  cl   ->  r8b ->  r9b |
+ *                                                   v
+ *
+ *             === Return Registers ===
+ *
+ * `Register* next`
+ *   ----->
+ *   rax |
+ *    |  |
+ *    v  |
+ *   eax |
+ *    |  |
+ *    v  | `Register* down'
+ *   ax  |
+ *    |  |
+ *    v  |
+ *   al  |
+ *       v
+ */
 
 struct Register {
         Register* next;
@@ -127,6 +165,7 @@ struct Register {
         }
 }
 
+// This builds the register data structure (see figure above Register definition).
 void buildRegisters(Register** r10, Register** rdi, Register** rax) {
         *r10 = new Register("r10");
         Register* r11 = new Register("r11");

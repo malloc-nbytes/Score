@@ -1,0 +1,6 @@
+proc sum(a: i32, b: i32): i32 { return a+b; }
+
+export proc _start(void): ! {
+        let res: i32 = sum(sum(sum(1, 2), 3), 10) + (69 - 16);
+        exit res;
+}
