@@ -1,0 +1,24 @@
+proc s(void): i32 {
+        return 3;
+}
+
+proc b(void): i32 {
+        return s();
+}
+
+proc a(void): i32 {
+        return b();
+}
+
+proc x(void): i32 {
+        let v: i32 = 3;
+        return v + 3;
+}
+
+proc f(void): i32 {
+        return 60;
+}
+
+export proc _start(void): ! {
+        exit f() + x() + a();
+}

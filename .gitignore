@@ -3,10 +3,14 @@ scr
 output
 input
 
+# src/test/*
+# src/test/!*.rl
+# src/test/!*.scr
+# src/test/!*/
+
 src/test/*
-src/test/!*.rl
-src/test/!*.scr
-src/test/!*/
+!src/test/*.rl
+!src/test/*.scr
 
 # Except .scr files
 !/src/tests/*.scr

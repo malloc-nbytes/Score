@@ -1,0 +1,4 @@
+export proc _start(void): ! {
+        let x: i64 = 60 + 5 + 4;
+        exit x;
+}

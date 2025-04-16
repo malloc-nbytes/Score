@@ -1,0 +1,15 @@
+proc y(void): i64 {
+        return 69;
+}
+
+proc x(void): i64 {
+        return y();
+}
+
+proc f(void): i64 {
+        return x();
+}
+
+export proc _start(void): ! {
+        exit f();
+}

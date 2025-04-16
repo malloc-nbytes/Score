@@ -1,0 +1,8 @@
+proc f(a: i32): i32 {
+        let x: i32 = a+1;
+        return x;
+}
+
+export proc _start(void): ! {
+        exit f(68);
+}

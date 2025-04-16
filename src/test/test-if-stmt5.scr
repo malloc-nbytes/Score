@@ -1,0 +1,13 @@
+export proc _start(void): ! {
+        let x: i32 = 3;
+
+        if (x == 1) {
+                exit 4;
+        } else if (x == 2) {
+                exit 5;
+        } else {
+                exit 69;
+        }
+
+        exit 3;
+}

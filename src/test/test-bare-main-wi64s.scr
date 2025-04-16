@@ -1,0 +1,30 @@
+export proc _start(void): ! {
+        let a: i64 =  1;
+        let b: i64 =  2;
+        let c: i64 =  3;
+        let d: i64 =  4;
+        let e: i64 =  5;
+        let f: i64 =  6;
+        let g: i64 =  7;
+        let h: i64 =  8;
+        let i: i64 =  9;
+        let j: i64 = 10;
+        let k: i64 = 11;
+        let l: i64 = 12;
+        let m: i64 = 13;
+        let n: i64 = 14;
+        let o: i64 = 15;
+        let p: i64 = 16;
+        let q: i64 = 17;
+        let r: i64 = 18;
+        let s: i64 = 19;
+        let t: i64 = 20;
+        let u: i64 = 21;
+        let v: i64 = 22;
+        let w: i64 = 23;
+        let x: i64 = 24;
+        let y: i64 = 25;
+        let z: i64 = 26;
+
+        exit 69;
+}

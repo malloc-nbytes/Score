@@ -1,0 +1,12 @@
+proc f(x: i64, y: i64, z: i32): i64 {
+        -- Do nothing with z, just here
+        -- for testing.
+        return x + y;
+}
+
+export proc _start(void): ! {
+        let a: i64 = 60;
+        let b: i64 = 8;
+        let res: i64 = f(a, b, 9) + 1;
+        exit res;
+}

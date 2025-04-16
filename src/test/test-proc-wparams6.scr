@@ -1,0 +1,14 @@
+proc f2(x: i32): i32 {
+        return x + 1;
+}
+
+proc f(a: i32, b: i32): i32 {
+        let res: i32 = f2(a) + b + 4;
+        return res;
+}
+
+export proc _start(void): ! {
+        let x: i32 = 34;
+        let y: i32 = 30;
+        exit f(x, y);
+}
