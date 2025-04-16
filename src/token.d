@@ -63,28 +63,28 @@ struct Token {
 }
 
 Token* tokenCreate(char[] lx, TokenType ty, size_t r, size_t c, string fp) {
-        // char[] result;
+        char[] result;
 
-        // for (size_t i = 0; i < lx.length; ++i) {
-        //         if (i < lx.length - 1 && lx[i] == '\\') {
-        //                 if (lx[i + 1] == 'n') {
-        //                         result ~= '\n';
-        //                         i++;
-        //                 } else if (lx[i + 1] == '\\') {
-        //                         result ~= '\\';
-        //                         i++;
-        //                 } else {
-        //                         err("unsupported escape sequence: '"~lx[i]~lx[i + 1]~"'");
-        //                         result ~= lx[i];
-        //                 }
-        //         } else {
-        //                 result ~= lx[i];
-        //         }
-        // }
+        for (size_t i = 0; i < lx.length; ++i) {
+                if (i < lx.length - 1 && lx[i] == '\\') {
+                        if (lx[i + 1] == 'n') {
+                                result ~= '\n';
+                                i++;
+                        } else if (lx[i + 1] == '\\') {
+                                result ~= '\\';
+                                i++;
+                        } else {
+                                err("unsupported escape sequence: '"~lx[i]~lx[i + 1]~"'");
+                                result ~= lx[i];
+                        }
+                } else {
+                        result ~= lx[i];
+                }
+        }
 
         Token* t = new Token;
-        // t.lx = result;
-        t.lx = lx;
+        t.lx = result;
+        // t.lx = lx;
         t.ty = ty;
         t.r = r;
         t.c = c;

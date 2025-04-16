@@ -251,7 +251,7 @@ void visitStmtProc(Visitor* v, StmtProc s) {
 
         bool procIsVoid = s.returnType.size == 0;
         if ((!procIsVoid && s.block.stmts.length == 0) || (!procIsVoid && s.block.stmts[$-1].kind != StmtType.Return)) {
-                err(format("Procedure missing return final statement."));
+                err(format("Non-(void/Never) procedure missing return final statement."));
         }
 }
 

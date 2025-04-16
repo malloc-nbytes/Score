@@ -60,7 +60,7 @@ int main(string[] args) {
         nasm_assemble(outputName);
 
         write("\033[K[***** ] ", fp, " Linking Executable...\r"); stdout.flush();
-        ld(outputName);
+        ld(outputName, (flagParser.flags & FlagType.Lc) != 0);
 
         ulong size = getSize(outputName);
         writeln("\033[K[******] ", fp, " ok (", size, " bytes)");

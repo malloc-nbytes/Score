@@ -87,7 +87,6 @@ fn run(exes, show_asm) {
             }
         }
     }
-    log("=== End Running Tests ===", Colors::Te.Bold);
     log("=== Results ===", Colors::Te.Bold);
     log(f"Passed: {passes}", Colors::Te.Invert + Colors::Tfc.Green);
     log(f"Failed: {fails}", Colors::Te.Invert + Colors::Tfc.Red);
@@ -104,7 +103,6 @@ fn compile() {
         $f"../scr -o {name} {f}";
         exes.append(name);
     }
-    log("=== End Compiling ===", Colors::Te.Bold);
 
     return exes;
 }

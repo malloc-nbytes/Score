@@ -14,12 +14,14 @@ public static const string FLAG_2HYPH_HELP = "--help";
 public static const string FLAG_2HYPH_OUTPUT = "--output";
 public static const string FLAG_2HYPH_SHOW_ASM = "--show-asm";
 public static const string FLAG_2HYPH_NO_CLEANUP = "--no-cleanup";
+public static const string FLAG_2HYPH_LC = "--lc";
 
 enum FlagType {
         Output = 1 << 0,
         ShowAsm = 1 << 1,
         NoCleanup = 1 << 2,
         Help = 1 << 3,
+        Lc = 1 << 4,
 }
 
 class FlagParser {
@@ -65,6 +67,11 @@ private void handleHelpFlag(FlagParser fp) {
         cast(void)fp.eat();
 }
 
+private void handleLcFlag(FlagParser fp) {
+        fp.flags |= FlagType.Lc;
+        cast(void)fp.eat();
+}
+
 FlagParser handleArgs(ref string[] args) {
         FlagParser fp = new FlagParser(args);
         while (fp.args.length > 0) {
@@ -76,6 +83,8 @@ FlagParser handleArgs(ref string[] args) {
                         handleNoCleanupFlag(fp);
                 } else if (fp.args[0] == FLAG_2HYPH_HELP || fp.args[0] == FLAG_1HYPH_HELP) {
                         handleHelpFlag(fp);
+                } else if (fp.args[0] == FLAG_2HYPH_LC) {
+                        handleLcFlag(fp);
                 } else if (fp.args[0][0] == '-') {
                         err("Unknown flag: " ~ fp.args[0]);
                         exit(1);

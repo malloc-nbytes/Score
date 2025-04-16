@@ -3,11 +3,22 @@ module assemble;
 import std.process;
 import std.stdio;
 import core.stdc.stdlib : exit;
+import std.typecons;
 
-void ld(string outputName) {
-        auto result = execute(["ld", "-o", outputName, outputName~".o"]);
-        if (result.status != 0) {
-                writeln("Could not link: ", outputName, ": ", result.output);
+void ld(string outputName, bool lc) {
+        int status;
+        string output;
+        if (lc) {
+                auto result = execute(["ld", "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-lc", "-o", outputName, outputName~".o"]);
+                status = result.status;
+                output = result.output;
+        } else {
+                auto result = execute(["ld", "-o", outputName, outputName~".o"]);
+                status = result.status;
+                output = result.output;
+        }
+        if (status != 0) {
+                writeln("Could not link: ", outputName, ": ", output);
                 exit(1);
         }
 }

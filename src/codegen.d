@@ -22,6 +22,8 @@ class Context {
 
         Register* lru; // Last register used
         string[] globls;
+        string[] externs;
+        string[] strs;
         string outputName;
         int labelCounter;
 
@@ -32,18 +34,36 @@ class Context {
                 paramRegs = paramStart;
                 resRegs = resStart;
                 lru = null;
+                globls = [];
+                externs = [];
+                strs = [];
                 pushedRegs = [];
                 outputName = outputName;
                 labelCounter = 0;
         }
         ~this() {
+                wrtln("section .data");
+                for (size_t i = 0; i < strs.length; ++i) {
+                        wrtln(strs[i]);
+                }
+                wrtln("section .note.GNU-stack");
                 if (file.isOpen) { file.close(); }
         }
         string genLabel() {
                 return ".L"~(labelCounter++).to!string;
         }
+        string genStrLabel() {
+                static int l = 0;
+                return ".s"~(l++).to!string;
+        }
         void addGlobl(string name) {
                 wrtln(format("global %s", name));
+        }
+        void addExtern(string name) {
+                wrtln(format("extern %s", name));
+        }
+        void addStr(string s) {
+                strs ~= s;
         }
         void wrtln(string s) {
                 file.writeln(s);
@@ -131,6 +151,7 @@ class Context {
         void prologue() {
                 wrtln("push rbp");
                 wrtln("mov rbp, rsp");
+                wrtln("sub rsp, 8");
         }
         void epilogue() {
                 wrtln("mov rsp, rbp");
@@ -201,7 +222,7 @@ private void visitStmtProc(Visitor* v, StmtProc s) {
 
 private void visitStmtExtern(Visitor* v, StmtExtern s) {
         Context c = cast(Context)v.context;
-        assert(0);
+        c.addExtern(s.name);
 }
 
 private void visitStmtBlock(Visitor* v, StmtBlock s) {
@@ -313,7 +334,34 @@ private void visitExprUn(Visitor* v, ExprUn e) {
 
 private void visitExprStrLit(Visitor* v, ExprStrLit e) {
         Context c = cast(Context)v.context;
-        assert(0);
+        static size_t strCount = 0;
+        string label = ".s" ~ strCount++.to!string;
+
+        string buf;
+
+        for (size_t i = 0; i < e.str.length; ++i) {
+                if (e.str[i] == '\n') {
+                        buf ~= "\", 10, \"";
+                } else {
+                        buf ~= e.str[i];
+                }
+        }
+
+        // Remove surrounding quotes from e.s.lx if present and combine with processed content
+        string rawStr = e.str.idup;
+        if (rawStr.length >= 2 && rawStr[0] == '"' && rawStr[$-1] == '"') {
+                rawStr = rawStr[1..$-1]; // Strip quotes
+        }
+
+        // Only wrap in quotes if there's content, and append null terminator
+        if (buf.length > 0) {
+                c.addStr(label ~ ": db \"" ~ buf ~ "\", 0");
+        } else {
+                c.addStr(label ~ ": db 0"); // Empty string case
+        }
+
+        Register* reg = c.allocGenReg(8);
+        c.wrtln(format("lea %s, [%s]", reg.name, label));
 }
 
 private void visitExprIntLit(Visitor* v, ExprIntLit e) {
@@ -356,6 +404,7 @@ private void visitExprProcCall(Visitor* v, ExprProcCall e) {
                 c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, lr.name));
                 c.freeGenReg(c.lru);
         }
+        c.wrtln("xor rax, rax");
         c.wrtln(format("call %s", callReg.name));
         c.popHot64Registers();
         c.freeGenReg(callReg);
