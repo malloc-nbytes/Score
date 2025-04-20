@@ -1,0 +1,9 @@
+export proc _start(void): ! {
+        let x: i32 = 0;
+
+        while (x < 69) {
+                x += 1;
+        }
+
+        exit x;
+}

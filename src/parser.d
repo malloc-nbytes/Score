@@ -417,7 +417,10 @@ private StmtIf parseStmtIf(Lexer* l) {
 }
 
 private StmtWhile parseStmtWhile(Lexer* l) {
-        assert(0);
+        lexerDiscard(l);
+        Expr e = parseExpr(l);
+        Stmt s = parseStmt(l);
+        return new StmtWhile(e, s);
 }
 
 private StmtStruct parseStmtStruct(Lexer* l) {

@@ -56,7 +56,7 @@ class Field {
         this(string name, Type type) {
                 this.name = name;
                 this.type = type;
-                this.offset = offset;
+                this.offset = 0;
         }
 }
 

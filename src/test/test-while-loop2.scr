@@ -1,0 +1,14 @@
+proc f(s: i32, e: i32): i32 {
+        while (s < e) {
+                s += 1;
+        }
+        return s;
+}
+
+export proc _start(void): ! {
+        if (f(0, 10) == 10) {
+                exit 69;
+        }
+
+        exit 8;
+}

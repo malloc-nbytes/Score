@@ -170,7 +170,8 @@ bool isTypeCompatible(Type t1, Type t2) {
 void visitStmtStruct(Visitor* v, StmtStruct s) {
         SemanticAnalyzer ana = cast(SemanticAnalyzer)v.context;
         Field[] fields;
-        foreach (fieldDecl; s.fields) {
+        size_t offset = 0;
+        foreach (i, fieldDecl; s.fields) {
                 fields ~= new Field(fieldDecl.name, fieldDecl.type);
         }
         Type structType = new StructType(s.name, fields);
@@ -197,6 +198,10 @@ void visitStmtLet(Visitor* v, StmtLet s) {
 
         if (s.type && s.expr.type && !isTypeCompatible(s.type, s.expr.type)) {
                 err(format("type mismatch in let: expected %s, got %s", s.type.name, s.expr.type.name));
+        }
+
+        if (s.type.size == 0) {
+                err(format("cannot allocate a variable of size 0"));
         }
 
         size_t offset = ana.allocStack(s.type.size);
@@ -398,6 +403,10 @@ void visitExprBin(Visitor* v, ExprBin e) {
         case "-": break;
         case "*": break;
         case "/": break;
+        case "%": break;
+        case "&&":
+        case ">":
+        case "<":
         case "==":
                 e.type = new PrimitiveType("bool", 1);
                 break;
@@ -468,6 +477,11 @@ void visitExprMut(Visitor* v, ExprMut e) {
         }
 
         switch (e.op) {
+        case "+=":
+        case "-=":
+        case "*=":
+        case "/=":
+        case "%=":
         case "=":
                 if (!isTypeCompatible(e.left.type, e.right.type)) {
                         err(format("assignment type mismatch: %s vs %s", e.left.type.name, e.right.type.name));

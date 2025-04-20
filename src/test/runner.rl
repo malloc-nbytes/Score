@@ -5,6 +5,7 @@ module Runner
 import "std/system.rl"; as sys
 import "std/io.rl"; as io
 import "std/colors.rl";
+import "std/utils.rl";
 
 set_flag("-e");
 
@@ -68,7 +69,8 @@ fn run(exes, show_asm) {
     let passes, fails = (0, 0);
     @const let success = 69;
     log("=== Running Tests ===", Colors::Te.Bold);
-    foreach e in exes {
+    for i in 0 to len(exes) {
+        let e = exes[i];
         $f"./{e} || echo $?" |> let _out;
         if (len(_out) == 0) {
             println(f"└──FAILED: {e} (no output)");
@@ -107,19 +109,77 @@ fn compile() {
     return exes;
 }
 
+enum Flag_Type {
+    Help = 1 << Utils::iota(),
+    Clean = 1 << Utils::iota(),
+    Show_Asm = 1 << Utils::iota(),
+    Test = 1 << Utils::iota(),
+}
+
+fn parse_args(args) {
+    let flags = 0x0;
+
+
+    let eat = |exp| {
+        let res = args[0];
+        if (exp.is_some() && res != exp.unwrap()) {
+            panic(f"expected {exp} but got {res}");
+        }
+        args = args[1:];
+        return res;
+    };
+
+    let consume_until = |s, until| {
+        let buf = "";
+        let i = 0;
+        while (s[i] != until) {
+            buf.append(s[i]);
+            i += 1;
+        }
+        return (buf, s.substr(i, len(s)));
+    };
+
+    let handle_help = |_| {
+        flags `|= Flag_Type.Help;
+        let _ = eat(none);
+    };
+
+    let handle_clean = |_| {
+        flags `|= Flag_Type.Clean;
+        let _ = eat(none);
+    };
+
+    let handle_asm = |_| {
+        flags `|= Flag_Type.Show_Asm;
+        let _ = eat(none);
+    };
+
+    let handle_test = |_| {
+        panic("test flag is unimplemented");
+    };
+
+    while len(args) > 0 {
+        with a = args[0] in
+        match a {
+            "help" -> { handle_help(); }
+            "clean" -> { handle_clean(); }
+            "asm" -> { handle_asm(); }
+            "test" -> { handle_test(); }
+            _ -> { panic(f"unknown flag: {a}"); }
+        }
+    }
+
+    return flags;
+}
+
 fn main() {
     let show_asm = false;
 
-    if (len(argv()) > 1) {
-        if (argv()[1] == "clean") {
-            cleanup();
-            exit(0);
-        } else if (argv()[1] == "asm") {
-            show_asm = true;
-        } else {
-            usage();
-        }
-    }
+    let flags = parse_args(argv()[1:]);
+
+    if (flags `& Flag_Type.Help) { usage(); }
+    if (flags `& Flag_Type.Clean) { cleanup(); exit(0); }
+    if (flags `& Flag_Type.Show_Asm) { show_asm = true; }
 
     cleanup();
     let exes = compile();

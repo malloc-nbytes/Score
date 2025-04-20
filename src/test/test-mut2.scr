@@ -1,0 +1,7 @@
+export proc _start(void): ! {
+        let x: i32 = 30;
+
+        x += 39;
+
+        exit x;
+}

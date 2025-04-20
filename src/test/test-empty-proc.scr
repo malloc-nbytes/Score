@@ -1,0 +1,6 @@
+proc f(void): void {}
+
+export proc _start(void): ! {
+        f();
+        exit 69;
+}

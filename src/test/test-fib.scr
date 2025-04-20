@@ -1,0 +1,14 @@
+proc fib(n: i32): i32 {
+        if (n < 2) { return n; }
+        return fib(n-1) + fib(n-2);
+}
+
+export proc _start(void): ! {
+        let res: i32 = fib(10);
+
+        if (fib(10) == 55) {
+                exit 69;
+        }
+
+        exit 0;
+}

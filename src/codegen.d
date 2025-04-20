@@ -159,6 +159,17 @@ class Context {
         }
 }
 
+private void compileLvalue(Visitor* v, Expr e) {
+        switch (e.kind) {
+        case ExprType.Ident: {
+                assert(0);
+        } break;
+        default: assert(0);
+        }
+
+        assert(0);
+}
+
 private void visitStmtExit(Visitor* v, StmtExit s) {
         Context c = cast(Context)v.context;
         if (s.expr) {
@@ -218,6 +229,11 @@ private void visitStmtProc(Visitor* v, StmtProc s) {
         }
 
         s.block.accept(s.block, v);
+
+        if (s.returnType.size == 0) {
+                c.epilogue();
+                c.wrtln("ret");
+        }
 }
 
 private void visitStmtExtern(Visitor* v, StmtExtern s) {
@@ -268,7 +284,32 @@ private void visitStmtIf(Visitor* v, StmtIf s) {
 
 private void visitStmtWhile(Visitor* v, StmtWhile s) {
         Context c = cast(Context)v.context;
-        assert(0);
+
+        string loopLabel = c.genLabel();
+        string endLabel = c.genLabel();
+
+        c.wrtln(format("%s:", loopLabel));
+
+        // Evaluate the condition expression
+        s.expr.accept(s.expr, v);
+        Register* condReg = c.lru;
+
+        // Check the condition
+        c.wrtln(format("cmp %s, 0", condReg.name));
+        c.wrtln(format("je %s", endLabel)); // Jump to end if condition is false (zero)
+
+        c.freeGenReg(condReg);
+
+        // Execute the loop body
+        c.pushStack();
+        s.stmt.accept(s.stmt, v);
+        c.popStack();
+
+        // Jump back to the loop start
+        c.wrtln(format("jmp %s", loopLabel));
+
+        // Emit the end label
+        c.wrtln(format("%s:", endLabel));
 }
 
 private void visitStmtExpr(Visitor* v, StmtExpr s) {
@@ -291,18 +332,91 @@ private void visitStmtImport(Visitor* v, StmtImport s) {
 }
 
 private void visitExprMember(Visitor* v, ExprMember e) {
-        Context c = cast(Context)v.context;
         assert(0);
 }
 
 private void visitExprStructLit(Visitor* v, ExprStructLit e) {
         Context c = cast(Context)v.context;
-        assert(0);
+
+        // Step 1: Allocate stack space for the struct
+        c.incrStack(e.type.size);
+        size_t baseOffset = c.getStack(); // Stack position after allocation
+
+        // Step 2: Evaluate each field initializer and store at the correct offset
+        foreach (field; e.fields) {
+                StructType structType = cast(StructType)e.type;
+                assert(structType !is null, "Struct type expected");
+                size_t fieldOffset = 0;
+                bool found = false;
+                foreach (f; structType.fields) {
+                        if (f.name == field.name) {
+                                fieldOffset = f.offset;
+                                found = true;
+                                break;
+                        }
+                }
+                assert(found, format("Field %s not found in struct %s", field.name, e.structName));
+
+                // Evaluate the field initializer expression
+                field.expr.accept(field.expr, v);
+                Register* reg = c.lru;
+
+                // Store at [rbp - (baseOffset - fieldOffset)]
+                c.wrtln(format("mov [rbp-%d], %s; store field %s", baseOffset - fieldOffset, reg.name, field.name));
+
+                c.freeGenReg(reg);
+        }
+
+        // Step 3: Store the struct's base address in lru for subsequent use
+        //Register* baseReg = c.allocGenReg(8);
+        //c.wrtln(format("lea %s, [rbp-%d]; base address of struct %s", baseReg.name, baseOffset, e.structName));
+        //c.lru = baseReg;
+        c.freeGenReg(c.lru);
 }
+
+// private void visitExprStructLit(Visitor* v, ExprStructLit e) {
+//         Context c = cast(Context)v.context;
+
+//         // Allocate stack space for the struct
+//         c.incrStack(e.type.size);
+//         size_t baseOffset = c.getStack(); // Current stack pointer offset
+
+//         // Evaluate each field initializer and store at the correct offset
+//         foreach (field; e.fields) {
+//                 // Find the field's offset within the struct
+//                 StructType structType = cast(StructType)e.type;
+//                 assert(structType !is null, "Struct type expected");
+//                 size_t fieldOffset = 0;
+//                 bool found = false;
+//                 foreach (f; structType.fields) {
+//                         if (f.name == field.name) {
+//                                 fieldOffset = f.offset;
+//                                 found = true;
+//                                 break;
+//                         }
+//                 }
+//                 assert(found, format("Field %s not found in struct %s", field.name, e.structName));
+
+//                 // Evaluate the field initializer expression
+//                 field.expr.accept(field.expr, v);
+//                 Register* reg = c.lru;
+
+//                 // Store the field value at [rbp - (baseOffset - fieldOffset)]
+//                 // Note: baseOffset is the stack position of the struct's base
+//                 c.wrtln(format("mov [rbp-%d], %s; store field %s", baseOffset - fieldOffset, reg.name, field.name));
+
+//                 // Free the register used for the field value
+//                 c.freeGenReg(reg);
+//         }
+
+//         // lru is null, since the struct is on the stack, not in a register
+//         c.lru = null;
+// }
 
 private void visitExprBin(Visitor* v, ExprBin e) {
         Context c = cast(Context)v.context;
 
+        // Evaluate left and right operands
         e.left.accept(e.left, v);
         Register* lreg = c.lru;
         e.right.accept(e.right, v);
@@ -315,24 +429,105 @@ private void visitExprBin(Visitor* v, ExprBin e) {
         case "-": {
                 c.wrtln(format("sub %s, %s", lreg.name, rreg.name));
         } break;
+        case "*": {
+                c.wrtln(format("imul %s, %s", lreg.name, rreg.name));
+        } break;
         case "==": {
                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
-                // c.wrtln("sete al");     // Set al to 1 if equal, 0 otherwise
-                // c.wrtln("movzx rax, al"); // Zero-extend to 64-bit
                 Register* reg8bit = lreg.getSmallestReg();
-                c.wrtln(format("sete %s", reg8bit.name));
-                c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name));
+                c.wrtln(format("sete %s", reg8bit.name)); // Set to 1 if equal, 0 otherwise
+                c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
         } break;
-        default: assert(0);
+        case ">": {
+                c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+                Register* reg8bit = lreg.getSmallestReg();
+                c.wrtln(format("setg %s", reg8bit.name)); // Set to 1 if left > right (signed), 0 otherwise
+                c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
+        } break;
+        case "<": {
+                c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+                Register* reg8bit = lreg.getSmallestReg();
+                c.wrtln(format("setl %s", reg8bit.name)); // Set to 1 if left < right (signed), 0 otherwise
+                c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
+        } break;
+        case "%": {
+                assert(0 && "unimplemented");
+        } break;
+        case "&&": {
+                // Logical AND: result is 1 if both operands are non-zero, 0 otherwise
+                c.wrtln(format("cmp %s, 0", lreg.name)); // Check if left is non-zero
+                c.wrtln(format("setne %s", lreg.getSmallestReg().name)); // Set to 1 if non-zero
+                c.wrtln(format("movzx %s, %s", lreg.name, lreg.getSmallestReg().name)); // Zero-extend
+                c.wrtln(format("cmp %s, 0", rreg.name)); // Check if right is non-zero
+                c.wrtln(format("setne %s", rreg.getSmallestReg().name)); // Set to 1 if non-zero
+                c.wrtln(format("movzx %s, %s", rreg.name, rreg.getSmallestReg().name)); // Zero-extend
+                c.wrtln(format("and %s, %s", lreg.name, rreg.name)); // AND the results
+        } break;
+        case "||": {
+                // Logical OR: result is 1 if either operand is non-zero, 0 otherwise
+                c.wrtln(format("cmp %s, 0", lreg.name)); // Check if left is non-zero
+                c.wrtln(format("setne %s", lreg.getSmallestReg().name)); // Set to 1 if non-zero
+                c.wrtln(format("movzx %s, %s", lreg.name, lreg.getSmallestReg().name)); // Zero-extend
+                c.wrtln(format("cmp %s, 0", rreg.name)); // Check if right is non-zero
+                c.wrtln(format("setne %s", rreg.getSmallestReg().name)); // Set to 1 if non-zero
+                c.wrtln(format("movzx %s, %s", rreg.name, rreg.getSmallestReg().name)); // Zero-extend
+                c.wrtln(format("or %s, %s", lreg.name, rreg.name)); // OR the results
+        } break;
+        default:
+                assert(0, format("Unsupported binary operator: %s", e.op));
         }
 
-        //c.freeReg(lreg);
+        // Free the right-hand side register
         c.freeGenReg(rreg);
 
-        // TODO: Maybe we need to free c.lru since
-        //       we are reassigning it?
+        // Set lru to the left register, which holds the result
         c.lru = lreg;
 }
+
+// private void visitExprBin(Visitor* v, ExprBin e) {
+//         Context c = cast(Context)v.context;
+
+//         // Evaluate left and right operands
+//         e.left.accept(e.left, v);
+//         Register* lreg = c.lru;
+//         e.right.accept(e.right, v);
+//         Register* rreg = c.lru;
+
+//         switch (e.op) {
+//         case "+": {
+//                 c.wrtln(format("add %s, %s", lreg.name, rreg.name));
+//         } break;
+//         case "-": {
+//                 c.wrtln(format("sub %s, %s", lreg.name, rreg.name));
+//         } break;
+//         case "==": {
+//                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+//                 Register* reg8bit = lreg.getSmallestReg();
+//                 c.wrtln(format("sete %s", reg8bit.name)); // Set to 1 if equal, 0 otherwise
+//                 c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
+//         } break;
+//         case ">": {
+//                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+//                 Register* reg8bit = lreg.getSmallestReg();
+//                 c.wrtln(format("setg %s", reg8bit.name)); // Set to 1 if left > right (signed), 0 otherwise
+//                 c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
+//         } break;
+//         case "<": {
+//                 c.wrtln(format("cmp %s, %s", lreg.name, rreg.name));
+//                 Register* reg8bit = lreg.getSmallestReg();
+//                 c.wrtln(format("setl %s", reg8bit.name)); // Set to 1 if left < right (signed), 0 otherwise
+//                 c.wrtln(format("movzx %s, %s", lreg.name, reg8bit.name)); // Zero-extend to full register
+//         } break;
+//         default:
+//                 assert(0, format("Unsupported binary operator: %s", e.op));
+//         }
+
+//         // Free the right-hand side register
+//         c.freeGenReg(rreg);
+
+//         // Set lru to the left register, which holds the result
+//         c.lru = lreg;
+// }
 
 private void visitExprUn(Visitor* v, ExprUn e) {
         Context c = cast(Context)v.context;
@@ -342,7 +537,7 @@ private void visitExprUn(Visitor* v, ExprUn e) {
 private void visitExprStrLit(Visitor* v, ExprStrLit e) {
         Context c = cast(Context)v.context;
         static size_t strCount = 0;
-        string label = ".s" ~ strCount++.to!string;
+        string label = "g_s" ~ strCount++.to!string;
 
         string buf;
 
@@ -386,13 +581,82 @@ private void visitExprIdent(Visitor* v, ExprIdent e) {
                 c.wrtln(format("mov %s, %s", reg.name, e.name));
         } else {
                 Register* reg = c.allocGenReg(e.type.size);
-                c.wrtln(format("mov %s, [rbp-%d]", reg.name, e.address));
+                if (e.type.kind == TypeKind.Struct) {
+                        c.wrtln(format("mov %s, rbp", reg.name));
+                } else {
+                        c.wrtln(format("mov %s, [rbp-%d]; here", reg.name, e.address));
+                }
         }
 }
 
 private void visitExprMut(Visitor* v, ExprMut e) {
         Context c = cast(Context)v.context;
-        assert(0);
+
+        // Step 1: Evaluate the right-hand side expression
+        e.right.accept(e.right, v);
+        Register* rreg = c.lru; // Register holding the result of the right expression
+
+        //compileLvalue(v, e.left);
+
+        // Step 2: Evaluate the left-hand side to get the target address and value
+        if (cast(ExprIdent)e.left) {
+                ExprIdent ident = cast(ExprIdent)e.left;
+
+                // For compound assignments, we need the current value of the left-hand side
+                Register* lreg = c.allocGenReg(e.left.type.size);
+                c.wrtln(format("mov %s, [rbp-%d]; load %s", lreg.name, ident.address, ident.name));
+
+                // Step 3: Perform the operation based on the operator
+                switch (e.op) {
+                case "=": {
+                        // Simple assignment: store right-hand side directly
+                        c.wrtln(format("mov [rbp-%d], %s; assign to %s", ident.address, rreg.name, ident.name));
+                } break;
+                case "+=": {
+                        c.wrtln(format("add %s, %s", lreg.name, rreg.name));
+                        c.wrtln(format("mov [rbp-%d], %s; store %s", ident.address, lreg.name, ident.name));
+                } break;
+                case "-=": {
+                        c.wrtln(format("sub %s, %s", lreg.name, rreg.name));
+                        c.wrtln(format("mov [rbp-%d], %s; store %s", ident.address, lreg.name, ident.name));
+                } break;
+                case "*=": {
+                        c.wrtln(format("imul %s, %s", lreg.name, rreg.name));
+                        c.wrtln(format("mov [rbp-%d], %s; store %s", ident.address, lreg.name, ident.name));
+                } break;
+                case "/=": {
+                        // Assuming signed division, dividend in rax, divisor in rreg
+                        Register* rax = c.allocGenReg(8); // Need rax for division
+                        c.wrtln(format("mov %s, %s", rax.name, lreg.name)); // Move dividend to rax
+                        c.wrtln("cqo"); // Sign-extend rax into rdx:rax
+                        c.wrtln(format("idiv %s", rreg.name)); // Divide by rreg, quotient in rax
+                        c.wrtln(format("mov %s, %s", lreg.name, rax.name)); // Move quotient back to lreg
+                        c.wrtln(format("mov [rbp-%d], %s; store %s", ident.address, lreg.name, ident.name));
+                        c.freeGenReg(rax);
+                } break;
+                case "%=": {
+                        // Modulo uses same setup as division
+                        Register* rax = c.allocGenReg(8); // Need rax for division
+                        c.wrtln(format("mov %s, %s", rax.name, lreg.name)); // Move dividend to rax
+                        c.wrtln("cqo"); // Sign-extend rax into rdx:rax
+                        c.wrtln(format("idiv %s", rreg.name)); // Divide by rreg, remainder in rdx
+                        c.wrtln(format("mov %s, %s", lreg.name, "rdx")); // Move remainder to lreg
+                        c.wrtln(format("mov [rbp-%d], %s; store %s", ident.address, lreg.name, ident.name));
+                        c.freeGenReg(rax);
+                } break;
+                default: {
+                        assert(0, format("Unsupported assignment operator: %s", e.op));
+                }
+                }
+
+                // Step 4: Clean up
+                c.freeGenReg(rreg); // Free the right-hand side register
+                c.lru = lreg;       // Retain lreg as the result (for chaining assignments)
+        }
+        else {
+                // Unsupported left-hand side (e.g., ExprMember)
+                assert(0, "Unsupported left-hand side in assignment");
+        }
 }
 
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
@@ -434,10 +698,12 @@ private void visitExprProcCall(Visitor* v, ExprProcCall e) {
                 c.freeParamReg(paramRegs[i]);
         }
 
-        // Step 6: Store the return value
-        Register* reg = c.allocGenReg(e.type.size);
-        c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
-        c.lru = reg; // Update lru to the return value register
+        if (e.type.size != 0) {
+                // Step 6: Store the return value
+                Register* reg = c.allocGenReg(e.type.size);
+                c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
+                c.lru = reg; // Update lru to the return value register
+        }
 }
 
 private Visitor createVisitor(Context c) {

@@ -1,0 +1,14 @@
+struct Point {
+        x: i32,
+        y: i32,
+}
+
+struct F {
+        k: i64,
+        i: u8*,
+        j: i32,
+}
+
+export proc _start(void): ! {
+        exit 69;
+}
