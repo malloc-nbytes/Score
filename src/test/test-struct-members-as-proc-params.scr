@@ -1,0 +1,19 @@
+struct Point {
+        x: i32,
+        y: i32,
+        z: i32,
+}
+
+proc sum(a: i32, b: i32): i32 {
+        return a+b;
+}
+
+export proc _start(void): ! {
+        let p: Point = Point {
+                x = 30,
+                y = 10,
+                z = 39,
+        };
+
+        exit sum(p.x, p.z);
+}

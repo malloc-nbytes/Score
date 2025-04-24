@@ -90,8 +90,16 @@ fn run(exes, show_asm) {
         }
     }
     log("=== Results ===", Colors::Te.Bold);
-    log(f"Passed: {passes}", Colors::Te.Invert + Colors::Tfc.Green);
-    log(f"Failed: {fails}", Colors::Te.Invert + Colors::Tfc.Red);
+    if (fails == 0) {
+        log(f"Passed: {passes}", Colors::Te.Invert + Colors::Tfc.Green);
+    } else {
+        log(f"Passed: {passes}", Colors::Te.Bold + Colors::Tfc.Green);
+    }
+    if (fails != 0) {
+        log(f"Failed: {fails}", Colors::Te.Invert + Colors::Tfc.Red);
+    } else {
+        log(f"Failed: {fails}", Colors::Te.Bold + Colors::Tfc.Red);
+    }
 }
 
 fn compile() {
