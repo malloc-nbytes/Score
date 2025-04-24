@@ -1,0 +1,17 @@
+struct Point {
+        x: i64,
+        z: i64,
+        y: i64,
+}
+
+export proc _start(void): ! {
+        let p: Point = Point {
+                x = 2,
+                z = 69,
+                y = 3,
+        };
+
+        let a: i64 = p.z;
+
+        exit a;
+}

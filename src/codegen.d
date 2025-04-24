@@ -192,9 +192,13 @@ private void visitStmtStruct(Visitor* v, StmtStruct s) {
 
 private void visitStmtLet(Visitor* v, StmtLet s) {
         Context c = cast(Context)v.context;
-        c.incrStack(s.type.size);
+        if (s.expr.type.kind != TypeKind.Struct) {
+                c.incrStack(s.type.size);
+        }
         s.expr.accept(s.expr, v);
-        c.wrtln(format("mov [rbp-%d], %s; storing variable: %s", s.offset, c.lru.name, s.name));
+        if (s.expr.type.kind != TypeKind.Struct) {
+                c.wrtln(format("mov [rbp-%d], %s; storing variable: %s", s.offset, c.lru.name, s.name));
+        }
         c.freeGenReg(c.lru);
 }
 
@@ -332,7 +336,23 @@ private void visitStmtImport(Visitor* v, StmtImport s) {
 }
 
 private void visitExprMember(Visitor* v, ExprMember e) {
-        assert(0);
+        Context c = cast(Context)v.context;
+        assert(e.left.type.kind == TypeKind.Struct);
+        e.left.accept(e.left, v);
+        StructType st = cast(StructType)e.left.type;
+        size_t offset = 0;
+        size_t fieldSz = 0;
+        for (size_t i = 0; i < st.fields.length; ++i) {
+                if (st.fields[i].name == e.right) {
+                        offset = st.fields[i].offset;
+                        fieldSz = st.fields[i].type.size;
+                        break;
+                }
+        }
+        Register* lastReg = c.lru;
+        Register* resReg = c.allocGenReg(fieldSz);
+        c.wrtln(format("mov %s, [%s+%d]", resReg.name, lastReg.name, offset));
+        c.freeGenReg(lastReg);
 }
 
 private void visitExprStructLit(Visitor* v, ExprStructLit e) {
@@ -579,13 +599,14 @@ private void visitExprIdent(Visitor* v, ExprIdent e) {
         if (e.type.kind == TypeKind.Proc) {
                 Register* reg = c.allocGenReg(8);
                 c.wrtln(format("mov %s, %s", reg.name, e.name));
+        } else if (e.type.kind == TypeKind.Struct) {
+                Register* reg = c.allocGenReg(8);
+                c.wrtln(format("sub rbp, %d", e.address));
+                c.wrtln(format("mov %s, rbp", reg.name));
+                c.wrtln(format("add rbp, %d", e.address));
         } else {
                 Register* reg = c.allocGenReg(e.type.size);
-                if (e.type.kind == TypeKind.Struct) {
-                        c.wrtln(format("mov %s, rbp", reg.name));
-                } else {
-                        c.wrtln(format("mov %s, [rbp-%d]; here", reg.name, e.address));
-                }
+                c.wrtln(format("mov %s, [rbp-%d]", reg.name, e.address));
         }
 }
 
