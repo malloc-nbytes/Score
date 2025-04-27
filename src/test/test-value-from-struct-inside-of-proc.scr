@@ -1,0 +1,17 @@
+struct F {
+        x: i32,
+        y: i32,
+}
+
+proc __f(void): i32 {
+        let f: F = F {
+                x = 69,
+                y = 3,
+        };
+
+        return f.x;
+}
+
+export proc _start(void): ! {
+        exit __f();
+}

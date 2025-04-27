@@ -1,0 +1,27 @@
+* TODO
+
+** Test Cases that Fail (when they shouldn't)
+
+1.
+   #+begin_src
+     extern printf(f: u8*, ...): i32;
+
+     struct F {
+             x: i32,
+             y: i32,
+     }
+
+     proc __f(void): i32 {
+             return (F {
+                     x = 69,
+                     y = 3,
+             }).x;
+     }
+
+     export proc _start(void): ! {
+             let x: i32 = __f();
+             printf("%d\n", x);
+             exit;
+     }
+   #+end_src
+
