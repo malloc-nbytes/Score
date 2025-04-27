@@ -187,13 +187,19 @@ void visitStmtLet(Visitor* v, StmtLet s) {
 
         s.expr.accept(s.expr, v);  // Populates s.expr.type and s.expr.temp
 
+        if (s.expr.type.kind == TypeKind.Number) {
+                if (s.type.name == "i64") {
+                        s.expr.type = new PrimitiveType("i64", 8);
+                }
+        }
+
         if (s.type) {
                 Symbol sym = ana.currentScope.lookup(s.type.name);
                 if (sym && sym.type.kind == TypeKind.Struct) {
                         s.type = sym.type;
                 }
         } else if (s.expr.type) {
-                s.type = s.expr.type;
+                // s.type = s.expr.type;
         }
 
         if (s.type && s.expr.type && !isTypeCompatible(s.type, s.expr.type)) {
@@ -471,6 +477,10 @@ void visitExprMut(Visitor* v, ExprMut e) {
 
         e.left.accept(e.left, v);
         e.right.accept(e.right, v);
+
+        if (e.right.type.kind == TypeKind.Number) {
+                e.right.type = e.left.type;
+        }
 
         if (!e.left.type || !e.right.type) {
                 err("mutation operands must have types");

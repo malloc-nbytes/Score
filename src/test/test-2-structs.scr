@@ -1,0 +1,25 @@
+struct A {
+        x: i32,
+        y: i32,
+}
+
+struct B {
+        a: i32,
+        b: i32,
+}
+
+export proc _start(void): ! {
+        let a: A = A {
+                x = 1,
+                y = 2,
+        };
+
+        let b: B = B {
+                a = 1,
+                b = 2,
+        };
+
+        let x: i32 = a.y + b.a + 65;
+
+        exit x+1;
+}
