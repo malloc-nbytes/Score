@@ -1,0 +1,15 @@
+struct F {
+        x: i32,
+        y: i32,
+}
+
+export proc _start(void): ! {
+        let f: F = F {
+                x = 30,
+                y = 38,
+        };
+
+        f.x += f.y + 1;
+
+        exit f.x;
+}

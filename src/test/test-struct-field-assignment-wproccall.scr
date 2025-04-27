@@ -1,0 +1,11 @@
+struct F { x: i32, }
+
+proc sum(a: i32, b: i32): i32 { return a + b; }
+
+export proc _start(void): ! {
+        let f: F = F {
+                x = sum(30, 39),
+        };
+
+        exit f.x;
+}
