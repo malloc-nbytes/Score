@@ -17,6 +17,10 @@ fn log(msg, c) {
     println(c, msg, Colors::Te.Reset);
 }
 
+fn info(msg) {
+    log(f"[INFO]: {msg}", Colors::Tfc.Yellow);
+}
+
 fn usage() {
     println("Usage: earl runner.earl -- [options...]");
     println("Options:");
@@ -169,10 +173,10 @@ fn parse_args(args) {
     while len(args) > 0 {
         with a = args[0] in
         match a {
-            "help" -> { handle_help(); }
+            "help"  -> { handle_help();  }
             "clean" -> { handle_clean(); }
-            "asm" -> { handle_asm(); }
-            "test" -> { handle_test(); }
+            "asm"   -> { handle_asm();   }
+            "test"  -> { handle_test();  }
             _ -> { panic(f"unknown flag: {a}"); }
         }
     }
@@ -189,9 +193,23 @@ fn main() {
     if (flags `& Flag_Type.Clean) { cleanup(); exit(0); }
     if (flags `& Flag_Type.Show_Asm) { show_asm = true; }
 
+    @const let persist_name = f"{__FILE__}/num_tests";
+    let num_tests = persist_lookup(persist_name);
+    if (!num_tests) {
+        num_tests = some(0);
+    } else {
+        num_tests = some(int(num_tests.unwrap()));
+    }
+
     cleanup();
     let exes = compile();
     run(exes, show_asm);
+
+    with M = format("(", len(exes), ") from last test run (", num_tests.unwrap(), ")")
+    in   if len(exes) > num_tests.unwrap() { info(f"New tests {M}"); }
+    else if len(exes) < num_tests.unwrap() { info(f"Removed tests {M}"); }
+
+    persist(persist_name, len(exes));
 }
 
 main();

@@ -1,0 +1,8 @@
+export proc _start(void): ! {
+    let s0: u8* = "hello";
+    let s1: u8* = "world";
+    let s3: u8* = "foo";
+    let s4: u8* = "bar";
+    let s5: u8* = "baz";
+    exit 69;
+}

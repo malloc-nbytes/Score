@@ -27,9 +27,7 @@ void usage() {
 }
 
 int main(string[] args) {
-        if (args.length < 2) {
-                usage();
-        }
+        if (args.length < 2) { usage(); }
 
         args = args[1..$];
 
@@ -44,26 +42,26 @@ int main(string[] args) {
         const string fp = flagParser.paths[0];
         const string src = readText(fp);
 
-        write("[      ] ", fp, " Lexing...\r"); stdout.flush();
+        write("[      ] ", fp, " Lexing...\r"), stdout.flush();
         Lexer l = lexFile(src, fp);
 
-        write("\033[K[*     ] ", fp, " Parsing...\r"); stdout.flush();
+        write("\033[K[*     ] ", fp, " Parsing...\r"), stdout.flush();
         Program p = parseProgram(&l);
 
-        write("\033[K[**    ] ", fp, " Semantic...\r"); stdout.flush();
+        write("\033[K[**    ] ", fp, " Semantic...\r"), stdout.flush();
         SemanticAnalyzer ana = semanticAnalyze(p);
 
-        write("\033[K[***   ] ", fp, " Codegen...\r"); stdout.flush();
+        write("\033[K[***   ] ", fp, " Codegen...\r"), stdout.flush();
         gen(p, outputName);
 
-        write("\033[K[****  ] ", fp, " Assembling...\r"); stdout.flush();
+        write("\033[K[****  ] ", fp, " Assembling...\r"), stdout.flush();
         nasm_assemble(outputName);
 
-        write("\033[K[***** ] ", fp, " Linking Executable...\r"); stdout.flush();
+        write("\033[K[***** ] ", fp, " Linking Executable...\r"), stdout.flush();
         ld(outputName, (flagParser.flags & FlagType.Lc) != 0);
 
         ulong size = getSize(outputName);
-        writeln("\033[K[******] ", fp, " ok (", size, " bytes)");
+        writeln("\033[K[******] ", fp, " ok (", size, " bytes)"), stdout.flush();
         return 0;
 }
 

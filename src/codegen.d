@@ -41,7 +41,8 @@ class Context {
                 outputName = outputName;
                 labelCounter = 0;
         }
-        ~this() {
+        ~this() {}
+        void wrtDataSection() {
                 wrtln("section .data");
                 for (size_t i = 0; i < strs.length; ++i) {
                         wrtln(strs[i]);
@@ -798,4 +799,5 @@ void gen(Program p, string outputName) {
         foreach (stmt; p.stmts) {
                 stmt.accept(stmt, &v);
         }
+        c.wrtDataSection();
 }

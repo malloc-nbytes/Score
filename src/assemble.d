@@ -30,7 +30,7 @@ void nasm_assemble(string outputName) {
                                outputName~".asm",
                                "-o", outputName~".o"]);
         if (result.status != 0) {
-                writeln("Could not assemble: ", outputName, ": ", result.output);
+                writeln("NASM: Could not assemble: ", outputName, ": ", result.output);
                 exit(1);
         }
 }

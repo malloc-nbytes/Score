@@ -1,0 +1,5 @@
+proc f(s: u8*): i32 { return 69; }
+
+export proc _start(void): ! {
+    exit f("foo");
+}

@@ -1,0 +1,6 @@
+proc f(s: u8*): i32 { return 69; }
+
+export proc _start(void): ! {
+    let s: u8* = "foo";
+    exit f(s);
+}
