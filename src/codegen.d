@@ -129,8 +129,45 @@ class Context {
                 }
                 assert(0 && "out of gen registers");
         }
-        Register* allocParamReg(size_t sz) {
-                assert(sz == 4 || sz == 8);
+        Register* allocParamReg(size_t sz, Type type) {
+                // Check if the parameter is a struct
+                if (type.kind == TypeKind.Struct) {
+                        StructType st = cast(StructType)type;
+                        assert(st !is null, "Struct type expected");
+
+                        // System V ABI: Structs ≤ 16 bytes are split into 8-byte chunks
+                        if (st.size <= 16) {
+                                Register*[] regs;
+                                size_t remaining = st.size;
+                                Register* it = paramRegs;
+
+                                // Allocate registers for each 8-byte chunk
+                                while (remaining > 0 && it) {
+                                        if (!it.regInUse()) {
+                                                it.inUse = true;
+                                                regs ~= it;
+                                                remaining -= 8; // Each register handles 8 bytes
+                                        }
+                                        it = it.next;
+                                }
+                                assert(remaining == 0, "Not enough parameter registers for struct");
+                                return regs.length == 1 ? regs[0] : null; // Return first register or null for multi-register
+                        } else {
+                                // For structs > 16 bytes, pass a pointer (8 bytes)
+                                Register* it = paramRegs;
+                                while (it) {
+                                        if (!it.regInUse()) {
+                                                it.inUse = true;
+                                                return it;
+                                        }
+                                        it = it.next;
+                                }
+                                assert(0, "Out of parameter registers for struct pointer");
+                        }
+                }
+
+                // Original logic for scalar types
+                assert(sz == 4 || sz == 8, "Invalid parameter register size");
                 Register* it = null;
                 if (sz == 8) { it = paramRegs; }
                 else if (sz == 4) { it = paramRegs.down; }
@@ -141,8 +178,23 @@ class Context {
                         }
                         it = it.next;
                 }
-                assert(0 && "out of param registers");
+                assert(0, "Out of parameter registers");
         }
+
+        // Register* allocParamReg(size_t sz) {
+        //         assert(sz == 4 || sz == 8);
+        //         Register* it = null;
+        //         if (sz == 8) { it = paramRegs; }
+        //         else if (sz == 4) { it = paramRegs.down; }
+        //         while (it) {
+        //                 if (!it.regInUse()) {
+        //                         it.inUse = true;
+        //                         return it;
+        //                 }
+        //                 it = it.next;
+        //         }
+        //         assert(0 && "out of param registers");
+        // }
         void freeGenReg(Register* r) {
                 r.inUse = false;
         }
@@ -250,22 +302,45 @@ private void visitStmtProc(Visitor* v, StmtProc s) {
         c.wrtln(s.name ~ ":");
         c.prologue();
 
-        // TODO: support for more parameters
-        assert(s.params.length <= 6);
-
+        // Calculate total stack space for parameters
         int rspAmnt = 0;
         for (size_t i = 0; i < s.params.length; ++i) {
-                rspAmnt += s.params[i].address;
+                rspAmnt += s.params[i].type.size; // Use actual size of the type
         }
 
         if (rspAmnt > 0) {
                 c.wrtln(format("sub rsp, %d", rspAmnt));
         }
 
+        // Store parameters
+        size_t offset = 0;
         Register*[] pregs = [];
         for (size_t i = 0; i < s.params.length; ++i) {
-                pregs ~= c.allocParamReg(s.params[i].type.size);
-                c.wrtln(format("mov [rbp-%d], %s; store param", s.params[i].address, pregs[i].name));
+                Type paramType = s.params[i].type;
+                size_t paramSize = paramType.size;
+
+                if (paramType.kind == TypeKind.Struct && paramSize <= 16) {
+                        // Struct passed in registers
+                        StructType st = cast(StructType)paramType;
+                        size_t remaining = paramSize;
+
+                        size_t currentOffset = offset;
+
+                        while (remaining > 0 && i < s.params.length) {
+                                Register* reg = c.allocParamReg(8, paramType); // Allocate 8-byte chunks
+                                pregs ~= reg;
+
+                                // Store each 8-byte chunk at the correct offset
+                                c.wrtln(format("mov [rbp-%d], %s; store struct param chunk", currentOffset, reg.name));
+                                currentOffset += 8;
+                                remaining -= 8;
+                        }
+                } else {
+                        // Non-struct or large struct (pointer)
+                        Register* reg = c.allocParamReg(paramSize, paramType);
+                        pregs ~= reg;
+                        c.wrtln(format("mov [rbp-%d], %s; store param", s.params[i].address, reg.name));
+                }
         }
 
         for (size_t i = 0; i < pregs.length; ++i) {
@@ -716,47 +791,72 @@ private void visitExprMut(Visitor* v, ExprMut e) {
 private void visitExprProcCall(Visitor* v, ExprProcCall e) {
         Context c = cast(Context)v.context;
 
-        // Save hot registers to preserve their state
         c.pushHot64Registers();
 
-        // Step 1: Evaluate all arguments first and store results in temporary registers
         Register*[] argRegs;
         for (size_t i = 0; i < e.args.length; ++i) {
-                e.args[i].accept(e.args[i], v); // Evaluate argument
-                Register* lr = c.lru;           // Get the register holding the argument result
-                argRegs ~= lr;                  // Store the register for later use
-                // Note: Don't free lr yet, as we need its value
+                e.args[i].accept(e.args[i], v);
+                Register* lr = c.lru;
+
+                if (e.args[i].type.kind == TypeKind.Struct && e.args[i].type.size <= 16) {
+                        StructType st = cast(StructType)e.args[i].type;
+                        size_t remaining = st.size;
+                        size_t offset = 0;
+
+                        while (remaining > 0) {
+                                Register* reg = c.allocGenReg(8);
+                                c.wrtln(format("mov %s, [rbp-%d+%d]; load struct chunk", reg.name, lr.address, offset));
+                                argRegs ~= reg;
+                                offset += 8;
+                                remaining -= 8;
+                        }
+                        c.freeGenReg(lr); // Free the struct's base address register
+                } else {
+                        argRegs ~= lr;
+                }
         }
 
-        // Step 2: Evaluate the function expression (e.g., function name or pointer)
         e.call.accept(e.call, v);
-        Register* callReg = c.lru; // Register holding the function address
+        Register* callReg = c.lru;
 
-        // Step 3: Move arguments to parameter registers
         Register*[] paramRegs;
         assert(e.args.length <= 6, "More than 6 arguments not supported");
+
+        size_t paramIdx = 0;
         for (size_t i = 0; i < e.args.length; ++i) {
-                paramRegs ~= c.allocParamReg(e.args[i].type.size);
-                c.wrtln(format("mov %s, %s; parameter", paramRegs[i].name, argRegs[i].name));
-                c.freeGenReg(argRegs[i]); // Free the temporary register after moving
+                Type argType = e.args[i].type;
+                if (argType.kind == TypeKind.Struct && argType.size <= 16) {
+                        StructType st = cast(StructType)argType;
+                        size_t remaining = st.size;
+
+                        while (remaining > 0 && paramIdx < 6) {
+                                paramRegs ~= c.allocParamReg(8, argType);
+                                c.wrtln(format("mov %s, %s; struct parameter chunk", paramRegs[paramIdx].name, argRegs[paramIdx].name));
+                                c.freeGenReg(argRegs[paramIdx]);
+                                paramIdx++;
+                                remaining -= 8;
+                        }
+                } else {
+                        paramRegs ~= c.allocParamReg(argType.size, argType);
+                        c.wrtln(format("mov %s, %s; parameter", paramRegs[paramIdx].name, argRegs[paramIdx].name));
+                        c.freeGenReg(argRegs[paramIdx]);
+                        paramIdx++;
+                }
         }
 
-        // Step 4: Prepare and perform the function call
-        c.wrtln("xor rax, rax"); // Clear rax (no floating-point args)
+        c.wrtln("xor rax, rax");
         c.wrtln(format("call %s", callReg.name));
 
-        // Step 5: Restore hot registers and clean up
         c.popHot64Registers();
-        c.freeGenReg(callReg); // Free the function address register
+        c.freeGenReg(callReg);
         for (size_t i = 0; i < paramRegs.length; ++i) {
                 c.freeParamReg(paramRegs[i]);
         }
 
         if (e.type.size != 0) {
-                // Step 6: Store the return value
                 Register* reg = c.allocGenReg(e.type.size);
                 c.wrtln(format("mov %s, %s", reg.name, c.getRetReg(e.type.size).name));
-                c.lru = reg; // Update lru to the return value register
+                c.lru = reg;
         }
 }
 
